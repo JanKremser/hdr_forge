@@ -1,0 +1,12 @@
+# Python dependencies
+python-ffmpeg>=2.0.0
+
+# EHDR also relies on external tools that must be installed separately:
+#
+# Required:
+#   - ffmpeg (video encoding)
+#   - ffprobe (metadata extraction, usually bundled with ffmpeg)
+#
+# Optional (Dolby Vision only):
+#   - x265 (10-bit version for Dolby Vision encoding)
+#   - dovi_tool (Dolby Vision metadata extraction)
