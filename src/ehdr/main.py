@@ -4,12 +4,19 @@ import argparse
 import subprocess
 import sys
 from pathlib import Path
-from typing import Callable, Dict, List, Optional
+from typing import Optional
 
-from ffmpeg import FFmpeg, Progress
+from ffmpeg import FFmpeg
 
 from . import __version__
+from .cli_output import create_progress_handler, print_conversion_summary
 from .dolby_vision import build_dolby_vision_params, extract_rpu
+from .encoding import (
+    build_ffmpeg_output_options,
+    determine_encoding_params,
+    determine_output_file,
+    get_video_files,
+)
 from .video import Video
 
 # Supported input video formats
@@ -17,132 +24,6 @@ SUPPORTED_FORMATS = ['.mkv', '.m2ts', '.ts', '.mp4']
 
 # Constants
 DOLBY_VISION_PROFILE = '8.1'
-SUMMARY_LINE_WIDTH = 60
-HDR_X265_PARAMS = [
-    'hdr-opt=1',
-    'repeat-headers=1',
-    'colorprim=bt2020',
-    'transfer=smpte2084',
-    'colormatrix=bt2020nc',
-]
-HDR_PIXEL_FORMAT = 'yuv420p10le'
-
-
-def format_time(seconds: float) -> str:
-    """Format seconds to HH:MM:SS.
-
-    Args:
-        seconds: Time in seconds
-
-    Returns:
-        Formatted time string
-    """
-    hours = int(seconds // 3600)
-    minutes = int((seconds % 3600) // 60)
-    secs = int(seconds % 60)
-    return f"{hours:02d}:{minutes:02d}:{secs:02d}"
-
-
-def create_progress_handler(duration: float) -> Callable[[Progress], None]:
-    """Create a progress handler for ffmpeg encoding.
-
-    Args:
-        duration: Total video duration in seconds
-
-    Returns:
-        Progress handler function
-    """
-    def on_progress(progress: Progress) -> None:
-        """Handle progress updates from ffmpeg."""
-        if progress.time and duration > 0:
-            # Convert timedelta to seconds if necessary
-            time_seconds = progress.time.total_seconds() if hasattr(progress.time, 'total_seconds') else float(progress.time)
-            percent = min((time_seconds / duration) * 100, 100)
-            time_str = format_time(time_seconds)
-            speed = progress.speed if progress.speed else 0
-
-            # Print progress on same line
-            print(
-                f"\rProgress: {percent:5.1f}% | Time: {time_str} | Speed: {speed:.2f}x", end='', flush=True)
-
-    return on_progress
-
-
-def determine_encoding_params(video: Video, crf: Optional[int], preset: Optional[str]) -> tuple[int, str]:
-    """Determine CRF and preset values (auto-calculate if not provided).
-
-    Args:
-        video: Video object with metadata
-        crf: User-specified CRF or None for auto
-        preset: User-specified preset or None for auto
-
-    Returns:
-        Tuple of (crf, preset)
-    """
-    if crf is None:
-        crf = video.get_auto_crf()
-        print(f"Auto CRF: {crf}")
-
-    if preset is None:
-        preset = video.get_auto_preset()
-        print(f"Auto preset: {preset}")
-
-    return crf, preset
-
-
-def build_hdr_x265_params(video: Video) -> List[str]:
-    """Build x265 parameters for HDR video encoding.
-
-    Args:
-        video: Video object with HDR metadata
-
-    Returns:
-        List of x265 parameter strings
-    """
-    params = HDR_X265_PARAMS.copy()
-
-    master_display = video.get_master_display()
-    if master_display:
-        params.append(f'master-display={master_display}')
-
-    return params
-
-
-def build_ffmpeg_output_options(
-    video: Video,
-    crf: int,
-    preset: str,
-    crop_filter: Optional[str] = None
-) -> Dict[str, str]:
-    """Build FFmpeg output options dictionary for encoding.
-
-    Args:
-        video: Video object with metadata
-        crf: Constant Rate Factor value
-        preset: Encoding preset
-        crop_filter: Optional crop filter string
-
-    Returns:
-        Dictionary of FFmpeg output options
-    """
-    output_options = {
-        'c:v': 'libx265',
-        'preset': preset,
-        'crf': str(crf),
-        'c:a': 'copy',
-        'c:s': 'copy'
-    }
-
-    if video.is_hdr_video():
-        print("HDR video detected")
-        x265_params = build_hdr_x265_params(video)
-        output_options['pix_fmt'] = HDR_PIXEL_FORMAT
-        output_options['x265-params'] = ':'.join(x265_params)
-
-    if crop_filter:
-        output_options['vf'] = crop_filter
-
-    return output_options
 
 
 def parse_args():
@@ -207,27 +88,6 @@ Examples:
     )
 
     return parser.parse_args()
-
-
-def get_video_files(path: Path) -> List[Path]:
-    """Get list of video files from path.
-
-    Args:
-        path: File or directory path
-
-    Returns:
-        List of video file paths
-    """
-    if path.is_file():
-        return [path] if path.suffix.lower() in SUPPORTED_FORMATS else []
-
-    if path.is_dir():
-        video_files = []
-        for fmt in SUPPORTED_FORMATS:
-            video_files.extend(path.glob(f'*{fmt}'))
-        return sorted(video_files)
-
-    return []
 
 
 def convert_sdr_hdr10(
@@ -392,37 +252,6 @@ def convert_dolby_vision(
         return False
 
 
-def print_conversion_summary(success_count: int, fail_count: int) -> None:
-    """Print conversion summary.
-
-    Args:
-        success_count: Number of successful conversions
-        fail_count: Number of failed conversions
-    """
-    separator = '=' * SUMMARY_LINE_WIDTH
-    print(f"\n{separator}")
-    print("Conversion complete:")
-    print(f"  Success: {success_count}")
-    print(f"  Failed:  {fail_count}")
-    print(separator)
-
-
-def determine_output_file(video_file: Path, output_path: Path, is_batch: bool) -> Path:
-    """Determine output file path for a video file.
-
-    Args:
-        video_file: Input video file
-        output_path: Output path (file or directory)
-        is_batch: Whether this is batch processing
-
-    Returns:
-        Output file path
-    """
-    if is_batch:
-        return output_path / video_file.with_suffix('.mkv').name
-    return output_path
-
-
 def main() -> None:
     """Main entry point for CLI."""
     args = parse_args()
@@ -436,7 +265,7 @@ def main() -> None:
         sys.exit(1)
 
     # Get list of video files to process
-    video_files = get_video_files(input_path)
+    video_files = get_video_files(input_path, SUPPORTED_FORMATS)
 
     if not video_files:
         print(f"Error: No supported video files found in: {input_path}")
