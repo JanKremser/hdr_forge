@@ -4,7 +4,7 @@ import argparse
 import subprocess
 import sys
 from pathlib import Path
-from typing import List, Optional
+from typing import Callable, Dict, List, Optional
 
 from ffmpeg import FFmpeg, Progress
 
@@ -14,6 +14,18 @@ from .video import Video
 
 # Supported input video formats
 SUPPORTED_FORMATS = ['.mkv', '.m2ts', '.ts', '.mp4']
+
+# Constants
+DOLBY_VISION_PROFILE = '8.1'
+SUMMARY_LINE_WIDTH = 60
+HDR_X265_PARAMS = [
+    'hdr-opt=1',
+    'repeat-headers=1',
+    'colorprim=bt2020',
+    'transfer=smpte2084',
+    'colormatrix=bt2020nc',
+]
+HDR_PIXEL_FORMAT = 'yuv420p10le'
 
 
 def format_time(seconds: float) -> str:
@@ -31,7 +43,7 @@ def format_time(seconds: float) -> str:
     return f"{hours:02d}:{minutes:02d}:{secs:02d}"
 
 
-def create_progress_handler(duration: float):
+def create_progress_handler(duration: float) -> Callable[[Progress], None]:
     """Create a progress handler for ffmpeg encoding.
 
     Args:
@@ -40,7 +52,7 @@ def create_progress_handler(duration: float):
     Returns:
         Progress handler function
     """
-    def on_progress(progress: Progress):
+    def on_progress(progress: Progress) -> None:
         """Handle progress updates from ffmpeg."""
         if progress.time and duration > 0:
             # Convert timedelta to seconds if necessary
@@ -54,6 +66,83 @@ def create_progress_handler(duration: float):
                 f"\rProgress: {percent:5.1f}% | Time: {time_str} | Speed: {speed:.2f}x", end='', flush=True)
 
     return on_progress
+
+
+def determine_encoding_params(video: Video, crf: Optional[int], preset: Optional[str]) -> tuple[int, str]:
+    """Determine CRF and preset values (auto-calculate if not provided).
+
+    Args:
+        video: Video object with metadata
+        crf: User-specified CRF or None for auto
+        preset: User-specified preset or None for auto
+
+    Returns:
+        Tuple of (crf, preset)
+    """
+    if crf is None:
+        crf = video.get_auto_crf()
+        print(f"Auto CRF: {crf}")
+
+    if preset is None:
+        preset = video.get_auto_preset()
+        print(f"Auto preset: {preset}")
+
+    return crf, preset
+
+
+def build_hdr_x265_params(video: Video) -> List[str]:
+    """Build x265 parameters for HDR video encoding.
+
+    Args:
+        video: Video object with HDR metadata
+
+    Returns:
+        List of x265 parameter strings
+    """
+    params = HDR_X265_PARAMS.copy()
+
+    master_display = video.get_master_display()
+    if master_display:
+        params.append(f'master-display={master_display}')
+
+    return params
+
+
+def build_ffmpeg_output_options(
+    video: Video,
+    crf: int,
+    preset: str,
+    crop_filter: Optional[str] = None
+) -> Dict[str, str]:
+    """Build FFmpeg output options dictionary for encoding.
+
+    Args:
+        video: Video object with metadata
+        crf: Constant Rate Factor value
+        preset: Encoding preset
+        crop_filter: Optional crop filter string
+
+    Returns:
+        Dictionary of FFmpeg output options
+    """
+    output_options = {
+        'c:v': 'libx265',
+        'preset': preset,
+        'crf': str(crf),
+        'c:a': 'copy',
+        'c:s': 'copy'
+    }
+
+    if video.is_hdr_video():
+        print("HDR video detected")
+        x265_params = build_hdr_x265_params(video)
+        output_options['pix_fmt'] = HDR_PIXEL_FORMAT
+        output_options['x265-params'] = ':'.join(x265_params)
+
+    if crop_filter:
+        output_options['vf'] = crop_filter
+
+    return output_options
 
 
 def parse_args():
@@ -167,6 +256,7 @@ def convert_sdr_hdr10(
         video = Video(str(input_file))
 
         # Detect crop if enabled
+        crop_filter = None
         if enable_crop:
             print("Detecting black bars...")
             video.crop_video()
@@ -177,71 +267,26 @@ def convert_sdr_hdr10(
                 print("No cropping needed")
 
         # Determine CRF and preset
-        if crf is None:
-            crf = video.get_auto_crf()
-            print(f"Auto CRF: {crf}")
+        crf, preset = determine_encoding_params(video, crf, preset)
 
-        if preset is None:
-            preset = video.get_auto_preset()
-            print(f"Auto preset: {preset}")
-
-        # Build ffmpeg command using python-ffmpeg
+        # Build ffmpeg command
         ffmpeg = FFmpeg()
-        ffmpeg.option('y')  # Overwrite output files
+        ffmpeg.option('y')
         ffmpeg.input(str(input_file))
 
-        # Build output options dictionary
-        output_options = {
-            'c:v': 'libx265',
-            'preset': preset,
-            'crf': str(crf),
-            'c:a': 'copy',
-            'c:s': 'copy'
-        }
-
-        # Add HDR parameters if video is HDR
-        if video.is_hdr_video():
-            x265_params = []
-            print("HDR video detected")
-            x265_params.extend([
-                'hdr-opt=1',
-                'repeat-headers=1',
-                'colorprim=bt2020',
-                'transfer=smpte2084',
-                'colormatrix=bt2020nc',
-            ])
-
-            # Add master display metadata
-            master_display = video.get_master_display()
-            if master_display:
-                x265_params.append(f'master-display={master_display}')
-
-            # Set pixel format for 10-bit
-            output_options['pix_fmt'] = 'yuv420p10le'
-
-            # Add x265 parameters
-            output_options['x265-params'] = ':'.join(x265_params)
-
-        # Apply crop filter if needed
-        if enable_crop:
-            crop_filter = video.get_crop_filter()
-            if crop_filter:
-                output_options['vf'] = crop_filter
-
-        # Output file with all options
+        # Build output options
+        output_options = build_ffmpeg_output_options(video, crf, preset, crop_filter)
         ffmpeg.output(str(output_file), output_options)
 
         print(f"Encoding to: {output_file.name}")
 
-        # Get video duration for progress calculation
+        # Execute with progress tracking
         duration = float(video.metadata.get('format', {}).get('duration', 0))
-
-        # Run ffmpeg with progress handler
         if duration > 0:
             progress_handler = create_progress_handler(duration)
             ffmpeg.on('progress', progress_handler)
             ffmpeg.execute()
-            print()  # New line after progress
+            print()
         else:
             ffmpeg.execute()
 
@@ -280,19 +325,13 @@ def convert_dolby_vision(
         rpu_file = extract_rpu(str(input_file))
 
         # Determine CRF and preset
-        if crf is None:
-            crf = video.get_auto_crf()
-            print(f"Auto CRF: {crf}")
-
-        if preset is None:
-            preset = video.get_auto_preset()
-            print(f"Auto preset: {preset}")
+        crf, preset = determine_encoding_params(video, crf, preset)
 
         # Build x265 parameters
         x265_params = build_dolby_vision_params(video, crf, preset)
         x265_params.append('log-level=error')
         x265_params.append(f'dolby-vision-rpu={rpu_file}')
-        x265_params.append('dolby-vision-profile=8.1')
+        x265_params.append(f'dolby-vision-profile={DOLBY_VISION_PROFILE}')
 
         # Build ffmpeg to x265 pipeline
         ffmpeg_cmd = [
@@ -338,7 +377,7 @@ def convert_dolby_vision(
         _, stderr = x265_process.communicate()
 
         if x265_process.returncode != 0:
-            print(f"Error: x265 encoding failed")
+            print("Error: x265 encoding failed")
             print(stderr)
             return False
 
@@ -353,7 +392,38 @@ def convert_dolby_vision(
         return False
 
 
-def main():
+def print_conversion_summary(success_count: int, fail_count: int) -> None:
+    """Print conversion summary.
+
+    Args:
+        success_count: Number of successful conversions
+        fail_count: Number of failed conversions
+    """
+    separator = '=' * SUMMARY_LINE_WIDTH
+    print(f"\n{separator}")
+    print("Conversion complete:")
+    print(f"  Success: {success_count}")
+    print(f"  Failed:  {fail_count}")
+    print(separator)
+
+
+def determine_output_file(video_file: Path, output_path: Path, is_batch: bool) -> Path:
+    """Determine output file path for a video file.
+
+    Args:
+        video_file: Input video file
+        output_path: Output path (file or directory)
+        is_batch: Whether this is batch processing
+
+    Returns:
+        Output file path
+    """
+    if is_batch:
+        return output_path / video_file.with_suffix('.mkv').name
+    return output_path
+
+
+def main() -> None:
     """Main entry point for CLI."""
     args = parse_args()
 
@@ -381,7 +451,7 @@ def main():
         if not output_path.exists():
             output_path.mkdir(parents=True, exist_ok=True)
         elif not output_path.is_dir():
-            print(f"Error: Output must be a directory for batch processing")
+            print("Error: Output must be a directory for batch processing")
             sys.exit(1)
 
     # Process each video file
@@ -390,16 +460,10 @@ def main():
 
     for video_file in video_files:
         # Determine output file
-        if is_batch:
-            out_file = output_path / video_file.with_suffix('.mkv').name
-        else:
-            out_file = output_path
-
-        # Ensure output directory exists
+        out_file = determine_output_file(video_file, output_path, is_batch)
         out_file.parent.mkdir(parents=True, exist_ok=True)
 
         # Convert based on mode
-        success: bool
         if args.dv:
             success = convert_dolby_vision(
                 input_file=video_file,
@@ -421,13 +485,7 @@ def main():
         else:
             fail_count += 1
 
-    # Print summary
-    print(f"\n{'='*60}")
-    print(f"Conversion complete:")
-    print(f"  Success: {success_count}")
-    print(f"  Failed:  {fail_count}")
-    print(f"{'='*60}")
-
+    print_conversion_summary(success_count, fail_count)
     sys.exit(0 if fail_count == 0 else 1)
 
 
