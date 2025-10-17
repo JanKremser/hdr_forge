@@ -1,6 +1,7 @@
 """CLI output and progress tracking functionality."""
 
-from typing import Callable
+import re
+from typing import Callable, IO
 
 from ffmpeg import Progress
 
@@ -53,6 +54,47 @@ def create_progress_handler(duration: float) -> Callable[[Progress], None]:
             )
 
     return on_progress
+
+
+def monitor_x265_progress(stderr: IO[str], total_frames: int) -> None:
+    """Monitor and display x265 encoding progress in real-time.
+
+    Args:
+        stderr: x265 process stderr stream
+        total_frames: Total number of frames in the video
+    """
+    # Regex pattern to match x265 progress output
+    # Format: 160 frames: 20.64 fps, 483.46 kb/s
+    progress_pattern = re.compile(
+        r'(\d+)\s+frames:\s+([\d.]+)\s+fps'
+    )
+
+    for line in stderr:
+        line = line.strip()
+
+        # Try to match progress line
+        match = progress_pattern.search(line)
+        if match:
+            current_frame = int(match.group(1))
+            fps = float(match.group(2))
+
+            # Calculate percentage
+            percent = (current_frame / total_frames * 100) if total_frames > 0 else 0
+
+            # Calculate ETA
+            if fps > 0 and total_frames > 0:
+                remaining_frames = total_frames - current_frame
+                eta_seconds = remaining_frames / fps
+                eta = format_time(eta_seconds)
+            else:
+                eta = "--:--:--"
+
+            # Print progress on same line
+            print(
+                f"\rProgress: {percent:5.1f}% | Frame: {current_frame}/{total_frames} | Speed: {fps:.2f} fps | ETA: {eta}",
+                end='',
+                flush=True
+            )
 
 
 def print_conversion_summary(success_count: int, fail_count: int) -> None:

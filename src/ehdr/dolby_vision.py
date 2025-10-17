@@ -33,19 +33,29 @@ def extract_rpu(input_file: str, output_rpu: Optional[str] = None) -> str:
 
     print(f"Extracting Dolby Vision RPU metadata from {input_path.name}...")
 
+    # Get path to local dovi_tool (in project root)
+    project_root = Path(__file__).parent.parent.parent
+    dovi_tool_path = project_root / "dovi_tool"
+
+    # Fallback to system dovi_tool if local one doesn't exist
+    if dovi_tool_path.exists():
+        dovi_tool_cmd = str(dovi_tool_path)
+    else:
+        dovi_tool_cmd = "dovi_tool"
+
     try:
         # Extract HEVC bitstream from video file and pipe to dovi_tool
         ffmpeg_cmd = [
             'ffmpeg',
             '-i', str(input_path),
             '-c:v', 'copy',
-            '-vbsf', 'hevc_mp4toannexb',
+            '-bsf:v', 'hevc_mp4toannexb',
             '-f', 'hevc',
             '-'
         ]
 
         dovi_cmd = [
-            'dovi_tool',
+            dovi_tool_cmd,
             'extract-rpu',
             '-',
             '-o', str(rpu_path)

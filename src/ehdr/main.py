@@ -9,8 +9,8 @@ from typing import Optional
 from ffmpeg import FFmpeg
 
 from . import __version__
-from .cli_output import create_progress_handler, print_conversion_summary
-from .dolby_vision import build_dolby_vision_params, extract_rpu
+from .cli_output import create_progress_handler, monitor_x265_progress, print_conversion_summary
+from .dolby_vision import extract_rpu
 from .encoding import (
     build_ffmpeg_output_options,
     determine_encoding_params,
@@ -187,33 +187,57 @@ def convert_dolby_vision(
         # Determine CRF and preset
         crf, preset = determine_encoding_params(video, crf, preset)
 
-        # Build x265 parameters
-        x265_params = build_dolby_vision_params(video, crf, preset)
-        x265_params.append('log-level=error')
-        x265_params.append(f'dolby-vision-rpu={rpu_file}')
-        x265_params.append(f'dolby-vision-profile={DOLBY_VISION_PROFILE}')
-
         # Build ffmpeg to x265 pipeline
         ffmpeg_cmd = [
             'ffmpeg', '-y',
             '-i', str(input_file),
-            '-c:v', 'copy',
-            '-vbsf', 'hevc_mp4toannexb',
-            '-f', 'hevc',
+            '-f', 'yuv4mpegpipe',
+            '-strict', '-1',
+            '-pix_fmt', video.get_pix_fmt(),
             '-'
         ]
 
+        # Build x265 command with separate arguments (like Rust version)
         x265_cmd = [
             'x265',
-            '--y4m',
-            '--input', '-',
+            '-',
             '--input-depth', '10',
             '--output-depth', '10',
-            '--x265-params', ':'.join(x265_params),
-            '--output', str(output_file)
+            '--y4m',
+            '--preset', preset,
+            '--crf', str(crf),
         ]
 
+        # Add master display metadata
+        master_display = video.get_master_display()
+        if master_display:
+            x265_cmd.extend(['--master-display', master_display])
+
+        # Add remaining HDR parameters
+        x265_cmd.extend([
+            '--max-cll', '0,0',
+            '--colormatrix', video.get_color_space(),
+            '--colorprim', video.get_color_primaries(),
+            '--transfer', video.get_color_transfer(),
+            '--dolby-vision-rpu', rpu_file,
+            '--dolby-vision-profile', DOLBY_VISION_PROFILE,
+            '--vbv-bufsize', '20000',
+            '--vbv-maxrate', '20000',
+            f'{str(output_file)}.hevc'
+        ])
+
         print(f"Encoding Dolby Vision to: {output_file.name}")
+
+        # Calculate total frames for progress tracking
+        duration = float(video.metadata.get('format', {}).get('duration', 0))
+        video_stream = video._get_video_stream()
+
+        # Parse frame rate (format: "24000/1001" or "30/1")
+        frame_rate_str = video_stream.get('r_frame_rate', '24/1')
+        num, denom = map(float, frame_rate_str.split('/'))
+        fps = num / denom if denom > 0 else 24.0
+
+        total_frames = int(duration * fps) if duration > 0 else 0
 
         # Create pipeline
         ffmpeg_process = subprocess.Popen(
@@ -233,12 +257,21 @@ def convert_dolby_vision(
         if ffmpeg_process.stdout:
             ffmpeg_process.stdout.close()
 
-        # Wait for x265 to complete
-        _, stderr = x265_process.communicate()
+        # Monitor x265 progress in real-time
+        if total_frames > 0 and x265_process.stderr:
+            monitor_x265_progress(x265_process.stderr, total_frames)
+            x265_process.wait()
+            print()  # New line after progress
+        else:
+            # Fallback: just wait for completion
+            _, stderr = x265_process.communicate()
+            if x265_process.returncode != 0:
+                print("Error: x265 encoding failed")
+                print(stderr)
+                return False
 
         if x265_process.returncode != 0:
             print("Error: x265 encoding failed")
-            print(stderr)
             return False
 
         # Wait for ffmpeg

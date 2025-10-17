@@ -140,7 +140,11 @@ class Video:
                            f"WP({white_x},{white_y})"
                            f"L({max_lum},{min_lum})")
 
-        return None
+        return (f"G(13250,34500)"
+                f"B(7500,3000)"
+                f"R(34000,16000)"
+                f"WP(15635,16450)"
+                f"L(10000000,1)")
 
     def is_hdr_video(self) -> bool:
         """Check if video is HDR by detecting 10-bit pixel format.
