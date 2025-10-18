@@ -143,6 +143,7 @@ def convert_sdr_hdr10(
         # Execute with progress tracking
         duration = float(video.metadata.get('format', {}).get('duration', 0))
         total_frames = video.get_total_frames()
+        print()
         if duration > 0:
             progress_handler = create_progress_handler(duration, total_frames)
             ffmpeg.on('progress', progress_handler)

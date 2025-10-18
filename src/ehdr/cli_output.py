@@ -8,7 +8,14 @@ from ffmpeg import Progress
 
 # Constants
 SUMMARY_LINE_WIDTH = 60
-PROGRESS_BAR_WIDTH = 30
+PROGRESS_BAR_WIDTH = 50
+# ANSI escape codes für Terminal-Steuerung
+CURSOR_UP_ONE = '\033[1A'
+CLEAR_LINE = '\033[2K'  # Löscht die aktuelle Zeile
+MOVE_TO_START = '\r'    # Bewegt Cursor zum Zeilenanfang
+
+# Kompletter Code zum Löschen der aktuellen und der vorherigen Zeile
+CLEAR_TWO_LINES = f"{CLEAR_LINE}{CURSOR_UP_ONE}{CLEAR_LINE}{MOVE_TO_START}"
 
 
 def create_progress_bar(percent: float, width: int = PROGRESS_BAR_WIDTH) -> str:
@@ -51,6 +58,30 @@ def format_time(seconds: float) -> str:
     return f"{hours:02d}:{minutes:02d}:{secs:02d}"
 
 
+def print_progress_info(first_update: bool, percent: float, current_frame: int, total_frames: int, fps: float, speed: float | None, time_seconds: float | None) -> None:
+    # Calculate ETA
+    eta: str = calculate_eta(fps=fps, current_frame=current_frame, total_frames=total_frames)
+
+    # Create progress bar
+    progress_bar: str = create_progress_bar(percent=percent)
+
+    time_str: str = format_time(seconds=time_seconds) if time_seconds is not None else "--:--:--"
+
+    # Format für mehrzeilige Ausgabe
+    bar_line: str = f"{progress_bar} {percent:5.1f}%"
+    info_line: str = f"Frame: {current_frame}/{total_frames} | Speed: {speed:.2f}x | FPS: {fps} | ETA: {eta} | Time: {time_str}"
+
+    # Bei der ersten Ausgabe müssen wir nur die beiden Zeilen ausgeben
+    if first_update:
+        print(bar_line)
+        print(info_line, end="", flush=True)
+    else:
+        # Bei nachfolgenden Updates löschen wir zuerst beide Zeilen komplett
+        print(CLEAR_TWO_LINES, end="")
+        print(bar_line)
+        print(info_line, end="", flush=True)
+
+
 def finish_progress(total_frames: int, duration: float = 0.0) -> None:
     """Finalize the progress display by setting it to 100%.
 
@@ -58,14 +89,16 @@ def finish_progress(total_frames: int, duration: float = 0.0) -> None:
         total_frames: Total number of frames in the video
         duration: Total video duration in seconds
     """
-    progress_bar = create_progress_bar(100.0)
-    time_str = format_time(duration) if duration > 0 else "--:--:--"
+    progress_bar: str = create_progress_bar(100.0)
+    time_str: str = format_time(duration) if duration > 0 else "--:--:--"
 
-    print(
-        f"\r{progress_bar}[100.0%]   --   Frame: {total_frames}/{total_frames} | Speed: -.--x | ETA: 00:00:00 | Time: {time_str}",
-        end='',
-        flush=True
-    )
+    # Lösche zuerst die vorherigen Zeilen
+    print(CLEAR_TWO_LINES, end="")
+
+    # Schreibe dann die finalen Werte
+    print(f"{progress_bar} 100.0%")
+    print(f"Frame: {total_frames}/{total_frames} | Speed: -.--x | FPS: --.- | ETA: 00:00:00 | Time: {time_str}")
+
     # Add an empty line after finishing progress
     print()
 
@@ -79,8 +112,12 @@ def create_progress_handler(duration: float, total_frames: int = 0) -> Callable[
     Returns:
         Progress handler function
     """
+    first_update = True
+
     def on_progress(progress: Progress) -> None:
         """Handle progress updates from ffmpeg."""
+        nonlocal first_update
+
         if progress.time and duration > 0:
             # Convert timedelta to seconds if necessary
             time_seconds: float = (
@@ -88,24 +125,24 @@ def create_progress_handler(duration: float, total_frames: int = 0) -> Callable[
                 if isinstance(progress.time, timedelta)
                 else float(progress.time)
             )
-            time_str: str = format_time(time_seconds)
             speed: float = progress.speed if progress.speed else 0.0
             current_frame: int = progress.frame
             fps: float = progress.fps if progress.fps else 0.0
 
-            # Calculate ETA
-            eta: str = calculate_eta(fps=fps, current_frame=current_frame, total_frames=total_frames)
-
-            # Create progress bar
+            # Calculate percentage
             percent: float = min((time_seconds / duration) * 100, 100)
-            progress_bar: str = create_progress_bar(percent)
 
-            # Print progress on same line
-            print(
-                f"\r{progress_bar}[{percent:5.1f}%]   --   Frame: {current_frame}/{total_frames} | Speed: {speed:.2f}x | ETA: {eta} | Time: {time_str}",
-                end='\n',
-                flush=True
+            print_progress_info(
+                first_update=first_update,
+                percent=percent,
+                current_frame=current_frame,
+                total_frames=total_frames,
+                fps=fps,
+                speed=speed,
+                time_seconds=time_seconds,
             )
+            if first_update:
+                first_update = False
 
     return on_progress
 
@@ -123,6 +160,8 @@ def monitor_x265_progress(stderr: IO[str], total_frames: int) -> None:
         r'(\d+)\s+frames:\s+([\d.]+)\s+fps'
     )
 
+    first_update = True
+
     for line in stderr:
         line = line.strip()
 
@@ -135,18 +174,17 @@ def monitor_x265_progress(stderr: IO[str], total_frames: int) -> None:
             # Calculate percentage
             percent: float = (current_frame / total_frames * 100) if total_frames > 0 else 0.0
 
-            # Calculate ETA
-            eta: str = calculate_eta(fps=fps, current_frame=current_frame, total_frames=total_frames)
-
-            # Create progress bar
-            progress_bar: str = create_progress_bar(percent)
-
-            # Print progress on same line
-            print(
-                f"\r{progress_bar}[{percent:5.1f}%]   --   Frame: {current_frame}/{total_frames} | Speed: {fps:.2f} fps | ETA: {eta}",
-                end='',
-                flush=True
+            print_progress_info(
+                first_update=first_update,
+                percent=percent,
+                current_frame=current_frame,
+                total_frames=total_frames,
+                fps=fps,
+                speed=None,
+                time_seconds=None,
             )
+            if first_update:
+                first_update = False
 
 
 def print_conversion_summary(success_count: int, fail_count: int) -> None:
