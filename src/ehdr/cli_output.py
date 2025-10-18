@@ -17,6 +17,13 @@ MOVE_TO_START = '\r'    # Bewegt Cursor zum Zeilenanfang
 # Kompletter Code zum Löschen der aktuellen und der vorherigen Zeile
 CLEAR_TWO_LINES = f"{CLEAR_LINE}{CURSOR_UP_ONE}{CLEAR_LINE}{MOVE_TO_START}"
 
+# ANSI Farbcodes
+YELLOW = '\033[93m'
+RED = '\033[91m'
+RESET = '\033[0m'
+
+DEBUG_MODE = False
+
 
 def create_progress_bar(percent: float, width: int = PROGRESS_BAR_WIDTH) -> str:
     """Create a visual progress bar.
@@ -82,6 +89,7 @@ def print_progress_info(first_update: bool, current_frame: int, total_frames: in
 
     # Bei der ersten Ausgabe müssen wir nur die beiden Zeilen ausgeben
     if first_update:
+        print()
         print(bar_line)
         print(info_line, end="", flush=True)
     else:
@@ -167,6 +175,11 @@ def monitor_x265_progress(stderr: IO[str], total_frames: int) -> None:
         r'(\d+)\s+frames:\s+([\d.]+)\s+fps,\s+([\d.]+)\s+kb/s'
     )
 
+    # Regex für Info-, Warn- und Fehlerausgaben - akzeptiert beliebige Präfixe
+    info_pattern: re.Pattern[str] = re.compile(
+        r'(\S+)\s+\[(info|warning|error)\]:\s+(.*)'
+    )
+
     first_update = True
 
     for line in stderr:
@@ -191,6 +204,27 @@ def monitor_x265_progress(stderr: IO[str], total_frames: int) -> None:
             )
             if first_update:
                 first_update = False
+
+        # Prüfe zuerst auf Info/Warning/Error Zeilen
+        info_match: re.Match[str] | None = info_pattern.search(line)
+        if info_match:
+            prefix = info_match.group(1)  # Beliebiges Präfix
+            level = info_match.group(2)   # info, warning oder error
+            message = info_match.group(3) # Die eigentliche Nachricht
+
+            # Wähle Farbe basierend auf dem Level
+            color = ""
+            if level == "warning":
+                color = YELLOW
+            elif level == "error":
+                color = RED
+
+            if DEBUG_MODE == False and level == "info":
+                continue
+
+            # Gib die Nachricht mit Farbe aus
+            print(f"\r{color}{prefix} [{level}]: {message}{RESET}")
+            continue
 
 
 def print_conversion_summary(success_count: int, fail_count: int) -> None:
