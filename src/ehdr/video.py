@@ -122,20 +122,21 @@ class Video:
             r"Content light level metadata:.*?MaxCLL=(?P<maxcll>\d+),\s*MaxFALL=(?P<maxfall>\d+)"
         )
 
-        for line in process.stderr:
-            if not mastering_data:
-                m: re.Match[str] | None = mastering_re.search(line)
-                if m:
-                    mastering_data = MasterDisplayMetadata(**{k: float(v) for k, v in m.groupdict().items()})
-            if not light_data:
-                l: re.Match[str] | None = light_re.search(line)
-                if l:
-                    light_data = ContentLightLevelMetadata(**{k: int(v) for k, v in l.groupdict().items()})
+        if process.stderr:
+            for line in process.stderr.readlines():
+                if not mastering_data:
+                    m: re.Match[str] | None = mastering_re.search(line)
+                    if m:
+                        mastering_data = MasterDisplayMetadata(**{k: float(v) for k, v in m.groupdict().items()})
+                if not light_data:
+                    l: re.Match[str] | None = light_re.search(line)
+                    if l:
+                        light_data = ContentLightLevelMetadata(**{k: int(v) for k, v in l.groupdict().items()})
 
-            # Falls beide gefunden wurden, abbrechen
-            if mastering_data and light_data:
-                process.kill()
-                break
+                # Falls beide gefunden wurden, abbrechen
+                if mastering_data and light_data:
+                    process.kill()
+                    break
 
         process.wait()
 
