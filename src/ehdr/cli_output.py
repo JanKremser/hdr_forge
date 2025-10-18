@@ -1,12 +1,29 @@
 """CLI output and progress tracking functionality."""
 
 import re
+from datetime import timedelta
 from typing import Callable, IO
 
 from ffmpeg import Progress
 
 # Constants
 SUMMARY_LINE_WIDTH = 60
+PROGRESS_BAR_WIDTH = 30
+
+
+def create_progress_bar(percent: float, width: int = PROGRESS_BAR_WIDTH) -> str:
+    """Create a visual progress bar.
+
+    Args:
+        percent: Completion percentage (0-100)
+        width: Width of the progress bar in characters
+
+    Returns:
+        Progress bar string (e.g., "[████████░░░░░░░░░░]")
+    """
+    filled = int(width * percent / 100)
+    empty = width - filled
+    return f"{'█' * filled}{'░' * empty}"
 
 
 def format_time(seconds: float) -> str:
@@ -24,7 +41,7 @@ def format_time(seconds: float) -> str:
     return f"{hours:02d}:{minutes:02d}:{secs:02d}"
 
 
-def create_progress_handler(duration: float) -> Callable[[Progress], None]:
+def create_progress_handler(duration: float, total_frames: int = 0) -> Callable[[Progress], None]:
     """Create a progress handler for ffmpeg encoding.
 
     Args:
@@ -37,18 +54,22 @@ def create_progress_handler(duration: float) -> Callable[[Progress], None]:
         """Handle progress updates from ffmpeg."""
         if progress.time and duration > 0:
             # Convert timedelta to seconds if necessary
-            time_seconds = (
+            time_seconds: float = (
                 progress.time.total_seconds()
-                if hasattr(progress.time, 'total_seconds')
+                if isinstance(progress.time, timedelta)
                 else float(progress.time)
             )
-            percent = min((time_seconds / duration) * 100, 100)
-            time_str = format_time(time_seconds)
-            speed = progress.speed if progress.speed else 0
+            percent: float = min((time_seconds / duration) * 100, 100)
+            time_str: str = format_time(time_seconds)
+            speed: float = progress.speed if progress.speed else 0.0
+            current_frame: int = progress.frame
+
+            # Create progress bar
+            progress_bar: str = create_progress_bar(percent)
 
             # Print progress on same line
             print(
-                f"\rProgress: {percent:5.1f}% | Time: {time_str} | Speed: {speed:.2f}x",
+                f"\r{progress_bar}[{percent:5.1f}%]   --   Frame: {current_frame}/{total_frames} | Speed: {speed:.2f}x | Time: {time_str}",
                 end='',
                 flush=True
             )
@@ -65,7 +86,7 @@ def monitor_x265_progress(stderr: IO[str], total_frames: int) -> None:
     """
     # Regex pattern to match x265 progress output
     # Format: 160 frames: 20.64 fps, 483.46 kb/s
-    progress_pattern = re.compile(
+    progress_pattern: re.Pattern[str] = re.compile(
         r'(\d+)\s+frames:\s+([\d.]+)\s+fps'
     )
 
@@ -79,19 +100,21 @@ def monitor_x265_progress(stderr: IO[str], total_frames: int) -> None:
             fps = float(match.group(2))
 
             # Calculate percentage
-            percent = (current_frame / total_frames * 100) if total_frames > 0 else 0
+            percent: float = (current_frame / total_frames * 100) if total_frames > 0 else 0.0
 
             # Calculate ETA
+            eta: str = "--:--:--"
             if fps > 0 and total_frames > 0:
-                remaining_frames = total_frames - current_frame
-                eta_seconds = remaining_frames / fps
+                remaining_frames: int = total_frames - current_frame
+                eta_seconds: float = remaining_frames / fps
                 eta = format_time(eta_seconds)
-            else:
-                eta = "--:--:--"
+
+            # Create progress bar
+            progress_bar: str = create_progress_bar(percent)
 
             # Print progress on same line
             print(
-                f"\rProgress: {percent:5.1f}% | Frame: {current_frame}/{total_frames} | Speed: {fps:.2f} fps | ETA: {eta}",
+                f"\r{progress_bar}[{percent:5.1f}%]   --   Frame: {current_frame}/{total_frames} | Speed: {fps:.2f} fps | ETA: {eta}",
                 end='',
                 flush=True
             )

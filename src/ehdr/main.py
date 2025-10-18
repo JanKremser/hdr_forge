@@ -127,7 +127,7 @@ def convert_sdr_hdr10(
                 print("No cropping needed")
 
         # Determine CRF and preset
-        crf, preset = determine_encoding_params(video, crf, preset)
+        crf, preset = determine_encoding_params(video=video, crf=crf, preset=preset)
 
         # Build ffmpeg command
         ffmpeg = FFmpeg()
@@ -135,15 +135,16 @@ def convert_sdr_hdr10(
         ffmpeg.input(str(input_file))
 
         # Build output options
-        output_options = build_ffmpeg_output_options(video, crf, preset, crop_filter)
-        ffmpeg.output(str(output_file), output_options)
+        output_options: dict = build_ffmpeg_output_options(video=video, crf=crf, preset=preset, crop_filter=crop_filter)
+        ffmpeg.output(url=str(output_file), options=output_options)
 
         print(f"Encoding to: {output_file.name}")
 
         # Execute with progress tracking
         duration = float(video.metadata.get('format', {}).get('duration', 0))
+        total_frames = video.get_total_frames()
         if duration > 0:
-            progress_handler = create_progress_handler(duration)
+            progress_handler = create_progress_handler(duration, total_frames)
             ffmpeg.on('progress', progress_handler)
             ffmpeg.execute()
             print()
@@ -229,15 +230,7 @@ def convert_dolby_vision(
         print(f"Encoding Dolby Vision to: {output_file.name}")
 
         # Calculate total frames for progress tracking
-        duration = float(video.metadata.get('format', {}).get('duration', 0))
-        video_stream = video._get_video_stream()
-
-        # Parse frame rate (format: "24000/1001" or "30/1")
-        frame_rate_str = video_stream.get('r_frame_rate', '24/1')
-        num, denom = map(float, frame_rate_str.split('/'))
-        fps = num / denom if denom > 0 else 24.0
-
-        total_frames = int(duration * fps) if duration > 0 else 0
+        total_frames = video.get_total_frames()
 
         # Create pipeline
         ffmpeg_process = subprocess.Popen(
@@ -259,7 +252,7 @@ def convert_dolby_vision(
 
         # Monitor x265 progress in real-time
         if total_frames > 0 and x265_process.stderr:
-            monitor_x265_progress(x265_process.stderr, total_frames)
+            monitor_x265_progress(stderr=x265_process.stderr, total_frames=total_frames)
             x265_process.wait()
             print()  # New line after progress
         else:

@@ -162,6 +162,35 @@ class Video:
         """
         return self.width * self.height
 
+    def get_fps(self) -> float:
+        """Get video frame rate (frames per second).
+
+        Returns:
+            Frame rate as float (e.g., 23.976, 30.0)
+        """
+        video_stream = self._get_video_stream()
+        frame_rate_str = video_stream.get('r_frame_rate', '24/1')
+
+        try:
+            # Parse frame rate (format: "24000/1001" or "30/1")
+            num, denom = map(float, frame_rate_str.split('/'))
+            return num / denom if denom > 0 else 24.0
+        except (ValueError, ZeroDivisionError):
+            return 24.0
+
+    def get_total_frames(self) -> int:
+        """Calculate total number of frames in the video.
+
+        Returns:
+            Total frame count
+        """
+        duration = float(self.metadata.get('format', {}).get('duration', 0))
+        if duration <= 0:
+            return 0
+
+        fps = self.get_fps()
+        return int(duration * fps)
+
     def get_auto_crf(self) -> int:
         """Calculate optimal CRF value based on resolution.
 
