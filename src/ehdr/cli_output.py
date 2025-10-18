@@ -9,12 +9,12 @@ from ffmpeg import Progress
 # Constants
 SUMMARY_LINE_WIDTH = 60
 PROGRESS_BAR_WIDTH = 50
-# ANSI escape codes für Terminal-Steuerung
+# ANSI escape codes for terminal control
 CURSOR_UP_ONE = '\033[1A'
-CLEAR_LINE = '\033[2K'  # Löscht die aktuelle Zeile
-MOVE_TO_START = '\r'    # Bewegt Cursor zum Zeilenanfang
+CLEAR_LINE = '\033[2K'  # Clears the current line
+MOVE_TO_START = '\r'    # Moves cursor to the beginning of the line
 
-# Kompletter Code zum Löschen der aktuellen und der vorherigen Zeile
+# Complete code to clear current and previous line
 CLEAR_TWO_LINES = f"{CLEAR_LINE}{CURSOR_UP_ONE}{CLEAR_LINE}{MOVE_TO_START}"
 
 # ANSI Farbcodes
@@ -83,17 +83,17 @@ def print_progress_info(first_update: bool, current_frame: int, total_frames: in
 
     size_str: str = f"{size_bytes / 1024:.2f} KB" if size_bytes is not None else "--.- KB"
 
-    # Format für mehrzeilige Ausgabe
+    # Format for multi-line output
     bar_line: str = f"{progress_bar} {percent:5.1f}%"
     info_line: str = f"Frame: {current_frame}/{total_frames} | Speed: {speed_str} | FPS: {fps} | ETA: {eta} | Time: {time_str} | Bitrate: {bitrate_str} | Size: {size_str}"
 
-    # Bei der ersten Ausgabe müssen wir nur die beiden Zeilen ausgeben
+    # For the first output, we only need to print both lines
     if first_update:
         print()
         print(bar_line)
         print(info_line, end="", flush=True)
     else:
-        # Bei nachfolgenden Updates löschen wir zuerst beide Zeilen komplett
+        # For subsequent updates, we first clear both lines completely
         print(CLEAR_TWO_LINES, end="")
         print(bar_line)
         print(info_line, end="", flush=True)
@@ -175,7 +175,7 @@ def monitor_x265_progress(stderr: IO[str], total_frames: int) -> None:
         r'(\d+)\s+frames:\s+([\d.]+)\s+fps,\s+([\d.]+)\s+kb/s'
     )
 
-    # Regex für Info-, Warn- und Fehlerausgaben - akzeptiert beliebige Präfixe
+    # Regex for info, warning, and error outputs - accepts arbitrary prefixes
     info_pattern: re.Pattern[str] = re.compile(
         r'(\S+)\s+\[(info|warning|error)\]:\s+(.*)'
     )
@@ -190,7 +190,7 @@ def monitor_x265_progress(stderr: IO[str], total_frames: int) -> None:
         if match:
             current_frame = int(match.group(1))
             fps = float(match.group(2))
-            bitrate = float(match.group(3))  # Extrahiere die Bitrate
+            bitrate = float(match.group(3))  # Extract the bitrate
 
             print_progress_info(
                 first_update=first_update,
@@ -205,14 +205,14 @@ def monitor_x265_progress(stderr: IO[str], total_frames: int) -> None:
             if first_update:
                 first_update = False
 
-        # Prüfe zuerst auf Info/Warning/Error Zeilen
+        # First check for Info/Warning/Error lines
         info_match: re.Match[str] | None = info_pattern.search(line)
         if info_match:
-            prefix = info_match.group(1)  # Beliebiges Präfix
-            level = info_match.group(2)   # info, warning oder error
-            message = info_match.group(3) # Die eigentliche Nachricht
+            prefix = info_match.group(1)  # Any prefix
+            level = info_match.group(2)   # info, warning, or error
+            message = info_match.group(3) # The actual message
 
-            # Wähle Farbe basierend auf dem Level
+            # Choose color based on level
             color = ""
             if level == "warning":
                 color = YELLOW
@@ -222,7 +222,7 @@ def monitor_x265_progress(stderr: IO[str], total_frames: int) -> None:
             if DEBUG_MODE == False and level == "info":
                 continue
 
-            # Gib die Nachricht mit Farbe aus
+            # Output the message with color
             print(f"\r{color}{prefix} [{level}]: {message}{RESET}")
             continue
 
