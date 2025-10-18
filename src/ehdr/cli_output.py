@@ -26,6 +26,16 @@ def create_progress_bar(percent: float, width: int = PROGRESS_BAR_WIDTH) -> str:
     return f"{'█' * filled}{'░' * empty}"
 
 
+def calculate_eta(fps: float, current_frame: int, total_frames: int) -> str:
+    # Calculate ETA
+    eta: str = "--:--:--"
+    if fps > 0 and total_frames > 0:
+        remaining_frames: int = total_frames - current_frame
+        eta_seconds: float = remaining_frames / fps
+        eta = format_time(eta_seconds)
+    return eta
+
+
 def format_time(seconds: float) -> str:
     """Format seconds to HH:MM:SS.
 
@@ -39,6 +49,25 @@ def format_time(seconds: float) -> str:
     minutes = int((seconds % 3600) // 60)
     secs = int(seconds % 60)
     return f"{hours:02d}:{minutes:02d}:{secs:02d}"
+
+
+def finish_progress(total_frames: int, duration: float = 0.0) -> None:
+    """Finalize the progress display by setting it to 100%.
+
+    Args:
+        total_frames: Total number of frames in the video
+        duration: Total video duration in seconds
+    """
+    progress_bar = create_progress_bar(100.0)
+    time_str = format_time(duration) if duration > 0 else "--:--:--"
+
+    print(
+        f"\r{progress_bar}[100.0%]   --   Frame: {total_frames}/{total_frames} | Speed: -.--x | ETA: 00:00:00 | Time: {time_str}",
+        end='',
+        flush=True
+    )
+    # Add an empty line after finishing progress
+    print()
 
 
 def create_progress_handler(duration: float, total_frames: int = 0) -> Callable[[Progress], None]:
@@ -59,18 +88,22 @@ def create_progress_handler(duration: float, total_frames: int = 0) -> Callable[
                 if isinstance(progress.time, timedelta)
                 else float(progress.time)
             )
-            percent: float = min((time_seconds / duration) * 100, 100)
             time_str: str = format_time(time_seconds)
             speed: float = progress.speed if progress.speed else 0.0
             current_frame: int = progress.frame
+            fps: float = progress.fps if progress.fps else 0.0
+
+            # Calculate ETA
+            eta: str = calculate_eta(fps=fps, current_frame=current_frame, total_frames=total_frames)
 
             # Create progress bar
+            percent: float = min((time_seconds / duration) * 100, 100)
             progress_bar: str = create_progress_bar(percent)
 
             # Print progress on same line
             print(
-                f"\r{progress_bar}[{percent:5.1f}%]   --   Frame: {current_frame}/{total_frames} | Speed: {speed:.2f}x | Time: {time_str}",
-                end='',
+                f"\r{progress_bar}[{percent:5.1f}%]   --   Frame: {current_frame}/{total_frames} | Speed: {speed:.2f}x | ETA: {eta} | Time: {time_str}",
+                end='\n',
                 flush=True
             )
 
@@ -103,11 +136,7 @@ def monitor_x265_progress(stderr: IO[str], total_frames: int) -> None:
             percent: float = (current_frame / total_frames * 100) if total_frames > 0 else 0.0
 
             # Calculate ETA
-            eta: str = "--:--:--"
-            if fps > 0 and total_frames > 0:
-                remaining_frames: int = total_frames - current_frame
-                eta_seconds: float = remaining_frames / fps
-                eta = format_time(eta_seconds)
+            eta: str = calculate_eta(fps=fps, current_frame=current_frame, total_frames=total_frames)
 
             # Create progress bar
             progress_bar: str = create_progress_bar(percent)

@@ -9,7 +9,7 @@ from typing import Optional
 from ffmpeg import FFmpeg
 
 from . import __version__
-from .cli_output import create_progress_handler, monitor_x265_progress, print_conversion_summary
+from .cli_output import create_progress_handler, finish_progress, monitor_x265_progress, print_conversion_summary
 from .dolby_vision import extract_rpu
 from .encoding import (
     build_ffmpeg_output_options,
@@ -147,9 +147,10 @@ def convert_sdr_hdr10(
             progress_handler = create_progress_handler(duration, total_frames)
             ffmpeg.on('progress', progress_handler)
             ffmpeg.execute()
-            print()
+            finish_progress(total_frames=total_frames, duration=duration)
         else:
             ffmpeg.execute()
+
 
         print(f"Success: {output_file.name}")
         return True
