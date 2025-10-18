@@ -35,7 +35,7 @@ def create_progress_bar(percent: float, width: int = PROGRESS_BAR_WIDTH) -> str:
 
 def calculate_eta(fps: float, current_frame: int, total_frames: int) -> str:
     # Calculate ETA
-    eta: str = "--:--:--"
+    eta: str = "00:00:00"
     if fps > 0 and total_frames > 0:
         remaining_frames: int = total_frames - current_frame
         eta_seconds: float = remaining_frames / fps
@@ -58,7 +58,7 @@ def format_time(seconds: float) -> str:
     return f"{hours:02d}:{minutes:02d}:{secs:02d}"
 
 
-def print_progress_info(first_update: bool, percent: float, current_frame: int, total_frames: int, fps: float, speed: float | None, time_seconds: float | None) -> None:
+def print_progress_info(first_update: bool, percent: float, current_frame: int, total_frames: int, fps: float, speed: float | None, time_seconds: float | None, bitrate: float | None, size: int | None) -> None:
     # Calculate ETA
     eta: str = calculate_eta(fps=fps, current_frame=current_frame, total_frames=total_frames)
 
@@ -69,9 +69,13 @@ def print_progress_info(first_update: bool, percent: float, current_frame: int, 
 
     speed_str: str = f"{speed:.2f}x" if speed is not None else "--.-x"
 
+    bitrate_str: str = f"{bitrate:.2f} kb/s" if bitrate is not None else "--.- kb/s"
+
+    size_str: str = f"{size / 1024:.2f} KB" if size is not None else "--.- KB"
+
     # Format für mehrzeilige Ausgabe
     bar_line: str = f"{progress_bar} {percent:5.1f}%"
-    info_line: str = f"Frame: {current_frame}/{total_frames} | Speed: {speed_str} | FPS: {fps} | ETA: {eta} | Time: {time_str}"
+    info_line: str = f"Frame: {current_frame}/{total_frames} | Speed: {speed_str} | FPS: {fps} | ETA: {eta} | Time: {time_str} | Bitrate: {bitrate_str} | Size: {size_str}"
 
     # Bei der ersten Ausgabe müssen wir nur die beiden Zeilen ausgeben
     if first_update:
@@ -91,15 +95,17 @@ def finish_progress(total_frames: int, duration: float = 0.0) -> None:
         total_frames: Total number of frames in the video
         duration: Total video duration in seconds
     """
-    progress_bar: str = create_progress_bar(100.0)
-    time_str: str = format_time(duration) if duration > 0 else "--:--:--"
-
-    # Lösche zuerst die vorherigen Zeilen
-    print(CLEAR_TWO_LINES, end="")
-
-    # Schreibe dann die finalen Werte
-    print(f"{progress_bar} 100.0%")
-    print(f"Frame: {total_frames}/{total_frames} | Speed: -.--x | FPS: --.- | ETA: 00:00:00 | Time: {time_str}")
+    print_progress_info(
+        first_update=False,
+        percent=100.0,
+        current_frame=total_frames,
+        total_frames=total_frames,
+        fps=0.0,
+        speed=0.0,
+        time_seconds=duration,
+        bitrate=0.0,
+        size=None,
+    )
 
     # Add an empty line after finishing progress
     print()
@@ -127,7 +133,6 @@ def create_progress_handler(duration: float, total_frames: int = 0) -> Callable[
                 if isinstance(progress.time, timedelta)
                 else float(progress.time)
             )
-            speed: float = progress.speed if progress.speed else 0.0
             current_frame: int = progress.frame
             fps: float = progress.fps if progress.fps else 0.0
 
@@ -140,8 +145,10 @@ def create_progress_handler(duration: float, total_frames: int = 0) -> Callable[
                 current_frame=current_frame,
                 total_frames=total_frames,
                 fps=fps,
-                speed=speed,
+                speed=progress.speed,
                 time_seconds=time_seconds,
+                bitrate=progress.bitrate,
+                size=progress.size,
             )
             if first_update:
                 first_update = False
@@ -184,6 +191,8 @@ def monitor_x265_progress(stderr: IO[str], total_frames: int) -> None:
                 fps=fps,
                 speed=None,
                 time_seconds=None,
+                bitrate=None,
+                size=None,
             )
             if first_update:
                 first_update = False
