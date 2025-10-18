@@ -10,13 +10,36 @@ from typing import Dict, LiteralString, Optional, Tuple
 
 from ffmpeg import FFmpeg
 
-# Ersetze TypedDict durch dataclass
 @dataclass
 class DolbyVisionInfo:
     """Structure for Dolby Vision metadata information."""
     dv_profile: Optional[int] = None
     dv_level: Optional[int] = None
     rpu_present_flag: int = 0
+
+@dataclass
+class MasterDisplayMetadata:
+    r_x: float
+    r_y: float
+    g_x: float
+    g_y: float
+    b_x: float
+    b_y: float
+    wp_x: float
+    wp_y: float
+    min_lum: float
+    max_lum: float
+
+@dataclass
+class ContentLightLevelMetadata:
+    """Structure for Content Light Level metadata information."""
+    maxcll: Optional[int] = None
+    maxfall: Optional[int] = None
+
+@dataclass
+class HdrMetadata:
+    mastering_display_metadata: Optional[MasterDisplayMetadata] = None
+    content_light_level_metadata: Optional[ContentLightLevelMetadata] = None
 
 DEFAULT_MASTER_DISPLAY: LiteralString = (
     f"G(13250,34500)"
@@ -42,6 +65,8 @@ class Video:
         self.filepath = Path(filepath)
         self.metadata = self._extract_metadata()
 
+        self.hdr_metadata: HdrMetadata = self.extract_hdr_metadata()
+
         # Extract dimensions from video stream
         video_stream = self._get_video_stream()
         self.width = video_stream.get('width', 0)
@@ -63,7 +88,71 @@ class Video:
         else:
             self.preset = preset
 
-    def _extract_metadata(self) -> Dict:
+    def extract_hdr_metadata(self) -> HdrMetadata:
+        # ffmpeg-Kommando: showinfo nur so lange laufen lassen, bis Daten auftauchen
+        cmd = [
+            "ffmpeg", "-hide_banner",
+            "-i", self.filepath,
+            "-vf", "showinfo",
+            "-frames:v", "10",  # bis 10 Frames prüfen (meist reicht 1)
+            "-f", "null", "-",
+        ]
+
+        process = subprocess.Popen(
+            cmd,
+            stderr=subprocess.PIPE,
+            stdout=subprocess.DEVNULL,
+            text=True,
+        )
+
+        mastering_data: MasterDisplayMetadata | None = None
+        light_data: ContentLightLevelMetadata | None = None
+
+        # Regex für Mastering Display Metadata
+        mastering_re = re.compile(
+            r"Mastering display metadata:.*?r\((?P<r_x>[\d\.]+),(?P<r_y>[\d\.]+)\)\s+"
+            r"g\((?P<g_x>[\d\.]+),(?P<g_y>[\d\.]+)\)\s+"
+            r"b\((?P<b_x>[\d\.]+)\s+(?P<b_y>[\d\.]+)\)\s+"
+            r"wp\((?P<wp_x>[\d\.]+),\s*(?P<wp_y>[\d\.]+)\)\s+"
+            r"min_luminance=(?P<min_lum>[\d\.]+),\s*max_luminance=(?P<max_lum>[\d\.]+)"
+        )
+
+        # Regex für Content Light Level Metadata
+        light_re = re.compile(
+            r"Content light level metadata:.*?MaxCLL=(?P<maxcll>\d+),\s*MaxFALL=(?P<maxfall>\d+)"
+        )
+
+        for line in process.stderr:
+            if not mastering_data:
+                m: re.Match[str] | None = mastering_re.search(line)
+                if m:
+                    mastering_data = MasterDisplayMetadata(**{k: float(v) for k, v in m.groupdict().items()})
+            if not light_data:
+                l: re.Match[str] | None = light_re.search(line)
+                if l:
+                    light_data = ContentLightLevelMetadata(**{k: int(v) for k, v in l.groupdict().items()})
+
+            # Falls beide gefunden wurden, abbrechen
+            if mastering_data and light_data:
+                process.kill()
+                break
+
+        process.wait()
+
+        # Werte bereinigen (0 → None)
+        if light_data:
+            if light_data.maxcll == 0:
+                light_data.maxcll = None
+            if light_data.maxfall == 0:
+                light_data.maxfall = None
+
+        return HdrMetadata(
+            mastering_display_metadata=mastering_data,
+            content_light_level_metadata=light_data,
+        )
+
+
+    def _extract_metadata(self) -> dict:
         """Extract video metadata using ffprobe.
 
         Returns:
@@ -74,9 +163,9 @@ class Video:
         """
         try:
             result = subprocess.run(
-                [
+                args=[
                     'ffprobe',
-                    '-v', 'quiet',
+                    '-v', 'debug',
                     '-print_format', 'json',
                     '-show_format',
                     '-show_streams',
@@ -86,7 +175,10 @@ class Video:
                 text=True,
                 check=True
             )
-            return json.loads(result.stdout)
+
+            stdout_json = result.stdout.strip()
+
+            return json.loads(stdout_json)
         except subprocess.CalledProcessError as e:
             raise RuntimeError(f"Failed to extract metadata: {e}")
         except json.JSONDecodeError as e:
@@ -193,6 +285,14 @@ class Video:
         Returns:
             Master display metadata string or None if not found
         """
+        if self.hdr_metadata.mastering_display_metadata:
+            md: MasterDisplayMetadata = self.hdr_metadata.mastering_display_metadata
+            return (f"G({int(md.g_x*50000)},{int(md.g_y*50000)})"
+                    f"B({int(md.b_x*50000)},{int(md.b_y*50000)})"
+                    f"R({int(md.r_x*50000)},{int(md.r_y*50000)})"
+                    f"WP({int(md.wp_x*50000)},{int(md.wp_y*50000)})"
+                    f"L({int(md.max_lum*10000)},{int(md.min_lum*10000)})")
+
         video_stream = self._get_video_stream()
         side_data = video_stream.get('side_data_list', [])
 
@@ -226,15 +326,12 @@ class Video:
         Returns:
             Tuple of (MaxCLL, MaxFALL) or None if not found
         """
-        # video_stream = self._get_video_stream()
-        # side_data = video_stream.get('side_data_list', [])
 
-        # for data in side_data:
-        #     if data.get('side_data_type') == 'Content light level information':
-        #         max_cll = data.get('max_content_light_level')
-        #         max_fall = data.get('max_frame_average_light_level')
-        #         if max_cll is not None and max_fall is not None:
-        #             return (int(max_cll), int(max_fall))
+        if self.hdr_metadata.content_light_level_metadata:
+            max_cll = self.hdr_metadata.content_light_level_metadata.maxcll
+            max_fall = self.hdr_metadata.content_light_level_metadata.maxfall
+            if max_cll is not None and max_fall is not None:
+                return (int(max_cll), int(max_fall))
 
         if return_fallback:
             return 0, 0

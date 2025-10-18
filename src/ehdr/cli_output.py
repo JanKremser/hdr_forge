@@ -274,7 +274,18 @@ def print_video_infos(video: Video) -> None:
     print(f"  Color Primaries: {color_str(video.get_color_primaries(), color)}")
     print(f"  Color Transfer: {color_str(video.get_color_transfer(), color)}")
     print(f"  Color Space: {color_str(video.get_color_space(), color)}")
-    print(f"  HDR Video: {color_str("Yes" if video.is_hdr_video() else "No", color)}")
+    if video.is_hdr_video():
+        max_cll_max_fall = video.get_max_cll_max_fall()
+        print(f"  HDR Video: {color_str('Yes', color)}")
+        print(f"  HDR MasterDisplay: {color_str(video.get_master_display() or 'N/A', color)}")
+        if max_cll_max_fall:
+            max_cll, max_fall = max_cll_max_fall
+            print(f"  HDR MaxCLL/MaxFALL: {color_str(f'{max_cll}, {max_fall}', color)}")
+        else:
+            print(f"  HDR MaxCLL/MaxFALL: {color_str('N/A', color)}")
+    else:
+        print(f"  HDR Video: {color_str('No', color)}")
+
     dolby_vision_info: DolbyVisionInfo | None = video.get_dolby_vision_infos()
     if dolby_vision_info:
         print("  Dolby Vision Metadata:")

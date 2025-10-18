@@ -45,7 +45,7 @@ def extract_rpu(input_file: str, output_rpu: Optional[str] = None) -> str:
 
     try:
         # Extract HEVC bitstream from video file and pipe to dovi_tool
-        ffmpeg_cmd = [
+        ffmpeg_cmd: list[str] = [
             'ffmpeg',
             '-i', str(input_path),
             '-c:v', 'copy',
@@ -54,7 +54,7 @@ def extract_rpu(input_file: str, output_rpu: Optional[str] = None) -> str:
             '-'
         ]
 
-        dovi_cmd = [
+        dovi_cmd: list[str] = [
             dovi_tool_cmd,
             'extract-rpu',
             '-',

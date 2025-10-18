@@ -198,7 +198,7 @@ def convert_dolby_vision(
         print_encoding_params(video=video)
 
         # Build ffmpeg to x265 pipeline
-        ffmpeg_cmd = [
+        ffmpeg_cmd: list[str] = [
             'ffmpeg', '-y',
             '-i', str(input_file),
             '-f', 'yuv4mpegpipe',
@@ -208,7 +208,7 @@ def convert_dolby_vision(
         ]
 
         # Build x265 command with separate arguments (like Rust version)
-        x265_cmd = [
+        x265_cmd: list[str] = [
             'x265',
             '-',
             '--input-depth', '10',

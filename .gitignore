@@ -5,6 +5,7 @@
 /test_input
 /test_output
 /samples
+/export
 /.devcontainer
 
 dovi_tool
