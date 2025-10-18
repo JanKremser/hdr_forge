@@ -1,7 +1,7 @@
 """Video encoding parameter building and configuration."""
 
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from .video import Video
 
@@ -16,32 +16,6 @@ HDR_X265_PARAMS = [
 HDR_PIXEL_FORMAT = 'yuv420p10le'
 
 
-def determine_encoding_params(
-    video: Video,
-    crf: Optional[int],
-    preset: Optional[str]
-) -> tuple[int, str]:
-    """Determine CRF and preset values (auto-calculate if not provided).
-
-    Args:
-        video: Video object with metadata
-        crf: User-specified CRF or None for auto
-        preset: User-specified preset or None for auto
-
-    Returns:
-        Tuple of (crf, preset)
-    """
-    if crf is None:
-        crf = video.get_auto_crf()
-        print(f"Auto CRF: {crf}")
-
-    if preset is None:
-        preset = video.get_auto_preset()
-        print(f"Auto preset: {preset}")
-
-    return crf, preset
-
-
 def build_hdr_x265_params(video: Video) -> List[str]:
     """Build x265 parameters for HDR video encoding.
 
@@ -51,7 +25,12 @@ def build_hdr_x265_params(video: Video) -> List[str]:
     Returns:
         List of x265 parameter strings
     """
-    params = HDR_X265_PARAMS.copy()
+    params: List[str] = HDR_X265_PARAMS.copy()
+
+    max_cll_max_fall: Tuple[int, int] | None = video.get_max_cll_max_fall()
+    if max_cll_max_fall:
+        max_cll, max_fall = max_cll_max_fall
+        params.extend(['--max-cll', f'{max_cll},{max_fall}'])
 
     master_display = video.get_master_display()
     if master_display:

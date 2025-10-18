@@ -4,16 +4,33 @@ import json
 import re
 import subprocess
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Optional, Tuple
+from typing import Dict, LiteralString, Optional, Tuple
 
 from ffmpeg import FFmpeg
+
+# Ersetze TypedDict durch dataclass
+@dataclass
+class DolbyVisionInfo:
+    """Structure for Dolby Vision metadata information."""
+    dv_profile: Optional[int] = None
+    dv_level: Optional[int] = None
+    rpu_present_flag: int = 0
+
+DEFAULT_MASTER_DISPLAY: LiteralString = (
+    f"G(13250,34500)"
+    f"B(7500,3000)"
+    f"R(34000,16000)"
+    f"WP(15635,16450)"
+    f"L(10000000,1)"
+)
 
 
 class Video:
     """Handles video file metadata extraction and analysis."""
 
-    def __init__(self, filepath: str):
+    def __init__(self, filepath: str, crf: Optional[int], preset: Optional[str]):
         """Initialize video object and extract metadata using ffprobe.
 
         Args:
@@ -35,6 +52,16 @@ class Video:
         self.crop_height = self.height
         self.crop_x = 0
         self.crop_y = 0
+
+        if crf is None:
+            self.crf = self._get_auto_crf()
+        else:
+            self.crf = crf
+
+        if preset is None:
+            self.preset = self._get_auto_preset()
+        else:
+            self.preset = preset
 
     def _extract_metadata(self) -> Dict:
         """Extract video metadata using ffprobe.
@@ -77,6 +104,38 @@ class Video:
                 return stream
         return {}
 
+    def get_crf(self) -> int:
+        """Get the CRF value for encoding.
+
+        Returns:
+            CRF value
+        """
+        return self.crf
+
+    def get_preset(self) -> str:
+        """Get the preset value for encoding.
+
+        Returns:
+            Preset string
+        """
+        return self.preset
+
+    def get_width(self) -> int:
+        """Get video width.
+
+        Returns:
+            Width in pixels
+        """
+        return self.width
+
+    def get_height(self) -> int:
+        """Get video height.
+
+        Returns:
+            Height in pixels
+        """
+        return self.height
+
     def get_pix_fmt(self) -> str:
         """Get pixel format of the video.
 
@@ -109,6 +168,25 @@ class Video:
         """
         return self._get_video_stream().get('color_transfer', '')
 
+    def get_dolby_vision_infos(self) -> Optional[DolbyVisionInfo]:
+        """Extract Dolby Vision metadata.
+
+        Returns:
+            DolbyVisionInfo object containing Dolby Vision metadata or None if not found
+        """
+        video_stream = self._get_video_stream()
+        side_data = video_stream.get('side_data_list', [])
+
+        for data in side_data:
+            if data.get('side_data_type') == 'DOVI configuration record':
+                return DolbyVisionInfo(
+                    dv_profile=data.get('dv_profile'),
+                    dv_level=data.get('dv_level'),
+                    rpu_present_flag=data.get('rpu_present_flag', 0)
+                )
+
+        return None
+
     def get_master_display(self) -> Optional[str]:
         """Extract HDR master display metadata.
 
@@ -140,11 +218,27 @@ class Video:
                            f"WP({white_x},{white_y})"
                            f"L({max_lum},{min_lum})")
 
-        return (f"G(13250,34500)"
-                f"B(7500,3000)"
-                f"R(34000,16000)"
-                f"WP(15635,16450)"
-                f"L(10000000,1)")
+        return DEFAULT_MASTER_DISPLAY
+
+    def get_max_cll_max_fall(self, return_fallback: bool | None = False) -> Tuple[int, int] | None:
+        """Extract HDR MaxCLL and MaxFALL metadata.
+
+        Returns:
+            Tuple of (MaxCLL, MaxFALL) or None if not found
+        """
+        # video_stream = self._get_video_stream()
+        # side_data = video_stream.get('side_data_list', [])
+
+        # for data in side_data:
+        #     if data.get('side_data_type') == 'Content light level information':
+        #         max_cll = data.get('max_content_light_level')
+        #         max_fall = data.get('max_frame_average_light_level')
+        #         if max_cll is not None and max_fall is not None:
+        #             return (int(max_cll), int(max_fall))
+
+        if return_fallback:
+            return 0, 0
+        return None
 
     def is_hdr_video(self) -> bool:
         """Check if video is HDR by detecting 10-bit pixel format.
@@ -191,7 +285,7 @@ class Video:
         fps = self.get_fps()
         return int(duration * fps)
 
-    def get_auto_crf(self) -> int:
+    def _get_auto_crf(self) -> int:
         """Calculate optimal CRF value based on resolution.
 
         Returns:
@@ -219,7 +313,7 @@ class Video:
 
         return 20
 
-    def get_auto_preset(self) -> str:
+    def _get_auto_preset(self) -> str:
         """Select optimal encoding preset based on resolution.
 
         Returns:

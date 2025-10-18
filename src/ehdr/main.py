@@ -4,16 +4,15 @@ import argparse
 import subprocess
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Tuple
 
 from ffmpeg import FFmpeg
 
 from . import __version__
-from .cli_output import create_progress_handler, finish_progress, monitor_x265_progress, print_conversion_summary
+from .cli_output import create_progress_handler, finish_progress, monitor_x265_progress, print_conversion_summary, print_encoding_params, print_video_infos
 from .dolby_vision import extract_rpu
 from .encoding import (
     build_ffmpeg_output_options,
-    determine_encoding_params,
     determine_output_file,
     get_video_files,
 )
@@ -113,7 +112,8 @@ def convert_sdr_hdr10(
         print(f"\nProcessing: {input_file.name}")
 
         # Load video metadata
-        video = Video(str(input_file))
+        video = Video(filepath=str(input_file), crf=crf, preset=preset)
+        print_video_infos(video=video)
 
         # Detect crop if enabled
         crop_filter = None
@@ -126,8 +126,11 @@ def convert_sdr_hdr10(
             else:
                 print("No cropping needed")
 
+        print_encoding_params(video=video)
+
         # Determine CRF and preset
-        crf, preset = determine_encoding_params(video=video, crf=crf, preset=preset)
+        crf = video.get_crf()
+        preset = video.get_preset()
 
         # Build ffmpeg command
         ffmpeg = FFmpeg()
@@ -182,13 +185,17 @@ def convert_dolby_vision(
         print(f"\nProcessing Dolby Vision: {input_file.name}")
 
         # Load video metadata
-        video = Video(str(input_file))
+        video = Video(filepath=str(input_file), crf=crf, preset=preset)
+        print_video_infos(video=video)
 
         # Extract RPU metadata
         rpu_file = extract_rpu(str(input_file))
 
         # Determine CRF and preset
-        crf, preset = determine_encoding_params(video, crf, preset)
+        crf = video.get_crf()
+        preset = video.get_preset()
+
+        print_encoding_params(video=video)
 
         # Build ffmpeg to x265 pipeline
         ffmpeg_cmd = [
@@ -216,9 +223,14 @@ def convert_dolby_vision(
         if master_display:
             x265_cmd.extend(['--master-display', master_display])
 
+        # Add max CLL and FALL if available
+        max_cll_max_fall: Tuple[int, int] | None = video.get_max_cll_max_fall(return_fallback=True)
+        if max_cll_max_fall:
+            max_cll, max_fall = max_cll_max_fall
+            x265_cmd.extend(['--max-cll', f'{max_cll},{max_fall}'])
+
         # Add remaining HDR parameters
         x265_cmd.extend([
-            '--max-cll', '0,0',
             '--colormatrix', video.get_color_space(),
             '--colorprim', video.get_color_primaries(),
             '--transfer', video.get_color_transfer(),

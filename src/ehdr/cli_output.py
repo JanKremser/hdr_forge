@@ -6,6 +6,8 @@ from typing import Callable, IO
 
 from ffmpeg import Progress
 
+from ehdr.video import DolbyVisionInfo, Video
+
 # Constants
 SUMMARY_LINE_WIDTH = 60
 PROGRESS_BAR_WIDTH = 50
@@ -20,10 +22,24 @@ CLEAR_TWO_LINES = f"{CLEAR_LINE}{CURSOR_UP_ONE}{CLEAR_LINE}{MOVE_TO_START}"
 # ANSI Farbcodes
 YELLOW = '\033[93m'
 RED = '\033[91m'
+GREEN = '\033[92m'
+BLUE = '\033[94m'
 RESET = '\033[0m'
 
 DEBUG_MODE = False
 
+
+def color_str(value: str | int | float, color: str) -> str:
+    """Wrap text with ANSI color codes.
+
+    Args:
+        text: The text to color
+        color_code: The ANSI color code
+
+    Returns:
+        Colored text string
+    """
+    return f"{color}{str(value)}{RESET}"
 
 def create_progress_bar(percent: float, width: int = PROGRESS_BAR_WIDTH) -> str:
     """Create a visual progress bar.
@@ -37,7 +53,7 @@ def create_progress_bar(percent: float, width: int = PROGRESS_BAR_WIDTH) -> str:
     """
     filled = int(width * percent / 100)
     empty = width - filled
-    return f"{'█' * filled}{'░' * empty}"
+    return f"{GREEN}{'█' * filled}{RESET}{'░' * empty}"
 
 
 def calculate_eta(fps: float, current_frame: int, total_frames: int) -> str:
@@ -172,18 +188,18 @@ def monitor_x265_progress(stderr: IO[str], total_frames: int) -> None:
     # Regex pattern to match x265 progress output
     # Format: 160 frames: 20.64 fps, 483.46 kb/s
     progress_pattern: re.Pattern[str] = re.compile(
-        r'(\d+)\s+frames:\s+([\d.]+)\s+fps,\s+([\d.]+)\s+kb/s'
+        pattern=r'(\d+)\s+frames:\s+([\d.]+)\s+fps,\s+([\d.]+)\s+kb/s'
     )
 
     # Regex for info, warning, and error outputs - accepts arbitrary prefixes
     info_pattern: re.Pattern[str] = re.compile(
-        r'(\S+)\s+\[(info|warning|error)\]:\s+(.*)'
+        pattern=r'(\S+)\s+\[(info|warning|error)\]:\s+(.*)'
     )
 
     first_update = True
 
     for line in stderr:
-        line = line.strip()
+        line: str = line.strip()
 
         # Try to match progress line
         match: re.Match[str] | None = progress_pattern.search(line)
@@ -223,7 +239,7 @@ def monitor_x265_progress(stderr: IO[str], total_frames: int) -> None:
                 continue
 
             # Output the message with color
-            print(f"\r{color}{prefix} [{level}]: {message}{RESET}")
+            print(color_str(value=f"\r{prefix} [{level}]: {message}", color=color))
             continue
 
 
@@ -240,3 +256,48 @@ def print_conversion_summary(success_count: int, fail_count: int) -> None:
     print(f"  Success: {success_count}")
     print(f"  Failed:  {fail_count}")
     print(separator)
+
+def print_video_infos(video: Video) -> None:
+    """Print extracted video information.
+
+    Args:
+        video: Video object with metadata
+    """
+    resolution: str = f"{video.get_width()}x{video.get_height()}"
+
+    color = BLUE
+    print()
+    print(f"{color_str('█', color)}" * 70)
+    print("Video Information:")
+    print(f"  Resolution: {color_str(resolution, color)}")
+    print(f"  Frame Rate: {color_str(video.get_fps(), color)}")
+    print(f"  Color Primaries: {color_str(video.get_color_primaries(), color)}")
+    print(f"  Color Transfer: {color_str(video.get_color_transfer(), color)}")
+    print(f"  Color Space: {color_str(video.get_color_space(), color)}")
+    print(f"  HDR Video: {color_str("Yes" if video.is_hdr_video() else "No", color)}")
+    dolby_vision_info: DolbyVisionInfo | None = video.get_dolby_vision_infos()
+    if dolby_vision_info:
+        print("  Dolby Vision Metadata:")
+        print(f"    Profile: {color_str(dolby_vision_info.dv_profile or 'N/A', color)}")
+        print(f"    Level: {color_str(dolby_vision_info.dv_level or 'N/A', color)}")
+        print(f"    RPU Present: {color_str("YES" if dolby_vision_info.rpu_present_flag == 1 else "NO", color)}")
+    print(f"{color_str('█', color)}" * 70)
+    print()
+
+def print_encoding_params(video: Video) -> None:
+    """Print encoding parameters.
+
+    Args:
+        crf: Constant Rate Factor value
+        preset: Encoding preset
+        ffmpeg_options: FFmpeg output options
+        x265_params: x265 encoding parameters
+    """
+    color = BLUE
+    print()
+    print(f"{color_str('█', color)}" * 70)
+    print("Encoding Parameters:")
+    print(f"  CRF: {color_str(video.get_crf(), color)}")
+    print(f"  Preset: {color_str(video.get_preset(), color)}")
+    print(f"{color_str('█', color)}" * 70)
+    print()
