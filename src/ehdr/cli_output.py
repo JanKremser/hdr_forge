@@ -58,7 +58,10 @@ def format_time(seconds: float) -> str:
     return f"{hours:02d}:{minutes:02d}:{secs:02d}"
 
 
-def print_progress_info(first_update: bool, percent: float, current_frame: int, total_frames: int, fps: float, speed: float | None, time_seconds: float | None, bitrate: float | None, size: int | None) -> None:
+def print_progress_info(first_update: bool, current_frame: int, total_frames: int, fps: float, speed: float | None, time_seconds: float | None, bitrate_kbs: float | None, size_bytes: int | None) -> None:
+    # Calculate percentage
+    percent: float = (current_frame / total_frames * 100) if total_frames > 0 else 0.0
+
     # Calculate ETA
     eta: str = calculate_eta(fps=fps, current_frame=current_frame, total_frames=total_frames)
 
@@ -69,9 +72,9 @@ def print_progress_info(first_update: bool, percent: float, current_frame: int, 
 
     speed_str: str = f"{speed:.2f}x" if speed is not None else "--.-x"
 
-    bitrate_str: str = f"{bitrate:.2f} kb/s" if bitrate is not None else "--.- kb/s"
+    bitrate_str: str = f"{bitrate_kbs:.2f} kb/s" if bitrate_kbs is not None else "--.- kb/s"
 
-    size_str: str = f"{size / 1024:.2f} KB" if size is not None else "--.- KB"
+    size_str: str = f"{size_bytes / 1024:.2f} KB" if size_bytes is not None else "--.- KB"
 
     # Format für mehrzeilige Ausgabe
     bar_line: str = f"{progress_bar} {percent:5.1f}%"
@@ -97,14 +100,13 @@ def finish_progress(total_frames: int, duration: float = 0.0) -> None:
     """
     print_progress_info(
         first_update=False,
-        percent=100.0,
         current_frame=total_frames,
         total_frames=total_frames,
         fps=0.0,
         speed=0.0,
         time_seconds=duration,
-        bitrate=0.0,
-        size=None,
+        bitrate_kbs=0.0,
+        size_bytes=None,
     )
 
     # Add an empty line after finishing progress
@@ -136,19 +138,15 @@ def create_progress_handler(duration: float, total_frames: int = 0) -> Callable[
             current_frame: int = progress.frame
             fps: float = progress.fps if progress.fps else 0.0
 
-            # Calculate percentage
-            percent: float = min((time_seconds / duration) * 100, 100)
-
             print_progress_info(
                 first_update=first_update,
-                percent=percent,
                 current_frame=current_frame,
                 total_frames=total_frames,
                 fps=fps,
                 speed=progress.speed,
                 time_seconds=time_seconds,
-                bitrate=progress.bitrate,
-                size=progress.size,
+                bitrate_kbs=progress.bitrate,
+                size_bytes=progress.size,
             )
             if first_update:
                 first_update = False
@@ -166,7 +164,7 @@ def monitor_x265_progress(stderr: IO[str], total_frames: int) -> None:
     # Regex pattern to match x265 progress output
     # Format: 160 frames: 20.64 fps, 483.46 kb/s
     progress_pattern: re.Pattern[str] = re.compile(
-        r'(\d+)\s+frames:\s+([\d.]+)\s+fps'
+        r'(\d+)\s+frames:\s+([\d.]+)\s+fps,\s+([\d.]+)\s+kb/s'
     )
 
     first_update = True
@@ -175,24 +173,21 @@ def monitor_x265_progress(stderr: IO[str], total_frames: int) -> None:
         line = line.strip()
 
         # Try to match progress line
-        match = progress_pattern.search(line)
+        match: re.Match[str] | None = progress_pattern.search(line)
         if match:
             current_frame = int(match.group(1))
             fps = float(match.group(2))
-
-            # Calculate percentage
-            percent: float = (current_frame / total_frames * 100) if total_frames > 0 else 0.0
+            bitrate = float(match.group(3))  # Extrahiere die Bitrate
 
             print_progress_info(
                 first_update=first_update,
-                percent=percent,
                 current_frame=current_frame,
                 total_frames=total_frames,
                 fps=fps,
                 speed=None,
                 time_seconds=None,
-                bitrate=None,
-                size=None,
+                bitrate_kbs=bitrate,
+                size_bytes=None,
             )
             if first_update:
                 first_update = False
