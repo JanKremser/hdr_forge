@@ -67,9 +67,11 @@ def print_progress_info(first_update: bool, percent: float, current_frame: int, 
 
     time_str: str = format_time(seconds=time_seconds) if time_seconds is not None else "--:--:--"
 
+    speed_str: str = f"{speed:.2f}x" if speed is not None else "--.-x"
+
     # Format für mehrzeilige Ausgabe
     bar_line: str = f"{progress_bar} {percent:5.1f}%"
-    info_line: str = f"Frame: {current_frame}/{total_frames} | Speed: {speed:.2f}x | FPS: {fps} | ETA: {eta} | Time: {time_str}"
+    info_line: str = f"Frame: {current_frame}/{total_frames} | Speed: {speed_str} | FPS: {fps} | ETA: {eta} | Time: {time_str}"
 
     # Bei der ersten Ausgabe müssen wir nur die beiden Zeilen ausgeben
     if first_update:
