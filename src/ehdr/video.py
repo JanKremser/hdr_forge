@@ -365,6 +365,17 @@ class Video:
         dv_info: DolbyVisionInfo | None = self.get_dolby_vision_infos()
         return dv_info is not None and dv_info.rpu_present_flag == 1
 
+    def is_cropped_video(self) -> bool:
+        """Check if video has been cropped.
+
+        Returns:
+            True if cropping parameters differ from original dimensions, False otherwise
+        """
+        return (self.crop_width != self.width or
+                self.crop_height != self.height or
+                self.crop_x != 0 or
+                self.crop_y != 0)
+
     def get_pixel_count(self) -> int:
         """Get total pixel count (width * height).
 

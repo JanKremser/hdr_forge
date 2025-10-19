@@ -1,7 +1,7 @@
 """Video encoding parameter building and configuration."""
 
 from pathlib import Path
-from typing import Dict, Optional, Tuple
+from typing import Dict, Tuple
 
 from ehdr.video import Video
 
@@ -41,15 +41,11 @@ def build_hdr_x265_params(video: Video) -> list[str]:
 
 def build_ffmpeg_output_options(
     video: Video,
-    crop_filter: Optional[str] = None
 ) -> Dict[str, str]:
     """Build FFmpeg output options dictionary for encoding.
 
     Args:
         video: Video object with metadata
-        crf: Constant Rate Factor value
-        preset: Encoding preset
-        crop_filter: Optional crop filter string
 
     Returns:
         Dictionary of FFmpeg output options
@@ -63,11 +59,11 @@ def build_ffmpeg_output_options(
     }
 
     if video.is_hdr_video():
-        print("HDR video detected")
-        x265_params = build_hdr_x265_params(video)
+        x265_params: list[str] = build_hdr_x265_params(video=video)
         output_options['pix_fmt'] = HDR_PIXEL_FORMAT
         output_options['x265-params'] = ':'.join(x265_params)
 
+    crop_filter: str | None = video.get_crop_filter()
     if crop_filter:
         output_options['vf'] = crop_filter
 
@@ -88,7 +84,7 @@ def get_video_files(path: Path, supported_formats: list[str]) -> list[Path]:
         return [path] if path.suffix.lower() in supported_formats else []
 
     if path.is_dir():
-        video_files = []
+        video_files: list = []
         for fmt in supported_formats:
             video_files.extend(path.glob(f'*{fmt}'))
         return sorted(video_files)

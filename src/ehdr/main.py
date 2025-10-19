@@ -157,15 +157,9 @@ def convert_sdr_hdr10(
     print(f"\nProcessing: {input_file.name}")
     try:
         # Detect crop if enabled
-        crop_filter = None
         if enable_crop:
             print("Detecting black bars...")
             video.crop_video()
-            crop_filter = video.get_crop_filter()
-            if crop_filter:
-                print(f"Crop detected: {crop_filter}")
-            else:
-                print("No cropping needed")
 
         print_encoding_params(video=video)
 
@@ -175,7 +169,7 @@ def convert_sdr_hdr10(
         ffmpeg.input(str(input_file))
 
         # Build output options
-        output_options: dict = build_ffmpeg_output_options(video=video, crop_filter=crop_filter)
+        output_options: dict = build_ffmpeg_output_options(video=video)
         ffmpeg.output(url=str(output_file), options=output_options)
 
         print(f"Encoding to: {output_file.name}")

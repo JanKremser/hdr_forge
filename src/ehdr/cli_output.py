@@ -29,7 +29,7 @@ RESET = '\033[0m'
 DEBUG_MODE = False
 
 
-def color_str(value: str | int | float, color: str) -> str:
+def color_str(value: str | int | float | None, color: str) -> str:
     """Wrap text with ANSI color codes.
 
     Args:
@@ -310,5 +310,10 @@ def print_encoding_params(video: Video) -> None:
     print("Encoding Parameters:")
     print(f"  CRF: {color_str(video.get_crf(), color)}")
     print(f"  Preset: {color_str(video.get_preset(), color)}")
+    if video.is_cropped_video():
+        crop_filter: str | None = video.get_crop_filter()
+        print(f"  Crop: {color_str(crop_filter, color)}")
+    else:
+        print(f"  Crop: {color_str('No cropping applied', color)}")
     print(f"{color_str('█', color)}" * 70)
     print()
