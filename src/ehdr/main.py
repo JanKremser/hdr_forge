@@ -8,15 +8,15 @@ from typing import Optional, Tuple
 
 from ffmpeg import FFmpeg
 
-from . import __version__
-from .cli_output import create_progress_handler, finish_progress, monitor_x265_progress, print_conversion_summary, print_encoding_params, print_video_infos
-from .dolby_vision import extract_rpu
-from .encoding import (
+from ehdr import __version__
+from ehdr.cli_output import create_progress_handler, finish_progress, monitor_x265_progress, print_conversion_summary, print_encoding_params, print_video_infos
+from ehdr.dolby_vision import extract_rpu
+from ehdr.encoding import (
     build_ffmpeg_output_options,
     determine_output_file,
     get_video_files,
 )
-from .video import Video
+from ehdr.video import Video
 
 # Supported input video formats
 SUPPORTED_FORMATS = ['.mkv', '.m2ts', '.ts', '.mp4']

@@ -1,12 +1,12 @@
 """Video encoding parameter building and configuration."""
 
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Optional, Tuple
 
-from .video import Video
+from ehdr.video import Video
 
 # Constants
-HDR_X265_PARAMS = [
+HDR_X265_PARAMS: list[str] = [
     'hdr-opt=1',
     'repeat-headers=1',
     'colorprim=bt2020',
@@ -16,16 +16,16 @@ HDR_X265_PARAMS = [
 HDR_PIXEL_FORMAT = 'yuv420p10le'
 
 
-def build_hdr_x265_params(video: Video) -> List[str]:
+def build_hdr_x265_params(video: Video) -> list[str]:
     """Build x265 parameters for HDR video encoding.
 
     Args:
         video: Video object with HDR metadata
 
     Returns:
-        List of x265 parameter strings
+        list of x265 parameter strings
     """
-    params: List[str] = HDR_X265_PARAMS.copy()
+    params: list[str] = HDR_X265_PARAMS.copy()
 
     max_cll_max_fall: Tuple[int, int] | None = video.get_max_cll_max_fall()
     if max_cll_max_fall:
@@ -76,15 +76,15 @@ def build_ffmpeg_output_options(
     return output_options
 
 
-def get_video_files(path: Path, supported_formats: List[str]) -> List[Path]:
+def get_video_files(path: Path, supported_formats: list[str]) -> list[Path]:
     """Get list of video files from path.
 
     Args:
         path: File or directory path
-        supported_formats: List of supported file extensions
+        supported_formats: list of supported file extensions
 
     Returns:
-        List of video file paths
+        list of video file paths
     """
     if path.is_file():
         return [path] if path.suffix.lower() in supported_formats else []
