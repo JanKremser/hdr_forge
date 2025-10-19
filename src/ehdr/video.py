@@ -41,10 +41,10 @@ class HdrMetadata:
     content_light_level_metadata: Optional[ContentLightLevelMetadata] = None
 
 DEFAULT_MASTER_DISPLAY: LiteralString = (
-    f"G(13250,34500)"
-    f"B(7500,3000)"
-    f"R(34000,16000)"
-    f"WP(15635,16450)"
+    f"G(x=13250,y=34500)"
+    f"B(x=7500,y=3000)"
+    f"R(x=34000,y=16000)"
+    f"WP(x=15635,y=16450)"
     f"L(10000000,1)"
 )
 
@@ -297,10 +297,10 @@ class Video:
         """
         if self.hdr_metadata.mastering_display_metadata:
             md: MasterDisplayMetadata = self.hdr_metadata.mastering_display_metadata
-            return (f"G({int(md.g_x*50000)},{int(md.g_y*50000)})"
-                    f"B({int(md.b_x*50000)},{int(md.b_y*50000)})"
-                    f"R({int(md.r_x*50000)},{int(md.r_y*50000)})"
-                    f"WP({int(md.wp_x*50000)},{int(md.wp_y*50000)})"
+            return (f"G(x={int(md.g_x*50000)},y={int(md.g_y*50000)})"
+                    f"B(x={int(md.b_x*50000)},y={int(md.b_y*50000)})"
+                    f"R(x={int(md.r_x*50000)},y={int(md.r_y*50000)})"
+                    f"WP({int(md.wp_x*50000)},y={int(md.wp_y*50000)})"
                     f"L({int(md.max_lum*10000)},{int(md.min_lum*10000)})")
 
         video_stream = self._get_video_stream()
@@ -322,10 +322,10 @@ class Video:
 
                 if all([red_x, red_y, green_x, green_y, blue_x, blue_y,
                        white_x, white_y, max_lum, min_lum]):
-                    return (f"G({green_x},{green_y})"
-                           f"B({blue_x},{blue_y})"
-                           f"R({red_x},{red_y})"
-                           f"WP({white_x},{white_y})"
+                    return (f"G(x={green_x},y={green_y})"
+                           f"B(x={blue_x},y={blue_y})"
+                           f"R(x={red_x},y={red_y})"
+                           f"WP(x={white_x},y={white_y})"
                            f"L({max_lum},{min_lum})")
 
         return DEFAULT_MASTER_DISPLAY
