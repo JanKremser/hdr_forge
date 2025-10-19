@@ -53,7 +53,7 @@ DEFAULT_MASTER_DISPLAY: LiteralString = (
 class Video:
     """Handles video file metadata extraction and analysis."""
 
-    def __init__(self, filepath: str, crf: Optional[int] = None, preset: Optional[str] = None):
+    def __init__(self, filepath: Path, crf: Optional[int] = None, preset: Optional[str] = None):
         """Initialize video object and extract metadata using ffprobe.
 
         Args:
@@ -62,7 +62,7 @@ class Video:
         Raises:
             RuntimeError: If ffprobe fails to extract metadata
         """
-        self.filepath = Path(filepath)
+        self.filepath: Path = filepath
         self.metadata: dict = self._extract_metadata()
 
         self.hdr_metadata: HdrMetadata = self.extract_hdr_metadata()
@@ -198,6 +198,14 @@ class Video:
             if stream.get('codec_type') == 'video':
                 return stream
         return {}
+
+    def get_filepath(self) -> Path:
+        """Get the video file path.
+
+        Returns:
+            Path object of the video file
+        """
+        return self.filepath
 
     def get_crf(self) -> int:
         """Get the CRF value for encoding.
@@ -347,6 +355,15 @@ class Video:
             True if video is HDR (10-bit), False otherwise
         """
         return '10le' in self.get_pix_fmt()
+
+    def is_dolby_vision_video(self) -> bool:
+        """Check if video contains Dolby Vision metadata.
+
+        Returns:
+            True if Dolby Vision metadata is present, False otherwise
+        """
+        dv_info: DolbyVisionInfo | None = self.get_dolby_vision_infos()
+        return dv_info is not None and dv_info.rpu_present_flag == 1
 
     def get_pixel_count(self) -> int:
         """Get total pixel count (width * height).

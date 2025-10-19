@@ -41,8 +41,6 @@ def build_hdr_x265_params(video: Video) -> list[str]:
 
 def build_ffmpeg_output_options(
     video: Video,
-    crf: int,
-    preset: str,
     crop_filter: Optional[str] = None
 ) -> Dict[str, str]:
     """Build FFmpeg output options dictionary for encoding.
@@ -56,10 +54,10 @@ def build_ffmpeg_output_options(
     Returns:
         Dictionary of FFmpeg output options
     """
-    output_options = {
+    output_options: dict = {
         'c:v': 'libx265',
-        'preset': preset,
-        'crf': str(crf),
+        'preset': video.preset,
+        'crf': str(video.crf),
         'c:a': 'copy',
         'c:s': 'copy'
     }

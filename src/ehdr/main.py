@@ -4,7 +4,7 @@ import argparse
 import subprocess
 import sys
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Tuple
 
 from ffmpeg import FFmpeg
 
@@ -126,7 +126,7 @@ def show_video_info(input_file: Path) -> bool:
             print(f"Error: The file {input_file} does not exist.")
             return False
 
-        video = Video(filepath=str(input_file))
+        video = Video(filepath=input_file)
 
         print_video_infos(video=video)
         return True
@@ -137,10 +137,8 @@ def show_video_info(input_file: Path) -> bool:
 
 
 def convert_sdr_hdr10(
-    input_file: Path,
+    video: Video,
     output_file: Path,
-    crf: Optional[int] = None,
-    preset: Optional[str] = None,
     enable_crop: bool = True
 ) -> bool:
     """Convert SDR or HDR10 video using ffmpeg with libx265.
@@ -155,13 +153,9 @@ def convert_sdr_hdr10(
     Returns:
         True if conversion succeeded, False otherwise
     """
+    input_file: Path = video.get_filepath()
+    print(f"\nProcessing: {input_file.name}")
     try:
-        print(f"\nProcessing: {input_file.name}")
-
-        # Load video metadata
-        video = Video(filepath=str(input_file), crf=crf, preset=preset)
-        print_video_infos(video=video)
-
         # Detect crop if enabled
         crop_filter = None
         if enable_crop:
@@ -175,17 +169,13 @@ def convert_sdr_hdr10(
 
         print_encoding_params(video=video)
 
-        # Determine CRF and preset
-        crf = video.get_crf()
-        preset = video.get_preset()
-
         # Build ffmpeg command
         ffmpeg = FFmpeg()
         ffmpeg.option('y')
         ffmpeg.input(str(input_file))
 
         # Build output options
-        output_options: dict = build_ffmpeg_output_options(video=video, crf=crf, preset=preset, crop_filter=crop_filter)
+        output_options: dict = build_ffmpeg_output_options(video=video, crop_filter=crop_filter)
         ffmpeg.output(url=str(output_file), options=output_options)
 
         print(f"Encoding to: {output_file.name}")
@@ -212,10 +202,8 @@ def convert_sdr_hdr10(
 
 
 def convert_dolby_vision(
-    input_file: Path,
+    video: Video,
     output_file: Path,
-    crf: Optional[int] = None,
-    preset: Optional[str] = None
 ) -> bool:
     """Convert Dolby Vision video using x265 with RPU injection.
 
@@ -228,19 +216,12 @@ def convert_dolby_vision(
     Returns:
         True if conversion succeeded, False otherwise
     """
+    input_file: Path = video.get_filepath()
+    print(f"\nProcessing Dolby Vision: {input_file.name}")
+
     try:
-        print(f"\nProcessing Dolby Vision: {input_file.name}")
-
-        # Load video metadata
-        video = Video(filepath=str(input_file), crf=crf, preset=preset)
-        print_video_infos(video=video)
-
         # Extract RPU metadata
         rpu_file = extract_rpu(str(input_file))
-
-        # Determine CRF and preset
-        crf = video.get_crf()
-        preset = video.get_preset()
 
         print_encoding_params(video=video)
 
@@ -255,6 +236,8 @@ def convert_dolby_vision(
         ]
 
         # Build x265 command with separate arguments (like Rust version)
+        crf = video.get_crf()
+        preset = video.get_preset()
         x265_cmd: list[str] = [
             'x265',
             '-',
@@ -374,23 +357,22 @@ def process_convert_command(args) -> None:
 
     for video_file in video_files:
         # Determine output file
-        out_file = determine_output_file(video_file, output_path, is_batch)
+        out_file: Path = determine_output_file(video_file=video_file, output_path=output_path, is_batch=is_batch)
         out_file.parent.mkdir(parents=True, exist_ok=True)
 
+        video = Video(filepath=video_file, crf=args.crf, preset=args.preset)
+        print_video_infos(video=video)
+
         # Convert based on mode
-        if args.dv:
+        if video.is_dolby_vision_video():
             success = convert_dolby_vision(
-                input_file=video_file,
+                video=video,
                 output_file=out_file,
-                crf=args.crf,
-                preset=args.preset
             )
         else:
             success = convert_sdr_hdr10(
-                input_file=video_file,
+                video=video,
                 output_file=out_file,
-                crf=args.crf,
-                preset=args.preset,
                 enable_crop=not args.ncrop
             )
 
