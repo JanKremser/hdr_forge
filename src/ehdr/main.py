@@ -103,12 +103,6 @@ Examples:
         help='Disable automatic black bar cropping'
     )
 
-    convert_parser.add_argument(
-        '--dv',
-        action='store_true',
-        help='Enable Dolby Vision mode (requires dovi_tool and 10-bit x265)'
-    )
-
     return parser.parse_args()
 
 
