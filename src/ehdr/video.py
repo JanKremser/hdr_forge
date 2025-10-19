@@ -5,41 +5,11 @@ import math
 import re
 import subprocess
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, LiteralString, Optional, Tuple
+from typing import Dict, LiteralString, Optional, Tuple, Callable
 
+from ehdr.dataclass import ContentLightLevelMetadata, CropHandler, DolbyVisionInfo, HdrMetadata, MasterDisplayMetadata
 
-@dataclass
-class DolbyVisionInfo:
-    """Structure for Dolby Vision metadata information."""
-    dv_profile: Optional[int] = None
-    dv_level: Optional[int] = None
-    rpu_present_flag: int = 0
-
-@dataclass
-class MasterDisplayMetadata:
-    r_x: float
-    r_y: float
-    g_x: float
-    g_y: float
-    b_x: float
-    b_y: float
-    wp_x: float
-    wp_y: float
-    min_lum: float
-    max_lum: float
-
-@dataclass
-class ContentLightLevelMetadata:
-    """Structure for Content Light Level metadata information."""
-    maxcll: Optional[int] = None
-    maxfall: Optional[int] = None
-
-@dataclass
-class HdrMetadata:
-    mastering_display_metadata: Optional[MasterDisplayMetadata] = None
-    content_light_level_metadata: Optional[ContentLightLevelMetadata] = None
 
 DEFAULT_MASTER_DISPLAY: LiteralString = (
     f"G(x=13250,y=34500)"
@@ -53,7 +23,7 @@ DEFAULT_MASTER_DISPLAY: LiteralString = (
 class Video:
     """Handles video file metadata extraction and analysis."""
 
-    def __init__(self, filepath: Path, crf: Optional[int] = None, preset: Optional[str] = None, scale_height: Optional[int] = None, enable_crop: bool = False) -> None:
+    def __init__(self, filepath: Path, crf: Optional[int] = None, preset: Optional[str] = None, scale_height: Optional[int] = None, enable_crop: bool = False, callback_handler_crop_video: Optional[Callable[[CropHandler], None]] = None) -> None:
         """Initialize video object and extract metadata using ffprobe.
 
         Args:
@@ -79,7 +49,9 @@ class Video:
         self.crop_y = 0
 
         if enable_crop and self.is_dolby_vision_video() is False:
-            self.crop_video()
+            self.crop_video(
+                callback=callback_handler_crop_video
+            )
 
         self.scale_video = False
         self.scale_width: int | None = None
@@ -558,12 +530,22 @@ class Video:
 
         return None
 
-    def crop_video(self, num_threads: int = 10) -> None:
+    def crop_video(self, num_threads: int = 10,
+                  callback: Optional[Callable[[CropHandler], None]] = None) -> None:
         """Detect and apply optimal crop parameters using multi-threaded analysis.
 
         Args:
             num_threads: Number of concurrent threads for crop detection
+            callback: Optional callback function to handle progress messages or crop results.
+                      Function signature: callback(message: Union[str, CropHandler], end: Optional[str] = None)
         """
+        if callback:
+            callback(CropHandler(
+                finish_progress=False,
+                completed_samples=0,
+                total_samples=num_threads,
+            ))
+
         # Get video duration
         duration = float(self.metadata.get('format', {}).get('duration', 0))
 
@@ -589,9 +571,21 @@ class Video:
                     crop_results.append(result)
                 completed += 1
                 # Show progress
-                print(f"\rAnalyzing crop: {completed}/{num_threads} samples", end='', flush=True)
+                #progress_msg = f"Analyzing crop: {completed}/{num_threads} samples"
+                if callback:
+                    callback(CropHandler(
+                        finish_progress=False,
+                        completed_samples=completed,
+                        total_samples=num_threads,
+                    ))
 
-        print()  # New line after progress
+        # Send final crop handler with all results
+        if callback:
+            callback(CropHandler(
+                finish_progress=True,
+                completed_samples=completed,
+                total_samples=num_threads,
+            ))
 
         if not crop_results:
             return

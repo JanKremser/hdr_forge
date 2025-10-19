@@ -6,11 +6,12 @@ from typing import Callable, IO, Tuple
 
 from ffmpeg import Progress
 
-from ehdr.video import DolbyVisionInfo, Video
+from ehdr.dataclass import CropHandler, DolbyVisionInfo
+from ehdr.video import Video
 
 # Constants
 SUMMARY_LINE_WIDTH = 60
-PROGRESS_BAR_WIDTH = 50
+PROGRESS_BAR_WIDTH = 70
 # ANSI escape codes for terminal control
 CURSOR_UP_ONE = '\033[1A'
 CLEAR_LINE = '\033[2K'  # Clears the current line
@@ -274,7 +275,7 @@ def print_video_infos(video: Video) -> None:
 
     color = BLUE
     print()
-    print(f"{color_str('█', color)}" * 70)
+    print(f"{color_str('_', color)}" * 70)
     print("Video Information:")
     print(f"  Resolution: {color_str(resolution, color)}")
     print(f"  Frame Rate: {color_str(video.get_fps(), color)}")
@@ -299,7 +300,7 @@ def print_video_infos(video: Video) -> None:
         print(f"    Profile: {color_str(dolby_vision_info.dv_profile or 'N/A', color)}")
         print(f"    Level: {color_str(dolby_vision_info.dv_level or 'N/A', color)}")
         print(f"    RPU Present: {color_str('YES' if dolby_vision_info.rpu_present_flag == 1 else 'NO', color)}")
-    print(f"{color_str('█', color)}" * 70)
+    print(f"{color_str('_', color)}" * 70)
     print()
 
 def print_encoding_params(video: Video) -> None:
@@ -313,7 +314,7 @@ def print_encoding_params(video: Video) -> None:
     """
     color = BLUE
     print()
-    print(f"{color_str('█', color)}" * 70)
+    print(f"{color_str('_', color)}" * 70)
     print("Encoding Parameters:")
     print(f"  CRF: {color_str(video.get_crf(), color)}")
     print(f"  Preset: {color_str(video.get_preset(), color)}")
@@ -326,5 +327,25 @@ def print_encoding_params(video: Video) -> None:
     if scale_dimensions:
         w, h = scale_dimensions
         print(f"  Scale: {color_str(f"{w}x{h}", color)}")
-    print(f"{color_str('█', color)}" * 70)
+    print(f"{color_str('_', color)}" * 70)
     print()
+
+def callback_handler_crop_video(crop_handler: CropHandler) -> None:
+    """Callback handler for crop video progress.
+
+    Args:
+        crop_handler: CropHandler instance
+        message: Optional message to display
+    """
+
+    if crop_handler.finish_progress:
+        print()  # New line on completion
+        return
+
+    completed_samples = crop_handler.completed_samples
+    total_samples = crop_handler.total_samples
+    percent: float = (completed_samples / total_samples * 100) if total_samples > 0 else 0.0
+    progress_bar: str = create_progress_bar(percent=percent)
+    if completed_samples == 0:
+        print("\nCropping Progress:")
+    print(f"\r{progress_bar} {percent:.1f}% | {completed_samples}/{total_samples}", end="", flush=True)

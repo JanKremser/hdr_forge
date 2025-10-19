@@ -9,7 +9,7 @@ from typing import Tuple
 from ffmpeg import FFmpeg
 
 from ehdr import __version__
-from ehdr.cli_output import create_progress_handler, finish_progress, monitor_x265_progress, print_conversion_summary, print_encoding_params, print_video_infos
+from ehdr.cli_output import callback_handler_crop_video, create_progress_handler, finish_progress, monitor_x265_progress, print_conversion_summary, print_encoding_params, print_video_infos
 from ehdr.dolby_vision import extract_rpu
 from ehdr.encoding import (
     build_ffmpeg_output_options,
@@ -183,7 +183,6 @@ def convert_sdr_hdr10(
         True if conversion succeeded, False otherwise
     """
     input_file: Path = video.get_filepath()
-    print(f"\nProcessing: {input_file.name}")
     try:
         print_encoding_params(video=video)
 
@@ -235,8 +234,6 @@ def convert_dolby_vision(
         True if conversion succeeded, False otherwise
     """
     input_file: Path = video.get_filepath()
-    print(f"\nProcessing Dolby Vision: {input_file.name}")
-
     try:
         # Extract RPU metadata
         rpu_file = extract_rpu(str(input_file))
@@ -381,7 +378,7 @@ def process_convert_command(args) -> None:
         out_file: Path = determine_output_file(video_file=video_file, output_path=output_path, is_batch=is_batch)
         out_file.parent.mkdir(parents=True, exist_ok=True)
 
-        video = Video(filepath=video_file, crf=args.crf, preset=args.preset, scale_height=scale_height, enable_crop=not args.ncrop)
+        video = Video(filepath=video_file, crf=args.crf, preset=args.preset, scale_height=scale_height, enable_crop=not args.ncrop, callback_handler_crop_video=callback_handler_crop_video)
         print_video_infos(video=video)
 
         # Convert based on mode
