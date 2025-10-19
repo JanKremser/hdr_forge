@@ -8,7 +8,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, LiteralString, Optional, Tuple
 
-from ffmpeg import FFmpeg
 
 @dataclass
 class DolbyVisionInfo:
@@ -94,7 +93,7 @@ class Video:
             "ffmpeg", "-hide_banner",
             "-i", self.filepath,
             "-vf", "showinfo",
-            "-frames:v", "10",  # bis 10 Frames prüfen (meist reicht 1)
+            "-frames:v", "10",
             "-f", "null", "-",
         ]
 
@@ -474,24 +473,26 @@ class Video:
             Tuple of (width, height, x, y) or None if detection fails
         """
         try:
-            ffmpeg = FFmpeg()
+            # FFmpeg-Kommando direkt mit subprocess ausführen statt mit FFmpeg-Bibliothek
+            cmd = [
+                'ffmpeg',
+                '-ss', str(position_seconds),
+                '-i', str(self.filepath),
+                '-t', '5',  # Analyze 5 seconds
+                '-vf', 'cropdetect',
+                '-f', 'null',
+                '-'
+            ]
 
-            # Capture stderr to get cropdetect output
-            import io
-            import sys
+            process = subprocess.run(
+                cmd,
+                stderr=subprocess.PIPE,
+                stdout=subprocess.DEVNULL,
+                text=True,
+                check=False
+            )
 
-            stderr_capture = io.StringIO()
-
-            ffmpeg.option('ss', str(position_seconds))
-            ffmpeg.input(str(self.filepath))
-            ffmpeg.option('t', '5')  # Analyze 5 seconds
-            ffmpeg.option('vf', 'cropdetect')
-            ffmpeg.option('f', 'null')
-            ffmpeg.output('-')
-
-            # Execute and capture stderr
-            process = ffmpeg.execute(stream=True, stderr=subprocess.PIPE, text=True)
-            stderr_output = process.stderr.read() if hasattr(process, 'stderr') and process.stderr else ""
+            stderr_output = process.stderr
 
             # Parse cropdetect output
             crop_pattern = re.compile(r'crop=(\d+):(\d+):(\d+):(\d+)')
@@ -502,8 +503,8 @@ class Video:
                 w, h, x, y = matches[-1]
                 return (int(w), int(h), int(x), int(y))
 
-        except Exception:
-            pass
+        except Exception as ex:
+            print(f"Fehler bei crop detection: {ex}")
 
         return None
 

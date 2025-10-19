@@ -291,7 +291,7 @@ def print_video_infos(video: Video) -> None:
         print("  Dolby Vision Metadata:")
         print(f"    Profile: {color_str(dolby_vision_info.dv_profile or 'N/A', color)}")
         print(f"    Level: {color_str(dolby_vision_info.dv_level or 'N/A', color)}")
-        print(f"    RPU Present: {color_str("YES" if dolby_vision_info.rpu_present_flag == 1 else "NO", color)}")
+        print(f"    RPU Present: {color_str('YES' if dolby_vision_info.rpu_present_flag == 1 else 'NO', color)}")
     print(f"{color_str('█', color)}" * 70)
     print()
 
