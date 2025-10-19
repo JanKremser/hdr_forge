@@ -31,6 +31,11 @@ def build_hdr_x265_params(video: Video) -> list[str]:
     if master_display:
         params.append(f'master-display={master_display}')
 
+        max_cll_max_fall: Tuple[int, int] | None = video.get_max_cll_max_fall()
+        if max_cll_max_fall:
+            max_cll, max_fall = max_cll_max_fall
+            params.append(f'max-cll={max_cll},{max_fall}')
+
     return params
 
 
@@ -57,11 +62,6 @@ def build_ffmpeg_output_options(
         x265_params: list[str] = build_hdr_x265_params(video=video)
         output_options['pix_fmt'] = HDR_PIXEL_FORMAT
         output_options['x265-params'] = ':'.join(x265_params)
-
-        max_cll_max_fall: Tuple[int, int] | None = video.get_max_cll_max_fall()
-        if max_cll_max_fall:
-            max_cll, max_fall = max_cll_max_fall
-            output_options['max_cll'] = f'{max_cll}:{max_fall}'
 
     crop_filter: str | None = video.get_crop_filter()
     if crop_filter:

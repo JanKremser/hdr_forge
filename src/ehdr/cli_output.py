@@ -53,7 +53,12 @@ def create_progress_bar(percent: float, width: int = PROGRESS_BAR_WIDTH) -> str:
     """
     filled = int(width * percent / 100)
     empty = width - filled
-    return f"{GREEN}{'█' * filled}{RESET}{'░' * empty}"
+
+    bar: str = f"{GREEN}{'█' * filled}{RESET}"
+    if empty > 0:
+        bar += f"{GREEN}{'░'}{RESET}"
+        bar += f"{'░' * (empty - 1)}"
+    return bar
 
 
 def calculate_eta(fps: float, current_frame: int, total_frames: int) -> str:
@@ -152,28 +157,30 @@ def create_progress_handler(duration: float, total_frames: int = 0) -> Callable[
         """Handle progress updates from ffmpeg."""
         nonlocal first_update
 
+        time_seconds: float = 0.0
         if progress.time and duration > 0:
             # Convert timedelta to seconds if necessary
-            time_seconds: float = (
+            time_seconds = (
                 progress.time.total_seconds()
                 if isinstance(progress.time, timedelta)
                 else float(progress.time)
             )
-            current_frame: int = progress.frame
-            fps: float = progress.fps if progress.fps else 0.0
 
-            print_progress_info(
-                first_update=first_update,
-                current_frame=current_frame,
-                total_frames=total_frames,
-                fps=fps,
-                speed=progress.speed,
-                time_seconds=time_seconds,
-                bitrate_kbs=progress.bitrate,
-                size_bytes=progress.size,
-            )
-            if first_update:
-                first_update = False
+        current_frame: int = progress.frame
+        fps: float = progress.fps if progress.fps else 0.0
+
+        print_progress_info(
+            first_update=first_update,
+            current_frame=current_frame,
+            total_frames=total_frames,
+            fps=fps,
+            speed=progress.speed,
+            time_seconds=time_seconds,
+            bitrate_kbs=progress.bitrate,
+            size_bytes=progress.size,
+        )
+        if first_update:
+            first_update = False
 
     return on_progress
 
