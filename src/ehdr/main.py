@@ -19,14 +19,14 @@ from ehdr.encoding import (
 from ehdr.video import Video
 
 # Supported input video formats
-SUPPORTED_FORMATS = ['.mkv', '.m2ts', '.ts', '.mp4']
+SUPPORTED_FORMATS: list[str] = ['.mkv', '.m2ts', '.ts', '.mp4']
 
 # Constants
 DOLBY_VISION_PROFILE = '8.1'
 
 
 def parse_args():
-    """Parse command-line arguments.
+    """Parse command-line arguments with subcommands.
 
     Returns:
         Parsed arguments namespace
@@ -34,50 +34,6 @@ def parse_args():
     parser = argparse.ArgumentParser(
         description='EHDR - Easy HDR Video Converter',
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Examples:
-  ehdr -i input.mkv -o output.mkv
-  ehdr -i input.mkv -o output.mkv --crf 16 --preset slow
-  ehdr -i input.mkv -o output.mkv --dv --ncrop
-  ehdr -i ./input_folder -o ./output_folder
-        """
-    )
-
-    parser.add_argument(
-        '-i', '--input',
-        required=True,
-        help='Input video file or folder'
-    )
-
-    parser.add_argument(
-        '-o', '--output',
-        required=True,
-        help='Output video file or folder'
-    )
-
-    parser.add_argument(
-        '--crf',
-        type=int,
-        help='Constant Rate Factor for quality (lower = higher quality). Auto-calculated if not specified.'
-    )
-
-    parser.add_argument(
-        '-p', '--preset',
-        choices=['ultrafast', 'superfast', 'veryfast', 'faster',
-                 'fast', 'medium', 'slow', 'slower', 'veryslow'],
-        help='Encoding preset (speed vs compression). Auto-calculated if not specified.'
-    )
-
-    parser.add_argument(
-        '--ncrop',
-        action='store_true',
-        help='Disable automatic black bar cropping'
-    )
-
-    parser.add_argument(
-        '--dv',
-        action='store_true',
-        help='Enable Dolby Vision mode (requires dovi_tool and 10-bit x265)'
     )
 
     parser.add_argument(
@@ -86,7 +42,98 @@ Examples:
         version=f'EHDR {__version__}'
     )
 
+    # Subkommandos erstellen
+    subparsers = parser.add_subparsers(dest='command', help='Subkommando')
+    subparsers.required = True
+
+    # "info" Subkommando
+    info_parser = subparsers.add_parser('info',
+        description='Zeigt Informationen zu einer Videodatei an',
+        help='Videoinformationen anzeigen'
+    )
+    
+    info_parser.add_argument(
+        '-i', '--input',
+        required=True,
+        help='Videodatei für Informationsanzeige'
+    )
+
+    # "convert" Subkommando
+    convert_parser = subparsers.add_parser('convert',
+        description='Konvertiert Videos',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        help='Videos konvertieren',
+        epilog="""
+Examples:
+  ehdr convert -i input.mkv -o output.mkv
+  ehdr convert -i input.mkv -o output.mkv --crf 16 --preset slow
+  ehdr convert -i input.mkv -o output.mkv --dv --ncrop
+  ehdr convert -i ./input_folder -o ./output_folder
+        """
+    )
+
+    convert_parser.add_argument(
+        '-i', '--input',
+        required=True,
+        help='Input video file or folder'
+    )
+
+    convert_parser.add_argument(
+        '-o', '--output',
+        required=True,
+        help='Output video file or folder'
+    )
+
+    convert_parser.add_argument(
+        '--crf',
+        type=int,
+        help='Constant Rate Factor for quality (lower = higher quality). Auto-calculated if not specified.'
+    )
+
+    convert_parser.add_argument(
+        '-p', '--preset',
+        choices=['ultrafast', 'superfast', 'veryfast', 'faster',
+                 'fast', 'medium', 'slow', 'slower', 'veryslow'],
+        help='Encoding preset (speed vs compression). Auto-calculated if not specified.'
+    )
+
+    convert_parser.add_argument(
+        '--ncrop',
+        action='store_true',
+        help='Disable automatic black bar cropping'
+    )
+
+    convert_parser.add_argument(
+        '--dv',
+        action='store_true',
+        help='Enable Dolby Vision mode (requires dovi_tool and 10-bit x265)'
+    )
+
     return parser.parse_args()
+
+
+def show_video_info(input_file: Path) -> bool:
+    """Show detailed information about a video file.
+
+    Args:
+        input_file: Input video file path
+
+    Returns:
+        True if successful, False otherwise
+    """
+    try:
+        if not input_file.exists():
+            print(f"Fehler: Die Datei {input_file} existiert nicht.")
+            return False
+
+        video = Video(filepath=str(input_file))
+
+        print_video_infos(video=video)
+        return True
+
+    except Exception as e:
+        print(f"Fehler beim Verarbeiten von {input_file.name}: {e}")
+        return False
 
 
 def convert_sdr_hdr10(
@@ -292,10 +339,8 @@ def convert_dolby_vision(
         return False
 
 
-def main() -> None:
-    """Main entry point for CLI."""
-    args = parse_args()
-
+def process_convert_command(args) -> None:
+    """Process the convert subcommand."""
     input_path = Path(args.input)
     output_path = Path(args.output)
 
@@ -356,6 +401,46 @@ def main() -> None:
 
     print_conversion_summary(success_count, fail_count)
     sys.exit(0 if fail_count == 0 else 1)
+
+
+def process_info_command(args) -> None:
+    """Process the info subcommand."""
+    input_path = Path(args.input)
+
+    # Validate input
+    if not input_path.exists():
+        print(f"Error: Input path does not exist: {input_path}")
+        sys.exit(1)
+
+    # Determine if it's a file or directory
+    if input_path.is_file():
+        show_video_info(input_path)
+    else:
+        # Get list of video files to process
+        video_files = get_video_files(input_path, SUPPORTED_FORMATS)
+
+        if not video_files:
+            print(f"Error: No supported video files found in: {input_path}")
+            print(f"Supported formats: {', '.join(SUPPORTED_FORMATS)}")
+            sys.exit(1)
+
+        # Show info for each video file
+        for video_file in video_files:
+            show_video_info(video_file)
+
+
+def main() -> None:
+    """Main entry point for CLI."""
+    args = parse_args()
+
+    # Führe das entsprechende Subkommando aus
+    if args.command == 'info':
+        process_info_command(args)
+    elif args.command == 'convert':
+        process_convert_command(args)
+    else:
+        print(f"Unbekanntes Kommando: {args.command}")
+        sys.exit(1)
 
 
 if __name__ == '__main__':

@@ -53,7 +53,7 @@ DEFAULT_MASTER_DISPLAY: LiteralString = (
 class Video:
     """Handles video file metadata extraction and analysis."""
 
-    def __init__(self, filepath: str, crf: Optional[int], preset: Optional[str]):
+    def __init__(self, filepath: str, crf: Optional[int] = None, preset: Optional[str] = None):
         """Initialize video object and extract metadata using ffprobe.
 
         Args:
@@ -63,12 +63,12 @@ class Video:
             RuntimeError: If ffprobe fails to extract metadata
         """
         self.filepath = Path(filepath)
-        self.metadata = self._extract_metadata()
+        self.metadata: dict = self._extract_metadata()
 
         self.hdr_metadata: HdrMetadata = self.extract_hdr_metadata()
 
         # Extract dimensions from video stream
-        video_stream = self._get_video_stream()
+        video_stream: dict = self._get_video_stream()
         self.width = video_stream.get('width', 0)
         self.height = video_stream.get('height', 0)
 
@@ -90,7 +90,7 @@ class Video:
 
     def extract_hdr_metadata(self) -> HdrMetadata:
         # ffmpeg-Kommando: showinfo nur so lange laufen lassen, bis Daten auftauchen
-        cmd = [
+        cmd: list = [
             "ffmpeg", "-hide_banner",
             "-i", self.filepath,
             "-vf", "showinfo",
@@ -99,7 +99,7 @@ class Video:
         ]
 
         process = subprocess.Popen(
-            cmd,
+            args=cmd,
             stderr=subprocess.PIPE,
             stdout=subprocess.DEVNULL,
             text=True,
@@ -108,18 +108,20 @@ class Video:
         mastering_data: MasterDisplayMetadata | None = None
         light_data: ContentLightLevelMetadata | None = None
 
-        # Regex für Mastering Display Metadata
-        mastering_re = re.compile(
-            r"Mastering display metadata:.*?r\((?P<r_x>[\d\.]+),(?P<r_y>[\d\.]+)\)\s+"
-            r"g\((?P<g_x>[\d\.]+),(?P<g_y>[\d\.]+)\)\s+"
-            r"b\((?P<b_x>[\d\.]+)\s+(?P<b_y>[\d\.]+)\)\s+"
-            r"wp\((?P<wp_x>[\d\.]+),\s*(?P<wp_y>[\d\.]+)\)\s+"
-            r"min_luminance=(?P<min_lum>[\d\.]+),\s*max_luminance=(?P<max_lum>[\d\.]+)"
+        # Regex für Mastering Display Metadata - beide Formate abdecken
+        mastering_re: re.Pattern[str] = re.compile(
+            r"(?:Mastering display metadata|side data - mastering display).*?"
+            r"r\((?P<r_x>[\d\.]+)[\s,]+(?P<r_y>[\d\.]+)\)\s*"
+            r"g\((?P<g_x>[\d\.]+)[\s,]+(?P<g_y>[\d\.]+)\)\s*"
+            r"b\((?P<b_x>[\d\.]+)[\s,]+(?P<b_y>[\d\.]+)\)\s*"
+            r"wp\((?P<wp_x>[\d\.]+)[\s,]+(?P<wp_y>[\d\.]+)\)\s*"
+            r"min_luminance=(?P<min_lum>[\d\.]+)[\s,]*max_luminance=(?P<max_lum>[\d\.]+)"
         )
 
-        # Regex für Content Light Level Metadata
-        light_re = re.compile(
-            r"Content light level metadata:.*?MaxCLL=(?P<maxcll>\d+),\s*MaxFALL=(?P<maxfall>\d+)"
+        # Regex für Content Light Level Metadata - beide Formate abdecken
+        light_re: re.Pattern[str] = re.compile(
+            r"(?:Content light level metadata|side data - Content Light Level information).*?"
+            r"MaxCLL=(?P<maxcll>\d+),\s*MaxFALL=(?P<maxfall>\d+)"
         )
 
         if process.stderr:
