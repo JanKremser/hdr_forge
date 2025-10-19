@@ -2,7 +2,7 @@
 
 import re
 from datetime import timedelta
-from typing import Callable, IO
+from typing import Callable, IO, Tuple
 
 from ffmpeg import Progress
 
@@ -322,5 +322,9 @@ def print_encoding_params(video: Video) -> None:
         print(f"  Crop: {color_str(crop_filter, color)}")
     else:
         print(f"  Crop: {color_str('No cropping applied', color)}")
+    scale_dimensions: Tuple[int, int] | None = video.get_scale_dimensions()
+    if scale_dimensions:
+        w, h = scale_dimensions
+        print(f"  Scale: {color_str(f"{w}x{h}", color)}")
     print(f"{color_str('█', color)}" * 70)
     print()

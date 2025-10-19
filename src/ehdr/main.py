@@ -24,6 +24,15 @@ SUPPORTED_FORMATS: list[str] = ['.mkv', '.m2ts', '.ts', '.mp4']
 # Constants
 DOLBY_VISION_PROFILE = '8.1'
 
+# Resolution constants
+RESOLUTIONS = {
+    'UHD': 2160,
+    'QHD': 1440,
+    'FHD': 1080,
+    'HD': 720,
+    'SD': 480
+}
+
 
 def parse_args():
     """Parse command-line arguments with subcommands.
@@ -103,7 +112,34 @@ Examples:
         help='Disable automatic black bar cropping'
     )
 
+    convert_parser.add_argument(
+        '--scale',
+        help='Scale video to specified resolution (4K, 2K, UHD, FHD, HD, SD or width in pixels)'
+    )
+
     return parser.parse_args()
+
+
+def get_scale_height(scale: str | None) -> int | None:
+    """Get target height from scale argument.
+    Args:
+        scale: Scale argument string
+    Returns:
+        Target height in pixels or None
+    """
+
+    target_height = None
+    if scale:
+        if scale.upper() in RESOLUTIONS:
+            target_height = RESOLUTIONS[scale.upper()]
+        else:
+            try:
+                # Try to parse as integer height
+                target_height = int(scale)
+            except ValueError:
+                print(f"Warning: Invalid scale value '{scale}', using original size")
+
+    return target_height
 
 
 def show_video_info(input_file: Path) -> bool:
@@ -133,7 +169,6 @@ def show_video_info(input_file: Path) -> bool:
 def convert_sdr_hdr10(
     video: Video,
     output_file: Path,
-    enable_crop: bool = True
 ) -> bool:
     """Convert SDR or HDR10 video using ffmpeg with libx265.
 
@@ -150,11 +185,6 @@ def convert_sdr_hdr10(
     input_file: Path = video.get_filepath()
     print(f"\nProcessing: {input_file.name}")
     try:
-        # Detect crop if enabled
-        if enable_crop:
-            print("Detecting black bars...")
-            video.crop_video()
-
         print_encoding_params(video=video)
 
         # Build ffmpeg command
@@ -339,6 +369,9 @@ def process_convert_command(args) -> None:
             print("Error: Output must be a directory for batch processing")
             sys.exit(1)
 
+    # Determine target height from scale argument if present
+    scale_height: int | None = get_scale_height(args.scale)
+
     # Process each video file
     success_count = 0
     fail_count = 0
@@ -348,7 +381,7 @@ def process_convert_command(args) -> None:
         out_file: Path = determine_output_file(video_file=video_file, output_path=output_path, is_batch=is_batch)
         out_file.parent.mkdir(parents=True, exist_ok=True)
 
-        video = Video(filepath=video_file, crf=args.crf, preset=args.preset)
+        video = Video(filepath=video_file, crf=args.crf, preset=args.preset, scale_height=scale_height, enable_crop=not args.ncrop)
         print_video_infos(video=video)
 
         # Convert based on mode
@@ -361,7 +394,6 @@ def process_convert_command(args) -> None:
             success = convert_sdr_hdr10(
                 video=video,
                 output_file=out_file,
-                enable_crop=not args.ncrop
             )
 
         if success:

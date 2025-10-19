@@ -67,6 +67,14 @@ def build_ffmpeg_output_options(
     if crop_filter:
         output_options['vf'] = crop_filter
 
+    scale_filter: str | None = video.get_scale_filter()
+    if scale_filter:
+        if 'vf' in output_options:
+            output_options['vf'] += f',{scale_filter}'
+        else:
+            output_options['vf'] = scale_filter
+
+
     return output_options
 
 

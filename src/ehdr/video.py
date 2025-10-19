@@ -1,6 +1,7 @@
 """Video metadata extraction and analysis module."""
 
 import json
+import math
 import re
 import subprocess
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -52,7 +53,7 @@ DEFAULT_MASTER_DISPLAY: LiteralString = (
 class Video:
     """Handles video file metadata extraction and analysis."""
 
-    def __init__(self, filepath: Path, crf: Optional[int] = None, preset: Optional[str] = None):
+    def __init__(self, filepath: Path, crf: Optional[int] = None, preset: Optional[str] = None, scale_height: Optional[int] = None, enable_crop: bool = False) -> None:
         """Initialize video object and extract metadata using ffprobe.
 
         Args:
@@ -77,6 +78,18 @@ class Video:
         self.crop_x = 0
         self.crop_y = 0
 
+        if enable_crop and self.is_dolby_vision_video() is False:
+            self.crop_video()
+
+        self.scale_video = False
+        self.scale_width: int | None = None
+        self.scale_height: int | None = None
+        if scale_height is not None and scale_height < self.height:
+            aspect_ratio: float = self.width / self.height
+            self.scale_video = True
+            self.scale_width = math.ceil(scale_height * aspect_ratio)
+            self.scale_height = scale_height
+
         if crf is None:
             self.crf = self._get_auto_crf()
         else:
@@ -86,6 +99,7 @@ class Video:
             self.preset = self._get_auto_preset()
         else:
             self.preset = preset
+
 
     def extract_hdr_metadata(self) -> HdrMetadata:
         # ffmpeg-Kommando: showinfo nur so lange laufen lassen, bis Daten auftauchen
@@ -375,12 +389,48 @@ class Video:
                 self.crop_x != 0 or
                 self.crop_y != 0)
 
+    def get_scale_dimensions(self) -> Optional[Tuple[int, int]]:
+        """Get target scale dimensions if scaling is enabled.
+
+        Returns:
+            Tuple of (width, height) or None if scaling is not applied
+        """
+        if self.scale_video and self.scale_width and self.scale_height:
+            if self.is_cropped_video():
+
+                width = self.crop_width
+                height = self.crop_height
+                new_aspect_ratio: float = width / height
+
+                if self.crop_width > self.scale_width:
+                    new_scale_height = math.floor(self.scale_width / new_aspect_ratio)
+                    return (self.scale_width, new_scale_height)
+
+                if self.crop_height > self.scale_height:
+                    new_scale_width = math.ceil(self.scale_height * new_aspect_ratio)
+                    return (new_scale_width, self.scale_height)
+
+                return (width, height)
+            else:
+                return (self.scale_width, self.scale_height)
+
+        return None
+
     def get_pixel_count(self) -> int:
         """Get total pixel count (width * height).
 
         Returns:
             Total number of pixels
         """
+
+        scale_d: Tuple[int, int] | None = self.get_scale_dimensions();
+        if scale_d:
+            w, h = scale_d
+            return w * h
+
+        if self.is_cropped_video():
+            return self.crop_width * self.crop_height
+
         return self.width * self.height
 
     def get_fps(self) -> float:
@@ -563,5 +613,19 @@ class Video:
             self.crop_height != self.height or
             self.crop_x != 0 or
             self.crop_y != 0):
+
             return f"crop={self.crop_width}:{self.crop_height}:{self.crop_x}:{self.crop_y}"
+        return None
+
+    def get_scale_filter(self) -> Optional[str]:
+        """Get ffmpeg scale filter string if scaling is needed.
+
+        Returns:
+            Scale filter string or None if no scaling needed
+        """
+        scale_d: Tuple[int, int] | None = self.get_scale_dimensions();
+        if scale_d:
+            w, h = scale_d
+            return f"scale={w}:{h}"
+
         return None
