@@ -42,27 +42,27 @@ def parse_args():
         version=f'EHDR {__version__}'
     )
 
-    # Subkommandos erstellen
-    subparsers = parser.add_subparsers(dest='command', help='Subkommando')
+    # Create subcommands
+    subparsers = parser.add_subparsers(dest='command', help='Subcommand')
     subparsers.required = True
 
-    # "info" Subkommando
+    # "info" subcommand
     info_parser = subparsers.add_parser('info',
-        description='Zeigt Informationen zu einer Videodatei an',
-        help='Videoinformationen anzeigen'
+        description='Shows information about a video file',
+        help='Display video information'
     )
-    
+
     info_parser.add_argument(
         '-i', '--input',
         required=True,
-        help='Videodatei für Informationsanzeige'
+        help='Video file for information display'
     )
 
-    # "convert" Subkommando
+    # "convert" subcommand
     convert_parser = subparsers.add_parser('convert',
-        description='Konvertiert Videos',
+        description='Convert videos',
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        help='Videos konvertieren',
+        help='Convert videos',
         epilog="""
 Examples:
   ehdr convert -i input.mkv -o output.mkv
@@ -123,7 +123,7 @@ def show_video_info(input_file: Path) -> bool:
     """
     try:
         if not input_file.exists():
-            print(f"Fehler: Die Datei {input_file} existiert nicht.")
+            print(f"Error: The file {input_file} does not exist.")
             return False
 
         video = Video(filepath=str(input_file))
@@ -132,7 +132,7 @@ def show_video_info(input_file: Path) -> bool:
         return True
 
     except Exception as e:
-        print(f"Fehler beim Verarbeiten von {input_file.name}: {e}")
+        print(f"Error processing {input_file.name}: {e}")
         return False
 
 
@@ -433,13 +433,13 @@ def main() -> None:
     """Main entry point for CLI."""
     args = parse_args()
 
-    # Führe das entsprechende Subkommando aus
+    # Execute the corresponding subcommand
     if args.command == 'info':
         process_info_command(args)
     elif args.command == 'convert':
         process_convert_command(args)
     else:
-        print(f"Unbekanntes Kommando: {args.command}")
+        print(f"Unknown command: {args.command}")
         sys.exit(1)
 
 
