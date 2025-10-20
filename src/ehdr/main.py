@@ -1,22 +1,18 @@
 """Main CLI entry point for EHDR video converter."""
 
 import argparse
-import subprocess
 import sys
 from pathlib import Path
 from typing import Optional
 
 from ehdr import __version__
 from ehdr.cli_output import callback_handler_crop_video, create_progress_handler, finish_progress, monitor_x265_progress, print_conversion_summary, print_encoding_params, print_video_infos
-from ehdr.dolby_vision import extract_rpu
-from ehdr.encoder import ColorFormat, Encoder
+from ehdr.dataclass import ColorFormat
+from ehdr.encoder import Encoder
 from ehdr.video import Video
 
 # Supported input video formats
 SUPPORTED_FORMATS: list[str] = ['.mkv', '.m2ts', '.ts', '.mp4']
-
-# Constants
-DOLBY_VISION_PROFILE = '8.1'
 
 # Resolution constants
 RESOLUTIONS = {
@@ -228,7 +224,7 @@ def show_video_info(input_file: Path) -> bool:
         return False
 
 
-def convert_sdr_hdr10(
+def convert_video(
     video: Video,
     target_file: Path,
     target_format: ColorFormat = ColorFormat.AUTO,
@@ -252,6 +248,9 @@ def convert_sdr_hdr10(
     Returns:
         True if conversion succeeded, False otherwise
     """
+    input_file: Path = video.get_filepath()
+
+    # Create encoder for Dolby Vision
     encoder = Encoder(
         video=video,
         target_file=target_file,
@@ -266,128 +265,41 @@ def convert_sdr_hdr10(
     try:
         print_encoding_params(encoder=encoder)
 
-        # Prepare progress tracking
-        duration = video.get_duration_seconds()
+        # Prepare progress monitoring
         total_frames = video.get_total_frames()
 
-        progress_handler = None
-        finish_callback = None
+        success: bool = False
+        if encoder.is_dolby_vision():
+            progress_handler = None
 
-        if duration > 0:
-            progress_handler = create_progress_handler(duration=duration, total_frames=total_frames)
-            finish_callback = lambda: finish_progress(total_frames=total_frames, duration=duration)
+            if total_frames > 0:
+                progress_handler = lambda stderr, frames: monitor_x265_progress(stderr=stderr, total_frames=frames)
 
-        # Execute conversion
-        success: bool = encoder.convert(
-            progress_callback=progress_handler,
-            finish_callback=finish_callback
-        )
+            # Execute conversion
+            success = encoder.convert_dolby_vision(
+                progress_callback=progress_handler
+            )
+        else:
+            duration = video.get_duration_seconds()
+
+            progress_handler = None
+            finish_callback = None
+
+            if duration > 0:
+                progress_handler = create_progress_handler(duration=duration, total_frames=total_frames)
+                finish_callback = lambda: finish_progress(total_frames=total_frames, duration=duration)
+
+            # Execute conversion
+            success: bool = encoder.convert(
+                progress_callback=progress_handler,
+                finish_callback=finish_callback
+            )
 
         if success:
+            print()  # New line after progress
             print(f"Success: {target_file.name}")
 
         return success
-
-    except Exception as e:
-        input_file: Path = video.get_filepath()
-        print(f"Error processing {input_file.name}: {e}")
-        return False
-
-
-def convert_dolby_vision(
-    video: Video,
-    target_file: Path,
-    crf: Optional[int] = None,
-    preset: Optional[str] = None,
-) -> bool:
-    """Convert Dolby Vision video using x265 with RPU injection.
-
-    Args:
-        video: Video object with metadata
-        target_file: Output video file path
-        crf: Optional CRF value (auto-calculated if None)
-        preset: Optional preset (auto-calculated if None)
-
-    Returns:
-        True if conversion succeeded, False otherwise
-    """
-    input_file: Path = video.get_filepath()
-
-    # Create encoder for Dolby Vision
-    encoder = Encoder(
-        video=video,
-        target_file=target_file,
-        color_format=ColorFormat.DOLBY_VISION,
-        crf=crf,
-        preset=preset,
-        enable_crop=False,  # Cropping not supported for Dolby Vision
-        scale_height=None,  # Scaling not supported for Dolby Vision
-    )
-
-    try:
-        # Extract RPU metadata
-        rpu_file = extract_rpu(str(input_file))
-
-        print_encoding_params(encoder=encoder)
-
-        # Build ffmpeg to x265 pipeline
-        ffmpeg_cmd: list[str] = [
-            'ffmpeg', '-y',
-            '-i', str(input_file),
-            '-f', 'yuv4mpegpipe',
-            '-strict', '-1',
-            '-pix_fmt', video.get_pix_fmt(),
-            '-'
-        ]
-
-        # Build x265 command using encoder
-        x265_cmd = encoder.build_x265_command(output_file=target_file, rpu_file=rpu_file)
-
-        print(f"Encoding Dolby Vision to: {target_file.name}")
-
-        # Calculate total frames for progress tracking
-        total_frames = video.get_total_frames()
-
-        # Create pipeline
-        ffmpeg_process = subprocess.Popen(
-            ffmpeg_cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL
-        )
-
-        x265_process = subprocess.Popen(
-            x265_cmd,
-            stdin=ffmpeg_process.stdout,
-            stderr=subprocess.PIPE,
-            text=True
-        )
-
-        # Close ffmpeg stdout in parent
-        if ffmpeg_process.stdout:
-            ffmpeg_process.stdout.close()
-
-        # Monitor x265 progress in real-time
-        if total_frames > 0 and x265_process.stderr:
-            monitor_x265_progress(stderr=x265_process.stderr, total_frames=total_frames)
-            x265_process.wait()
-            print()  # New line after progress
-        else:
-            # Fallback: just wait for completion
-            _, stderr = x265_process.communicate()
-            if x265_process.returncode != 0:
-                print("Error: x265 encoding failed")
-                print(stderr)
-                return False
-
-        if x265_process.returncode != 0:
-            print("Error: x265 encoding failed")
-            return False
-
-        # Wait for ffmpeg
-        ffmpeg_process.wait()
-
-        print(f"Success: {target_file.name}")
-        return True
 
     except Exception as e:
         print(f"Error processing {input_file.name}: {e}")
@@ -440,24 +352,15 @@ def process_convert_command(args) -> None:
         video = Video(filepath=video_file)
         print_video_infos(video=video)
 
-        # Convert based on mode
-        if video.is_dolby_vision_video():
-            success = convert_dolby_vision(
-                video=video,
-                target_file=out_file,
-                crf=args.crf,
-                preset=args.preset,
-            )
-        else:
-            success = convert_sdr_hdr10(
-                video=video,
-                target_file=out_file,
-                target_format=color_format,
-                crf=args.crf,
-                preset=args.preset,
-                scale_height=scale_height,
-                enable_crop=not args.ncrop,
-            )
+        success = convert_video(
+            video=video,
+            target_file=out_file,
+            target_format=color_format,
+            crf=args.crf,
+            preset=args.preset,
+            scale_height=scale_height,
+            enable_crop=not args.ncrop,
+        )
 
         if success:
             success_count += 1

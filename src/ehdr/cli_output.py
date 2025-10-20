@@ -259,12 +259,12 @@ def print_conversion_summary(success_count: int, fail_count: int) -> None:
         success_count: Number of successful conversions
         fail_count: Number of failed conversions
     """
-    separator = '=' * SUMMARY_LINE_WIDTH
-    print(f"\n{separator}")
+    color = BLUE
+    print(f"{color_str('_', color)}" * 70)
     print("Conversion complete:")
     print(f"  Success: {success_count}")
     print(f"  Failed:  {fail_count}")
-    print(separator)
+    print(f"{color_str('_', color)}" * 70)
 
 def print_video_infos(video: Video) -> None:
     """Print extracted video information.
@@ -278,22 +278,22 @@ def print_video_infos(video: Video) -> None:
     print()
     print(f"{color_str('_', color)}" * 70)
     print("Video Information:")
+    print(f"  Input File: {color_str(str(video.get_filepath()), color)}")
     print(f"  Resolution: {color_str(resolution, color)}")
     print(f"  Frame Rate: {color_str(video.get_fps(), color)}")
     print(f"  Color Primaries: {color_str(video.get_color_primaries(), color)}")
     print(f"  Color Transfer: {color_str(video.get_color_transfer(), color)}")
     print(f"  Color Space: {color_str(video.get_color_space(), color)}")
+    print(f"  HDR/SDR: {color_str(video.get_color_format().value.upper(), color)}")
     if video.is_hdr_video():
+        print("  HDR10 Metadata:")
         max_cll_max_fall = video.get_max_cll_max_fall()
-        print(f"  HDR Video: {color_str('Yes', color)}")
-        print(f"  HDR MasterDisplay: {color_str(video.get_master_display() or 'N/A', color)}")
+        print(f"    MasterDisplay: {color_str(video.get_master_display() or 'N/A', color)}")
         if max_cll_max_fall:
             max_cll, max_fall = max_cll_max_fall
-            print(f"  HDR MaxCLL/MaxFALL: {color_str(f'{max_cll}, {max_fall}', color)}")
+            print(f"    MaxCLL/MaxFALL: {color_str(f'{max_cll}, {max_fall}', color)}")
         else:
-            print(f"  HDR MaxCLL/MaxFALL: {color_str('N/A', color)}")
-    else:
-        print(f"  HDR Video: {color_str('No', color)}")
+            print(f"    MaxCLL/MaxFALL: {color_str('N/A', color)}")
 
     dolby_vision_info: DolbyVisionInfo | None = video.get_dolby_vision_infos()
     if dolby_vision_info:
@@ -314,6 +314,7 @@ def print_encoding_params(encoder: Encoder) -> None:
     print()
     print(f"{color_str('_', color)}" * 70)
     print("Encoding Parameters:")
+    print(f"  Output File: {color_str(str(encoder.get_target_file()), color)}")
     print(f"  CRF: {color_str(encoder.crf, color)}")
     print(f"  Preset: {color_str(encoder.preset, color)}")
     print(f"  Color-Format: {color_str(encoder.get_color_format().value.upper(), color)}")

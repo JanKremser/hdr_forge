@@ -4,22 +4,14 @@ import math
 import subprocess
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from enum import Enum
 from pathlib import Path
 from typing import Callable, Dict, Optional, Tuple
 
 from ffmpeg import FFmpeg
 
-from ehdr.dataclass import CropHandler
+from ehdr.dataclass import ColorFormat, CropHandler
+from ehdr.dolby_vision import extract_rpu
 from ehdr.video import Video
-
-
-class ColorFormat(Enum):
-    """Target color format for video encoding."""
-    AUTO = "auto"
-    SDR = "sdr"
-    HDR10 = "hdr10"
-    DOLBY_VISION = "dolby_vision"
 
 
 class Encoder:
@@ -39,6 +31,7 @@ class Encoder:
         'colorprim=bt709',
         'transfer=bt709',
         'colormatrix=bt709',
+        'no-hdr10-opt=1',
     ]
 
     HDR_PIXEL_FORMAT = 'yuv420p10le'
@@ -70,6 +63,11 @@ class Encoder:
         self.video = video
         self.target_file = target_file
 
+        # Determine effective color format
+        self.effective_format: ColorFormat = self._determine_effective_format(
+            color_format=color_format
+        )
+
         # Crop dimensions (initialized to full frame)
         self.crop_width = video.width
         self.crop_height = video.height
@@ -77,7 +75,7 @@ class Encoder:
         self.crop_y = 0
 
         # Apply cropping if enabled (not supported for Dolby Vision)
-        if enable_crop and not video.is_dolby_vision_video():
+        if enable_crop and not self.is_dolby_vision():
             self._crop_video(callback=crop_callback)
 
         # Scale dimensions
@@ -94,11 +92,6 @@ class Encoder:
         # Calculate or use provided CRF and preset
         self.crf = crf if crf is not None else self._get_auto_crf()
         self.preset = preset if preset is not None else self._get_auto_preset()
-
-        # Determine effective color format
-        self.effective_format: ColorFormat = self._determine_effective_format(
-            color_format=color_format
-        )
 
     def _determine_effective_format(self, color_format: ColorFormat) -> ColorFormat:
         """Determine the effective color format based on target and source.
@@ -390,6 +383,14 @@ class Encoder:
             return f"scale={w}:{h}"
         return None
 
+    def get_target_file(self) -> Path:
+        """Get the target output file path.
+
+        Returns:
+            Target file Path
+        """
+        return self.target_file
+
     def build_ffmpeg_output_options(self) -> Dict[str, str]:
         """Build FFmpeg output options dictionary for encoding.
 
@@ -430,7 +431,7 @@ class Encoder:
                 # Tone mapping for HDR to SDR conversion
                 output_options['vf'] = (
                     (output_options.get('vf', '') + ',') if 'vf' in output_options else ''
-                ) + 'zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,tonemap=hable,zscale=t=bt709:m=bt709:r=tv,format=yuv420p'
+                ) + 'zscale=primaries=bt2020:transfer=smpte2084:matrix=bt2020nc:t=linear:npl=100,format=gbrpf32le,zscale=primaries=bt709:transfer=bt709:matrix=bt709:range=tv,tonemap=hable,format=yuv420p'
 
         return output_options
 
@@ -466,7 +467,7 @@ class Encoder:
             params.append('max-cll=0,0')
         return params
 
-    def build_x265_command(self, output_file: Path, rpu_file: Optional[str] = None) -> list[str]:
+    def build_x265_command_for_dolby_vision_source(self, output_file: Path, rpu_file: Optional[str] = None) -> list[str]:
         """Build x265 command for Dolby Vision encoding.
 
         Args:
@@ -599,4 +600,87 @@ class Encoder:
 
         except Exception as e:
             print(f"Error during encoding: {e}")
+            return False
+
+    def convert_dolby_vision(
+        self,
+        progress_callback: Optional[Callable] = None,
+    ) -> bool:
+        """Execute Dolby Vision conversion using x265 with RPU injection.
+
+        Args:
+            progress_callback: Optional progress monitor callback (receives stderr and total_frames)
+
+        Returns:
+            True if conversion succeeded, False otherwise
+        """
+        input_file = self.video.get_filepath()
+
+        try:
+            # Extract RPU metadata
+            rpu_file: str | None = ""
+            if self.video.is_dolby_vision_video():
+                rpu_file = extract_rpu(str(input_file))
+
+            # Build ffmpeg to x265 pipeline
+            ffmpeg_cmd: list[str] = [
+                'ffmpeg', '-y',
+                '-i', str(input_file),
+                '-f', 'yuv4mpegpipe',
+                '-strict', '-1',
+                '-pix_fmt', self.video.get_pix_fmt(),
+                '-'
+            ]
+
+            # Build x265 command using encoder
+            x265_cmd: list[str] = self.build_x265_command_for_dolby_vision_source(
+                output_file=self.target_file,
+                rpu_file=rpu_file,
+            )
+
+            # Calculate total frames for progress tracking
+            total_frames = self.video.get_total_frames()
+
+            # Create pipeline
+            ffmpeg_process = subprocess.Popen(
+                ffmpeg_cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL
+            )
+
+            x265_process = subprocess.Popen(
+                x265_cmd,
+                stdin=ffmpeg_process.stdout,
+                stderr=subprocess.PIPE,
+                text=True
+            )
+
+            # Close ffmpeg stdout in parent
+            if ffmpeg_process.stdout:
+                ffmpeg_process.stdout.close()
+
+            # Monitor x265 progress in real-time
+            if total_frames > 0 and x265_process.stderr and progress_callback:
+                progress_callback(x265_process.stderr, total_frames)
+                x265_process.wait()
+            else:
+                # Fallback: just wait for completion
+                _, stderr = x265_process.communicate()
+                if x265_process.returncode != 0:
+                    print("Error: x265 encoding failed")
+                    if stderr:
+                        print(stderr)
+                    return False
+
+            if x265_process.returncode != 0:
+                print("Error: x265 encoding failed")
+                return False
+
+            # Wait for ffmpeg
+            ffmpeg_process.wait()
+
+            return True
+
+        except Exception as e:
+            print(f"Error during Dolby Vision encoding: {e}")
             return False

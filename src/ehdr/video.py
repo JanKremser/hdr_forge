@@ -6,7 +6,7 @@ import subprocess
 from pathlib import Path
 from typing import Dict, LiteralString, Optional, Tuple
 
-from ehdr.dataclass import ContentLightLevelMetadata, DolbyVisionInfo, HdrMetadata, MasterDisplayMetadata
+from ehdr.dataclass import ColorFormat, ContentLightLevelMetadata, DolbyVisionInfo, HdrMetadata, MasterDisplayMetadata
 
 
 DEFAULT_MASTER_DISPLAY: LiteralString = (
@@ -302,6 +302,19 @@ class Video:
         dv_info: DolbyVisionInfo | None = self.get_dolby_vision_infos()
         return dv_info is not None and dv_info.rpu_present_flag == 1
 
+    def get_color_format(self) -> ColorFormat:
+        """Determine the color format of the video.
+
+        Returns:
+            ColorFormat enum value representing the color format
+        """
+        if self.is_dolby_vision_video():
+            return ColorFormat.DOLBY_VISION
+        elif self.is_hdr_video():
+            return ColorFormat.HDR10
+        else:
+            return ColorFormat.SDR
+
     def get_fps(self) -> float:
         """Get video frame rate (frames per second).
 
@@ -338,5 +351,3 @@ class Video:
             Duration in seconds
         """
         return float(self.metadata.get('format', {}).get('duration', 0))
-
-
