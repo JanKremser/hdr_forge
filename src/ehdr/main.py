@@ -296,7 +296,7 @@ def convert_sdr_hdr10(
 
 def convert_dolby_vision(
     video: Video,
-    output_file: Path,
+    target_file: Path,
     crf: Optional[int] = None,
     preset: Optional[str] = None,
 ) -> bool:
@@ -304,7 +304,7 @@ def convert_dolby_vision(
 
     Args:
         video: Video object with metadata
-        output_file: Output video file path
+        target_file: Output video file path
         crf: Optional CRF value (auto-calculated if None)
         preset: Optional preset (auto-calculated if None)
 
@@ -316,7 +316,7 @@ def convert_dolby_vision(
     # Create encoder for Dolby Vision
     encoder = Encoder(
         video=video,
-        target_file=output_file,
+        target_file=target_file,
         color_format=ColorFormat.DOLBY_VISION,
         crf=crf,
         preset=preset,
@@ -341,9 +341,9 @@ def convert_dolby_vision(
         ]
 
         # Build x265 command using encoder
-        x265_cmd = encoder.build_x265_command(output_file=output_file, rpu_file=rpu_file)
+        x265_cmd = encoder.build_x265_command(output_file=target_file, rpu_file=rpu_file)
 
-        print(f"Encoding Dolby Vision to: {output_file.name}")
+        print(f"Encoding Dolby Vision to: {target_file.name}")
 
         # Calculate total frames for progress tracking
         total_frames = video.get_total_frames()
@@ -386,7 +386,7 @@ def convert_dolby_vision(
         # Wait for ffmpeg
         ffmpeg_process.wait()
 
-        print(f"Success: {output_file.name}")
+        print(f"Success: {target_file.name}")
         return True
 
     except Exception as e:
@@ -444,7 +444,7 @@ def process_convert_command(args) -> None:
         if video.is_dolby_vision_video():
             success = convert_dolby_vision(
                 video=video,
-                output_file=out_file,
+                target_file=out_file,
                 crf=args.crf,
                 preset=args.preset,
             )
