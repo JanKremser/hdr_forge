@@ -56,6 +56,7 @@ def extract_rpu(input_file: str, output_rpu: Optional[str] = None) -> str:
 
         dovi_cmd: list[str] = [
             dovi_tool_cmd,
+            '-m', '2', # Convert to profile 8.1
             'extract-rpu',
             '-',
             '-o', str(rpu_path)
