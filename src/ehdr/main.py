@@ -11,6 +11,7 @@ from ffmpeg import FFmpeg
 from ehdr import __version__
 from ehdr.cli_output import callback_handler_crop_video, create_progress_handler, finish_progress, monitor_x265_progress, print_conversion_summary, print_encoding_params, print_video_infos
 from ehdr.dolby_vision import extract_rpu
+from ehdr.encoder import ColorFormat, Encoder
 from ehdr.encoding import (
     build_ffmpeg_output_options,
     determine_output_file,
@@ -176,6 +177,7 @@ def show_video_info(input_file: Path) -> bool:
 def convert_sdr_hdr10(
     video: Video,
     output_file: Path,
+    target_format: ColorFormat = ColorFormat.AUTO,
 ) -> bool:
     """Convert SDR or HDR10 video using ffmpeg with libx265.
 
@@ -190,6 +192,7 @@ def convert_sdr_hdr10(
         True if conversion succeeded, False otherwise
     """
     input_file: Path = video.get_filepath()
+    encoder = Encoder(video=video, target_format=target_format, crf=video.get_crf(), preset=video.get_preset())
     try:
         print_encoding_params(video=video)
 
@@ -199,7 +202,8 @@ def convert_sdr_hdr10(
         ffmpeg.input(str(input_file))
 
         # Build output options
-        output_options: dict = build_ffmpeg_output_options(video=video)
+        output_options: dict = encoder.build_ffmpeg_output_options()
+        
         ffmpeg.output(url=str(output_file), options=output_options)
 
         print(f"Encoding to: {output_file.name}")
