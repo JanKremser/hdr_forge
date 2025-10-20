@@ -6,14 +6,11 @@ import sys
 from pathlib import Path
 from typing import Tuple
 
-from ffmpeg import FFmpeg
-
 from ehdr import __version__
 from ehdr.cli_output import callback_handler_crop_video, create_progress_handler, finish_progress, monitor_x265_progress, print_conversion_summary, print_encoding_params, print_video_infos
 from ehdr.dolby_vision import extract_rpu
 from ehdr.encoder import ColorFormat, Encoder
 from ehdr.encoding import (
-    build_ffmpeg_output_options,
     determine_output_file,
     get_video_files,
 )
@@ -176,55 +173,52 @@ def show_video_info(input_file: Path) -> bool:
 
 def convert_sdr_hdr10(
     video: Video,
-    output_file: Path,
+    target_file: Path,
     target_format: ColorFormat = ColorFormat.AUTO,
 ) -> bool:
     """Convert SDR or HDR10 video using ffmpeg with libx265.
 
     Args:
-        input_file: Input video file path
+        video: Video object with metadata
         output_file: Output video file path
-        crf: Constant Rate Factor (None for auto)
-        preset: Encoding preset (None for auto)
-        enable_crop: Enable automatic cropping
+        target_format: Target color format (AUTO, SDR, HDR10)
 
     Returns:
         True if conversion succeeded, False otherwise
     """
-    input_file: Path = video.get_filepath()
-    encoder = Encoder(video=video, target_format=target_format, crf=video.get_crf(), preset=video.get_preset())
+    encoder = Encoder(
+        video=video,
+        target_file=target_file,
+        target_format=target_format,
+    )
+
     try:
         print_encoding_params(video=video)
 
-        # Build ffmpeg command
-        ffmpeg = FFmpeg()
-        ffmpeg.option('y')
-        ffmpeg.input(str(input_file))
-
-        # Build output options
-        output_options: dict = encoder.build_ffmpeg_output_options()
-        
-        ffmpeg.output(url=str(output_file), options=output_options)
-
-        print(f"Encoding to: {output_file.name}")
-
-        # Execute with progress tracking
-        duration = float(video.metadata.get('format', {}).get('duration', 0))
+        # Prepare progress tracking
+        duration = video.get_duration_seconds()
         total_frames = video.get_total_frames()
-        print()
+
+        progress_handler = None
+        finish_callback = None
+
         if duration > 0:
-            progress_handler = create_progress_handler(duration, total_frames)
-            ffmpeg.on('progress', progress_handler)
-            ffmpeg.execute()
-            finish_progress(total_frames=total_frames, duration=duration)
-        else:
-            ffmpeg.execute()
+            progress_handler = create_progress_handler(duration=duration, total_frames=total_frames)
+            finish_callback = lambda: finish_progress(total_frames=total_frames, duration=duration)
 
+        # Execute conversion
+        success: bool = encoder.convert(
+            progress_callback=progress_handler,
+            finish_callback=finish_callback
+        )
 
-        print(f"Success: {output_file.name}")
-        return True
+        if success:
+            print(f"Success: {target_file.name}")
+
+        return success
 
     except Exception as e:
+        input_file: Path = video.get_filepath()
         print(f"Error processing {input_file.name}: {e}")
         return False
 
@@ -401,7 +395,7 @@ def process_convert_command(args) -> None:
         else:
             success = convert_sdr_hdr10(
                 video=video,
-                output_file=out_file,
+                target_file=out_file,
             )
 
         if success:

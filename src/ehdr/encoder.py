@@ -2,7 +2,9 @@
 
 from enum import Enum
 from pathlib import Path
-from typing import Dict, Optional, Tuple
+from typing import Callable, Dict, Optional, Tuple
+
+from ffmpeg import FFmpeg
 
 from ehdr.video import Video
 
@@ -40,6 +42,7 @@ class Encoder:
     def __init__(
         self,
         video: Video,
+        target_file: Path,
         target_format: ColorFormat = ColorFormat.AUTO,
         crf: Optional[int] = None,
         preset: Optional[str] = None,
@@ -54,6 +57,7 @@ class Encoder:
         """
         self.video = video
         self.target_format = target_format
+        self.target_file = target_file
         self.crf = crf if crf is not None else video.get_crf()
         self.preset = preset if preset is not None else video.get_preset()
 
@@ -266,3 +270,46 @@ class Encoder:
             return "HDR10"
         else:
             return "SDR"
+
+    def convert(
+        self,
+        progress_callback: Optional[Callable] = None,
+        finish_callback: Optional[Callable] = None,
+    ) -> bool:
+        """Execute FFmpeg conversion with configured parameters.
+
+        Args:
+            output_file: Output file path
+            progress_callback: Optional progress handler callback
+            finish_callback: Optional finish callback (called after successful encoding)
+
+        Returns:
+            True if conversion succeeded, False otherwise
+        """
+        input_file = self.video.get_filepath()
+
+        try:
+            # Build ffmpeg command
+            ffmpeg = FFmpeg()
+            ffmpeg.option('y')
+            ffmpeg.input(str(input_file))
+
+            # Build output options
+            output_options: dict = self.build_ffmpeg_output_options()
+            ffmpeg.output(url=str(self.target_file), options=output_options)
+
+            # Execute with optional progress tracking
+            if progress_callback:
+                ffmpeg.on('progress', progress_callback)
+
+            ffmpeg.execute()
+
+            # Call finish callback if provided
+            if finish_callback:
+                finish_callback()
+
+            return True
+
+        except Exception as e:
+            print(f"Error during encoding: {e}")
+            return False

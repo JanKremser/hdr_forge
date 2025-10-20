@@ -434,6 +434,15 @@ class Video:
         fps = self.get_fps()
         return int(duration * fps)
 
+    def get_duration_seconds(self) -> float:
+        """Get total duration of the video in seconds.
+
+        Returns:
+            Duration in seconds
+        """
+        return float(self.metadata.get('format', {}).get('duration', 0))
+
+
     def _get_auto_crf(self) -> int:
         """Calculate optimal CRF value based on resolution.
 
