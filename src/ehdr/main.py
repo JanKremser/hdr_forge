@@ -57,6 +57,18 @@ def parse_args():
         help='Video file for information display'
     )
 
+    # "info" subcommand
+    info_parser = subparsers.add_parser('calc_maxcll',
+        description='Shows information about a video file',
+        help='Display video information'
+    )
+
+    info_parser.add_argument(
+        '-i', '--input',
+        required=True,
+        help='Video file for information display'
+    )
+
     # "convert" subcommand
     convert_parser = subparsers.add_parser('convert',
         description='Convert videos',
@@ -406,6 +418,13 @@ def main() -> None:
         process_info_command(args)
     elif args.command == 'convert':
         process_convert_command(args)
+    elif args.command == 'calc_maxcll':
+        from ehdr.hdr10 import calc_maxcll
+        input_path = Path(args.input)
+        if not input_path.exists():
+            print(f"Error: Input path does not exist: {input_path}")
+            sys.exit(1)
+        calc_maxcll(video_path=str(input_path))
     else:
         print(f"Unknown command: {args.command}")
         sys.exit(1)
