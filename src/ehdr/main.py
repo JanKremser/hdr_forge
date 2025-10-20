@@ -117,6 +117,13 @@ Examples:
         help='Scale video to specified resolution (4K, 2K, UHD, FHD, HD, SD or width in pixels)'
     )
 
+    convert_parser.add_argument(
+        '--color-format',
+        choices=['auto', 'hdr10', 'sdr'],
+        default='auto',
+        help='Target color format for output video (auto = keep source format, hdr10 = convert to HDR10, sdr = convert to SDR)'
+    )
+
     return parser.parse_args()
 
 
