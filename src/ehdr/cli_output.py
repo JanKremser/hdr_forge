@@ -7,6 +7,7 @@ from typing import Callable, IO, Tuple
 from ffmpeg import Progress
 
 from ehdr.dataclass import CropHandler, DolbyVisionInfo
+from ehdr.encoder import Encoder
 from ehdr.video import Video
 
 # Constants
@@ -303,27 +304,25 @@ def print_video_infos(video: Video) -> None:
     print(f"{color_str('_', color)}" * 70)
     print()
 
-def print_encoding_params(video: Video) -> None:
+def print_encoding_params(encoder: Encoder) -> None:
     """Print encoding parameters.
 
     Args:
-        crf: Constant Rate Factor value
-        preset: Encoding preset
-        ffmpeg_options: FFmpeg output options
-        x265_params: x265 encoding parameters
+        encoder: Encoder object with encoding configuration
     """
     color = BLUE
     print()
     print(f"{color_str('_', color)}" * 70)
     print("Encoding Parameters:")
-    print(f"  CRF: {color_str(video.get_crf(), color)}")
-    print(f"  Preset: {color_str(video.get_preset(), color)}")
-    if video.is_cropped_video():
-        crop_filter: str | None = video.get_crop_filter()
+    print(f"  CRF: {color_str(encoder.crf, color)}")
+    print(f"  Preset: {color_str(encoder.preset, color)}")
+    print(f"  Color-Format: {color_str(encoder.get_color_format().value.upper(), color)}")
+    if encoder._is_cropped():
+        crop_filter: str | None = encoder.get_crop_filter()
         print(f"  Crop: {color_str(crop_filter, color)}")
     else:
         print(f"  Crop: {color_str('No cropping applied', color)}")
-    scale_dimensions: Tuple[int, int] | None = video.get_scale_dimensions()
+    scale_dimensions: Tuple[int, int] | None = encoder._get_scale_dimensions()
     if scale_dimensions:
         w, h = scale_dimensions
         print(f"  Scale: {color_str(f"{w}x{h}", color)}")

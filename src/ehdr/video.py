@@ -1,14 +1,12 @@
 """Video metadata extraction and analysis module."""
 
 import json
-import math
 import re
 import subprocess
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-from typing import Dict, LiteralString, Optional, Tuple, Callable
+from typing import Dict, LiteralString, Optional, Tuple
 
-from ehdr.dataclass import ContentLightLevelMetadata, CropHandler, DolbyVisionInfo, HdrMetadata, MasterDisplayMetadata
+from ehdr.dataclass import ContentLightLevelMetadata, DolbyVisionInfo, HdrMetadata, MasterDisplayMetadata
 
 
 DEFAULT_MASTER_DISPLAY: LiteralString = (
@@ -23,7 +21,7 @@ DEFAULT_MASTER_DISPLAY: LiteralString = (
 class Video:
     """Handles video file metadata extraction and analysis."""
 
-    def __init__(self, filepath: Path, crf: Optional[int] = None, preset: Optional[str] = None, scale_height: Optional[int] = None, enable_crop: bool = False, callback_handler_crop_video: Optional[Callable[[CropHandler], None]] = None) -> None:
+    def __init__(self, filepath: Path) -> None:
         """Initialize video object and extract metadata using ffprobe.
 
         Args:
@@ -41,36 +39,6 @@ class Video:
         video_stream: dict = self._get_video_stream()
         self.width = video_stream.get('width', 0)
         self.height = video_stream.get('height', 0)
-
-        # Crop dimensions (initialized to full frame)
-        self.crop_width = self.width
-        self.crop_height = self.height
-        self.crop_x = 0
-        self.crop_y = 0
-
-        if enable_crop and self.is_dolby_vision_video() is False:
-            self.crop_video(
-                callback=callback_handler_crop_video
-            )
-
-        self.scale_video = False
-        self.scale_width: int | None = None
-        self.scale_height: int | None = None
-        if scale_height is not None and scale_height < self.height:
-            aspect_ratio: float = self.width / self.height
-            self.scale_video = True
-            self.scale_width = math.ceil(scale_height * aspect_ratio)
-            self.scale_height = scale_height
-
-        if crf is None:
-            self.crf = self._get_auto_crf()
-        else:
-            self.crf = crf
-
-        if preset is None:
-            self.preset = self._get_auto_preset()
-        else:
-            self.preset = preset
 
 
     def extract_hdr_metadata(self) -> HdrMetadata:
@@ -191,22 +159,6 @@ class Video:
             Path object of the video file
         """
         return self.filepath
-
-    def get_crf(self) -> int:
-        """Get the CRF value for encoding.
-
-        Returns:
-            CRF value
-        """
-        return self.crf
-
-    def get_preset(self) -> str:
-        """Get the preset value for encoding.
-
-        Returns:
-            Preset string
-        """
-        return self.preset
 
     def get_width(self) -> int:
         """Get video width.
@@ -350,61 +302,6 @@ class Video:
         dv_info: DolbyVisionInfo | None = self.get_dolby_vision_infos()
         return dv_info is not None and dv_info.rpu_present_flag == 1
 
-    def is_cropped_video(self) -> bool:
-        """Check if video has been cropped.
-
-        Returns:
-            True if cropping parameters differ from original dimensions, False otherwise
-        """
-        return (self.crop_width != self.width or
-                self.crop_height != self.height or
-                self.crop_x != 0 or
-                self.crop_y != 0)
-
-    def get_scale_dimensions(self) -> Optional[Tuple[int, int]]:
-        """Get target scale dimensions if scaling is enabled.
-
-        Returns:
-            Tuple of (width, height) or None if scaling is not applied
-        """
-        if self.scale_video and self.scale_width and self.scale_height:
-            if self.is_cropped_video():
-
-                width = self.crop_width
-                height = self.crop_height
-                new_aspect_ratio: float = width / height
-
-                if self.crop_width > self.scale_width:
-                    new_scale_height = math.floor(self.scale_width / new_aspect_ratio)
-                    return (self.scale_width, new_scale_height)
-
-                if self.crop_height > self.scale_height:
-                    new_scale_width = math.ceil(self.scale_height * new_aspect_ratio)
-                    return (new_scale_width, self.scale_height)
-
-                return (width, height)
-            else:
-                return (self.scale_width, self.scale_height)
-
-        return None
-
-    def get_pixel_count(self) -> int:
-        """Get total pixel count (width * height).
-
-        Returns:
-            Total number of pixels
-        """
-
-        scale_d: Tuple[int, int] | None = self.get_scale_dimensions();
-        if scale_d:
-            w, h = scale_d
-            return w * h
-
-        if self.is_cropped_video():
-            return self.crop_width * self.crop_height
-
-        return self.width * self.height
-
     def get_fps(self) -> float:
         """Get video frame rate (frames per second).
 
@@ -443,192 +340,3 @@ class Video:
         return float(self.metadata.get('format', {}).get('duration', 0))
 
 
-    def _get_auto_crf(self) -> int:
-        """Calculate optimal CRF value based on resolution.
-
-        Returns:
-            CRF value (lower = higher quality)
-        """
-        pixels = self.get_pixel_count()
-
-        # UHD 4K (3840x2160 = 8,294,400 pixels)
-        if pixels >= 6_144_000:
-            return 13
-
-        # 2K to 4K range - scale linearly
-        if pixels >= 2_211_841:
-            # Linear interpolation between 14 (at 6.14M) and 18 (at 2.21M)
-            ratio = (pixels - 2_211_841) / (6_144_000 - 2_211_841)
-            return int(18 - (4 * ratio))
-
-        # Full HD (1920x1080 = 2,073,600 pixels)
-        if pixels >= 2_073_600:
-            return 18
-
-        # Lower resolutions
-        if pixels >= 1_000_000:
-            return 19
-
-        return 20
-
-    def _get_auto_preset(self) -> str:
-        """Select optimal encoding preset based on resolution.
-
-        Returns:
-            Preset string (faster preset = quicker encoding, lower compression)
-        """
-        pixels = self.get_pixel_count()
-
-        # 4K+ (4096x2160 = 8,847,360 pixels)
-        if pixels >= 8_847_361:
-            return 'superfast'
-
-        # 2K to 4K range
-        if pixels >= 2_073_601:
-            return 'faster'
-
-        # Full HD
-        if pixels >= 2_073_600:
-            return 'fast'
-
-        # Lower resolutions
-        return 'medium'
-
-    def _detect_crop_at_position(self, position_seconds: int) -> Optional[Tuple[int, int, int, int]]:
-        """Detect crop parameters at a specific video position.
-
-        Args:
-            position_seconds: Time position in seconds to analyze
-
-        Returns:
-            Tuple of (width, height, x, y) or None if detection fails
-        """
-        try:
-            # FFmpeg-Kommando direkt mit subprocess ausführen statt mit FFmpeg-Bibliothek
-            cmd = [
-                'ffmpeg',
-                '-ss', str(position_seconds),
-                '-i', str(self.filepath),
-                '-t', '5',  # Analyze 5 seconds
-                '-vf', 'cropdetect',
-                '-f', 'null',
-                '-'
-            ]
-
-            process = subprocess.run(
-                cmd,
-                stderr=subprocess.PIPE,
-                stdout=subprocess.DEVNULL,
-                text=True,
-                check=False
-            )
-
-            stderr_output = process.stderr
-
-            # Parse cropdetect output
-            crop_pattern = re.compile(r'crop=(\d+):(\d+):(\d+):(\d+)')
-            matches = crop_pattern.findall(stderr_output)
-
-            if matches:
-                # Get the last (most stable) crop detection
-                w, h, x, y = matches[-1]
-                return (int(w), int(h), int(x), int(y))
-
-        except Exception as ex:
-            print(f"Fehler bei crop detection: {ex}")
-
-        return None
-
-    def crop_video(self, num_threads: int = 10,
-                  callback: Optional[Callable[[CropHandler], None]] = None) -> None:
-        """Detect and apply optimal crop parameters using multi-threaded analysis.
-
-        Args:
-            num_threads: Number of concurrent threads for crop detection
-            callback: Optional callback function to handle progress messages or crop results.
-                      Function signature: callback(message: Union[str, CropHandler], end: Optional[str] = None)
-        """
-        if callback:
-            callback(CropHandler(
-                finish_progress=False,
-                completed_samples=0,
-                total_samples=num_threads,
-            ))
-
-        # Get video duration
-        duration = float(self.metadata.get('format', {}).get('duration', 0))
-
-        if duration <= 0:
-            return
-
-        # Calculate positions to sample (evenly distributed)
-        interval = duration / (num_threads + 1)
-        positions = [int(interval * (i + 1)) for i in range(num_threads)]
-
-        # Run crop detection in parallel
-        crop_results = []
-        completed = 0
-        with ThreadPoolExecutor(max_workers=num_threads) as executor:
-            futures = {
-                executor.submit(self._detect_crop_at_position, pos): pos
-                for pos in positions
-            }
-
-            for future in as_completed(futures):
-                result = future.result()
-                if result:
-                    crop_results.append(result)
-                completed += 1
-                # Show progress
-                #progress_msg = f"Analyzing crop: {completed}/{num_threads} samples"
-                if callback:
-                    callback(CropHandler(
-                        finish_progress=False,
-                        completed_samples=completed,
-                        total_samples=num_threads,
-                    ))
-
-        # Send final crop handler with all results
-        if callback:
-            callback(CropHandler(
-                finish_progress=True,
-                completed_samples=completed,
-                total_samples=num_threads,
-            ))
-
-        if not crop_results:
-            return
-
-        # Find most common crop dimensions
-        from collections import Counter
-        crop_counter = Counter(crop_results)
-        most_common_crop = crop_counter.most_common(1)[0][0]
-
-        self.crop_width, self.crop_height, self.crop_x, self.crop_y = most_common_crop
-
-    def get_crop_filter(self) -> Optional[str]:
-        """Get ffmpeg crop filter string if cropping is needed.
-
-        Returns:
-            Crop filter string or None if no cropping needed
-        """
-        if (self.crop_width != self.width or
-            self.crop_height != self.height or
-            self.crop_x != 0 or
-            self.crop_y != 0):
-
-            return f"crop={self.crop_width}:{self.crop_height}:{self.crop_x}:{self.crop_y}"
-        return None
-
-    def get_scale_filter(self) -> Optional[str]:
-        """Get ffmpeg scale filter string if scaling is needed.
-
-        Returns:
-            Scale filter string or None if no scaling needed
-        """
-        scale_d: Tuple[int, int] | None = self.get_scale_dimensions();
-        if scale_d:
-            w, h = scale_d
-            return f"scale={w}:{h}"
-
-        return None

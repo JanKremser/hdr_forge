@@ -4,16 +4,12 @@ import argparse
 import subprocess
 import sys
 from pathlib import Path
-from typing import Tuple
+from typing import Optional
 
 from ehdr import __version__
 from ehdr.cli_output import callback_handler_crop_video, create_progress_handler, finish_progress, monitor_x265_progress, print_conversion_summary, print_encoding_params, print_video_infos
 from ehdr.dolby_vision import extract_rpu
 from ehdr.encoder import ColorFormat, Encoder
-from ehdr.encoding import (
-    determine_output_file,
-    get_video_files,
-)
 from ehdr.video import Video
 
 # Supported input video formats
@@ -147,6 +143,67 @@ def get_scale_height(scale: str | None) -> int | None:
     return target_height
 
 
+def get_color_format_from_string(format_str: str | None) -> ColorFormat:
+    """Convert string to ColorFormat enum.
+
+    Args:
+        format_str: Color format string
+
+    Returns:
+        Corresponding ColorFormat enum value
+    """
+    if format_str is None:
+        return ColorFormat.AUTO
+
+    format_str = format_str.lower()
+    if format_str == 'sdr':
+        return ColorFormat.SDR
+    elif format_str == 'hdr10':
+        return ColorFormat.HDR10
+    elif format_str == 'dolby_vision':
+        return ColorFormat.DOLBY_VISION
+    else:
+        return ColorFormat.AUTO
+
+def get_video_files(path: Path, supported_formats: list[str]) -> list[Path]:
+    """Get list of video files from path.
+
+    Args:
+        path: File or directory path
+        supported_formats: list of supported file extensions
+
+    Returns:
+        list of video file paths
+    """
+    if path.is_file():
+        return [path] if path.suffix.lower() in supported_formats else []
+
+    if path.is_dir():
+        video_files: list = []
+        for fmt in supported_formats:
+            video_files.extend(path.glob(f'*{fmt}'))
+        return sorted(video_files)
+
+    return []
+
+
+def determine_output_file(video_file: Path, output_path: Path, is_batch: bool) -> Path:
+    """Determine output file path for a video file.
+
+    Args:
+        video_file: Input video file
+        output_path: Output path (file or directory)
+        is_batch: Whether this is batch processing
+
+    Returns:
+        Output file path
+    """
+    if is_batch:
+        return output_path / video_file.with_suffix('.mkv').name
+    return output_path
+
+
+
 def show_video_info(input_file: Path) -> bool:
     """Show detailed information about a video file.
 
@@ -175,13 +232,22 @@ def convert_sdr_hdr10(
     video: Video,
     target_file: Path,
     target_format: ColorFormat = ColorFormat.AUTO,
+    crf: Optional[int] = None,
+    preset: Optional[str] = None,
+    scale_height: Optional[int] = None,
+    enable_crop: bool = False,
 ) -> bool:
     """Convert SDR or HDR10 video using ffmpeg with libx265.
 
     Args:
         video: Video object with metadata
-        output_file: Output video file path
+        target_file: Target output file path
         target_format: Target color format (AUTO, SDR, HDR10)
+        crf: Optional CRF value (auto-calculated if None)
+        preset: Optional preset (auto-calculated if None)
+        scale_height: Optional target height for scaling
+        enable_crop: Enable automatic cropping
+        crop_callback: Optional crop detection progress callback
 
     Returns:
         True if conversion succeeded, False otherwise
@@ -189,11 +255,16 @@ def convert_sdr_hdr10(
     encoder = Encoder(
         video=video,
         target_file=target_file,
-        target_format=target_format,
+        color_format=target_format,
+        crf=crf,
+        preset=preset,
+        scale_height=scale_height,
+        enable_crop=enable_crop,
+        crop_callback=callback_handler_crop_video,
     )
 
     try:
-        print_encoding_params(video=video)
+        print_encoding_params(encoder=encoder)
 
         # Prepare progress tracking
         duration = video.get_duration_seconds()
@@ -226,24 +297,38 @@ def convert_sdr_hdr10(
 def convert_dolby_vision(
     video: Video,
     output_file: Path,
+    crf: Optional[int] = None,
+    preset: Optional[str] = None,
 ) -> bool:
     """Convert Dolby Vision video using x265 with RPU injection.
 
     Args:
-        input_file: Input video file path
+        video: Video object with metadata
         output_file: Output video file path
-        crf: Constant Rate Factor (None for auto)
-        preset: Encoding preset (None for auto)
+        crf: Optional CRF value (auto-calculated if None)
+        preset: Optional preset (auto-calculated if None)
 
     Returns:
         True if conversion succeeded, False otherwise
     """
     input_file: Path = video.get_filepath()
+
+    # Create encoder for Dolby Vision
+    encoder = Encoder(
+        video=video,
+        target_file=output_file,
+        color_format=ColorFormat.DOLBY_VISION,
+        crf=crf,
+        preset=preset,
+        enable_crop=False,  # Cropping not supported for Dolby Vision
+        scale_height=None,  # Scaling not supported for Dolby Vision
+    )
+
     try:
         # Extract RPU metadata
         rpu_file = extract_rpu(str(input_file))
 
-        print_encoding_params(video=video)
+        print_encoding_params(encoder=encoder)
 
         # Build ffmpeg to x265 pipeline
         ffmpeg_cmd: list[str] = [
@@ -255,41 +340,8 @@ def convert_dolby_vision(
             '-'
         ]
 
-        # Build x265 command with separate arguments (like Rust version)
-        crf = video.get_crf()
-        preset = video.get_preset()
-        x265_cmd: list[str] = [
-            'x265',
-            '-',
-            '--input-depth', '10',
-            '--output-depth', '10',
-            '--y4m',
-            '--preset', preset,
-            '--crf', str(crf),
-        ]
-
-        # Add master display metadata
-        master_display = video.get_master_display()
-        if master_display:
-            x265_cmd.extend(['--master-display', master_display])
-
-        # Add max CLL and FALL if available
-        max_cll_max_fall: Tuple[int, int] | None = video.get_max_cll_max_fall(return_fallback=True)
-        if max_cll_max_fall:
-            max_cll, max_fall = max_cll_max_fall
-            x265_cmd.extend(['--max-cll', f'{max_cll},{max_fall}'])
-
-        # Add remaining HDR parameters
-        x265_cmd.extend([
-            '--colormatrix', video.get_color_space(),
-            '--colorprim', video.get_color_primaries(),
-            '--transfer', video.get_color_transfer(),
-            '--dolby-vision-rpu', rpu_file,
-            '--dolby-vision-profile', DOLBY_VISION_PROFILE,
-            '--vbv-bufsize', '20000',
-            '--vbv-maxrate', '20000',
-            f'{str(output_file)}.hevc'
-        ])
+        # Build x265 command using encoder
+        x265_cmd = encoder.build_x265_command(output_file=output_file, rpu_file=rpu_file)
 
         print(f"Encoding Dolby Vision to: {output_file.name}")
 
@@ -374,6 +426,8 @@ def process_convert_command(args) -> None:
     # Determine target height from scale argument if present
     scale_height: int | None = get_scale_height(args.scale)
 
+    color_format: ColorFormat = get_color_format_from_string(args.color_format)
+
     # Process each video file
     success_count = 0
     fail_count = 0
@@ -383,7 +437,7 @@ def process_convert_command(args) -> None:
         out_file: Path = determine_output_file(video_file=video_file, output_path=output_path, is_batch=is_batch)
         out_file.parent.mkdir(parents=True, exist_ok=True)
 
-        video = Video(filepath=video_file, crf=args.crf, preset=args.preset, scale_height=scale_height, enable_crop=not args.ncrop, callback_handler_crop_video=callback_handler_crop_video)
+        video = Video(filepath=video_file)
         print_video_infos(video=video)
 
         # Convert based on mode
@@ -391,11 +445,18 @@ def process_convert_command(args) -> None:
             success = convert_dolby_vision(
                 video=video,
                 output_file=out_file,
+                crf=args.crf,
+                preset=args.preset,
             )
         else:
             success = convert_sdr_hdr10(
                 video=video,
                 target_file=out_file,
+                target_format=color_format,
+                crf=args.crf,
+                preset=args.preset,
+                scale_height=scale_height,
+                enable_crop=not args.ncrop,
             )
 
         if success:
