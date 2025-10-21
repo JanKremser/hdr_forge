@@ -282,14 +282,28 @@ def convert_video(
 
         success: bool = False
         if encoder.is_dolby_vision():
-            progress_handler = None
+            # progress_handler = None
 
-            if total_frames > 0:
-                progress_handler = lambda stderr, frames: monitor_x265_progress(stderr=stderr, total_frames=frames)
+            # if total_frames > 0:
+            #     progress_handler = lambda stderr, frames: monitor_x265_progress(stderr=stderr, total_frames=frames)
+
+            # # Execute conversion
+            # success = encoder.convert_dolby_vision(
+            #     progress_callback=progress_handler
+            # )
+            duration = video.get_duration_seconds()
+
+            progress_handler = None
+            finish_callback = None
+
+            if duration > 0:
+                progress_handler = create_progress_handler(duration=duration, total_frames=total_frames)
+                finish_callback = lambda: finish_progress(total_frames=total_frames, duration=duration)
 
             # Execute conversion
-            success = encoder.convert_dolby_vision(
-                progress_callback=progress_handler
+            success: bool = encoder.test_convert_dolby_vision(
+                progress_callback=progress_handler,
+                finish_callback=finish_callback
             )
         else:
             duration = video.get_duration_seconds()

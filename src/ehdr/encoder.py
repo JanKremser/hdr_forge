@@ -9,6 +9,7 @@ from typing import Callable, Dict, Optional, Tuple
 
 from ffmpeg import FFmpeg
 
+from ehdr.container import mkv
 from ehdr.dataclass import ColorFormat, CropHandler
 from ehdr.hdr_formats import dolby_vision
 from ehdr.video import Video
@@ -526,23 +527,13 @@ class Encoder:
         else:
             return "SDR"
 
-    def convert(
+    def _start_ffmpeg_process(
         self,
+        input_file: Path,
+        target_file: Path,
         progress_callback: Optional[Callable] = None,
         finish_callback: Optional[Callable] = None,
-    ) -> bool:
-        """Execute FFmpeg conversion with configured parameters.
-
-        Args:
-            output_file: Output file path
-            progress_callback: Optional progress handler callback
-            finish_callback: Optional finish callback (called after successful encoding)
-
-        Returns:
-            True if conversion succeeded, False otherwise
-        """
-        input_file = self.video.get_filepath()
-
+    ):
         try:
             # Build ffmpeg command
             ffmpeg = FFmpeg()
@@ -551,7 +542,7 @@ class Encoder:
 
             # Build output options
             output_options: dict = self.build_ffmpeg_output_options()
-            ffmpeg.output(url=str(self.target_file), options=output_options)
+            ffmpeg.output(url=str(target_file), options=output_options)
 
             # Execute with optional progress tracking
             if progress_callback:
@@ -569,6 +560,81 @@ class Encoder:
             print(f"Error during encoding: {e}")
             return False
 
+    def convert(
+        self,
+        progress_callback: Optional[Callable] = None,
+        finish_callback: Optional[Callable] = None,
+    ) -> bool:
+        """Execute FFmpeg conversion with configured parameters.
+
+        Args:
+            output_file: Output file path
+            progress_callback: Optional progress handler callback
+            finish_callback: Optional finish callback (called after successful encoding)
+
+        Returns:
+            True if conversion succeeded, False otherwise
+        """
+        input_file = self.video.get_filepath()
+
+        return self._start_ffmpeg_process(
+            input_file=input_file,
+            target_file=self.target_file,
+            progress_callback=progress_callback,
+            finish_callback=finish_callback,
+        )
+
+    def test_convert_dolby_vision(
+        self,
+        progress_callback: Optional[Callable] = None,
+        finish_callback: Optional[Callable] = None,
+    ) -> bool:
+        input_file = self.video.get_filepath()
+
+        # Extract RPU metadata
+        rpu_file: str = dolby_vision.extract_rpu(str(input_file))
+
+        # base Layer
+        base_layer_file: str = dolby_vision.extract_base_layer(
+            input_file=str(input_file),
+        )
+
+        bl_mkv_file: str = mkv.mux_hevc_to_mkv(
+            input_hevc=base_layer_file,
+            input_mkv=str(input_file),
+        )
+        bl_path = Path(bl_mkv_file)
+
+        bl_encode_file = input_file.with_name(f"{input_file.stem}_BL_Encoding.mkv")
+
+        s: bool = self._start_ffmpeg_process(
+            input_file=bl_path,
+            target_file=bl_encode_file,
+            progress_callback=progress_callback,
+            finish_callback=finish_callback,
+        )
+
+        if s is False:
+            return False
+
+        bl_encode_hevc_file: str = mkv.extract_hevc(
+            input_mkv=str(bl_encode_file),
+            output_hevc=str(bl_encode_file.with_suffix('.hevc'))
+        )
+
+        bl_rpu_hevc_file: str = dolby_vision.inject_rpu(
+            input_file=bl_encode_hevc_file,
+            input_rpu=rpu_file,
+        )
+
+        bl_mkv_file: str = mkv.mux_hevc_to_mkv(
+            input_hevc=bl_rpu_hevc_file,
+            input_mkv=str(bl_encode_file),
+            output_mkv=str(self.target_file),
+        )
+
+        return True
+
     def convert_dolby_vision(
         self,
         progress_callback: Optional[Callable] = None,
@@ -584,11 +650,26 @@ class Encoder:
         input_file = self.video.get_filepath()
 
         try:
-            if self.video.is_dolby_vision_video():
+            if self.video.is_dolby_vision_video() is False:
                 return False
 
             # Extract RPU metadata
             rpu_file: str = dolby_vision.extract_rpu(str(input_file))
+
+            # # base Layer
+            # base_layer_file: str = dolby_vision.extract_base_layer(
+            #     input_file=str(input_file),
+            # )
+
+            # bl_mkv_file: str = mkv.mux_hevc_to_mkv(
+            #     input_hevc=base_layer_file,
+            # )
+
+            # self._start_ffmpeg_process(
+            #     input_file=Path(bl_mkv_file),
+            #     progress_callback=progress_callback,
+            #     finish_callback=finish_callback,
+            # )
 
             # Build ffmpeg to x265 pipeline
             ffmpeg_cmd: list[str] = [
