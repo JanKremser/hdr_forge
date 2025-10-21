@@ -23,7 +23,6 @@ def print_encoding_params(encoder: Encoder) -> None:
     print(f"  Output File: {color_str(str(encoder.get_target_file()), color)}")
     print(f"  CRF: {color_str(encoder.crf, color)}")
     print(f"  Preset: {color_str(encoder.preset, color)}")
-    print(f"  Color-Format: {color_str(encoder.get_color_format().value.upper(), color)}")
     if encoder._is_cropped():
         crop_filter: str | None = encoder.get_crop_filter()
         print(f"  Crop: {color_str(crop_filter, color)}")
@@ -33,6 +32,10 @@ def print_encoding_params(encoder: Encoder) -> None:
     if scale_dimensions:
         w, h = scale_dimensions
         print(f"  Scale: {color_str(f"{w}x{h}", color)}")
+    print(f"  HDR/SDR: {color_str(encoder.get_color_format().value.upper(), color)}")
+    if encoder.is_dolby_vision_encoding():
+        print(f"  Dolby Vision:")
+        print(f"    Profile: {color_str(encoder.get_encoding_dolby_vision_profile(), color)}")
     print(f"{color_str('_', color)}" * 70)
     print()
 

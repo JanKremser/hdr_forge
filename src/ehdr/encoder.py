@@ -161,6 +161,23 @@ class Encoder:
 
         return dv_profile
 
+    def get_encoding_dolby_vision_profile(self) -> Optional[int]:
+        """Get the Dolby Vision profile number for encoding.
+
+        Returns:
+            Dolby Vision profile number (8) or None if not applicable
+        """
+        if not self.is_dolby_vision_encoding():
+            return None
+
+        if self.dv_profile_for_encoding == DolbyVisionProfile.AUTO:
+            profile: int | None = self.video.get_dolby_vision_profile()
+            return profile
+        elif self.dv_profile_for_encoding == DolbyVisionProfile._8:
+            return 8
+
+        return None
+
     def get_color_format(self) -> ColorFormat:
         """Get the effective color format for encoding.
 
@@ -541,7 +558,7 @@ class Encoder:
         else:
             return "SDR"
 
-    def _start_ffmpeg_process(
+    def _run_ffmpeg_encoding_process(
         self,
         input_file: Path,
         target_file: Path,
@@ -591,7 +608,7 @@ class Encoder:
         """
         input_file = self.video.get_filepath()
 
-        return self._start_ffmpeg_process(
+        return self._run_ffmpeg_encoding_process(
             input_file=input_file,
             target_file=self.target_file,
             progress_callback=progress_callback,
@@ -662,7 +679,7 @@ class Encoder:
         if only_hdr10_or_sdr_encoding:
             encoded_base_layer_mkv = self.target_file
 
-        encoding_success: bool = self._start_ffmpeg_process(
+        encoding_success: bool = self._run_ffmpeg_encoding_process(
             input_file=Path(base_layer_mkv_path),
             target_file=encoded_base_layer_mkv,
             progress_callback=progress_callback,
@@ -685,7 +702,7 @@ class Encoder:
         # Step 4: Extract encoded HEVC video stream from MKV
         encoded_hevc_bl_path: Path = mkv.extract_hevc(
             input_mkv=str(encoded_base_layer_mkv),
-            output_hevc=temp_dir / f"video_BL_Encoded.hevc"
+            output_hevc=temp_dir / f"video_encoded_BL.hevc"
         )
 
         # Step 5: Extract RPU metadata from original Dolby Vision video
@@ -695,27 +712,28 @@ class Encoder:
             dv_profile_encoding=self.dv_profile_for_encoding
         )
 
-        # # Setup 5.1: If AUTO profile and source is profile 7, demux EL profile 7 RPU
-        if self.dv_profile_for_encoding == DolbyVisionProfile.AUTO:
-            if self.video.get_dolby_vision_profile() == 7:
-                # start demux EL profile 7 for profile 7 encoding
-                el_path: Path = dolby_vision.extract_enhancement_layer(
-                    input_file=input_file,
-                    output_el=temp_dir / f"video_EL_Profile7.hevc",
-                )
-                bl_el_hevc: Path = dolby_vision.inject_dolby_vision_layers(
-                    bl_path=encoded_hevc_bl_path,
-                    el_path=el_path,
-                    output_bl_el=temp_dir / f"video_BL_EL_Profile7.hevc",
-                )
-                encoded_hevc_bl_path.unlink(missing_ok=True)
-                encoded_hevc_bl_path = bl_el_hevc
+        add_el_profile7: bool = False
+        # Setup 5.1: If AUTO profile and source is profile 7, demux EL profile 7 RPU
+        if self.dv_profile_for_encoding == DolbyVisionProfile.AUTO and self.video.get_dolby_vision_profile() == 7:
+            # start demux EL profile 7 for profile 7 encoding
+            el_path: Path = dolby_vision.extract_enhancement_layer(
+                input_file=input_file,
+                output_el=temp_dir / f"video_EL.hevc",
+            )
+            bl_el_hevc: Path = dolby_vision.inject_dolby_vision_layers(
+                bl_path=encoded_hevc_bl_path,
+                el_path=el_path,
+                output_bl_el=temp_dir / f"video_encoded_BL_EL.hevc",
+            )
+            add_el_profile7 = True
+            encoded_hevc_bl_path.unlink(missing_ok=True)
+            encoded_hevc_bl_path = bl_el_hevc
 
         # Step 6: Inject original RPU metadata back into encoded HEVC
         encoded_hevc_with_rpu_path: str = dolby_vision.inject_rpu(
             input_file=str(encoded_hevc_bl_path),
             input_rpu=rpu_file_path,
-            output_hevc=str(temp_dir / f"video_BL_Encoded_RPU.hevc")
+            output_hevc=str(temp_dir / f"video_encoded_BL_{'EL_' if add_el_profile7 else ''}RPU.hevc")
         )
 
         # Cleanup: Delete encoded HEVC without RPU (no longer needed after RPU injection)
