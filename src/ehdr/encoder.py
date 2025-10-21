@@ -579,14 +579,20 @@ class Encoder:
         1. Extracts RPU metadata from original video
         2. Extracts base layer (HEVC without RPU)
         3. Muxes base layer into MKV with original audio/subtitles
+           -> Deletes base layer HEVC
         4. Re-encodes the base layer with FFmpeg
+           -> Deletes base layer MKV
         5. Extracts encoded HEVC from MKV
         6. Injects original RPU back into encoded HEVC
+           -> Deletes encoded HEVC without RPU
+           -> Deletes RPU file
         7. Muxes final video with audio/subtitles into target file
+           -> Deletes encoded HEVC with RPU
+           -> Deletes encoded base layer MKV
         8. Cleans up temporary directory
 
-        All intermediate files are stored in a temporary directory, which is
-        automatically removed upon successful completion.
+        All intermediate files are stored in a temporary directory and deleted
+        incrementally as soon as they are no longer needed to minimize disk usage.
 
         Args:
             progress_callback: Optional progress handler callback
@@ -620,6 +626,9 @@ class Encoder:
             output_mkv=str(temp_dir / f"{input_file.stem}_BL.mkv")
         )
 
+        # Cleanup: Delete base layer HEVC (no longer needed after muxing)
+        Path(base_layer_hevc_path).unlink(missing_ok=True)
+
         # Step 4: Re-encode the base layer MKV with FFmpeg (apply CRF, filters, etc.)
         encoded_base_layer_mkv = temp_dir / f"{input_file.stem}_BL_Encoded.mkv"
 
@@ -632,6 +641,9 @@ class Encoder:
 
         if not encoding_success:
             return False
+
+        # Cleanup: Delete base layer MKV (no longer needed after encoding)
+        Path(base_layer_mkv_path).unlink(missing_ok=True)
 
         # Step 5: Extract encoded HEVC video stream from MKV
         encoded_hevc_path: str = mkv.extract_hevc(
@@ -646,6 +658,11 @@ class Encoder:
             output_hevc=str(temp_dir / f"{input_file.stem}_BL_Encoded_RPU.hevc")
         )
 
+        # Cleanup: Delete encoded HEVC without RPU (no longer needed after RPU injection)
+        Path(encoded_hevc_path).unlink(missing_ok=True)
+        # Cleanup: Delete RPU file (no longer needed after injection)
+        Path(rpu_file_path).unlink(missing_ok=True)
+
         # Step 7: Mux final HEVC (with RPU) + audio/subtitles into target file
         mkv.mux_hevc_to_mkv(
             input_hevc=encoded_hevc_with_rpu_path,
@@ -653,7 +670,7 @@ class Encoder:
             output_mkv=str(self.target_file),
         )
 
-        # Step 8: Clean up temporary directory
+        # Step 8: Clean up temporary directory (should be empty now, but removes it anyway)
         self._cleanup_temp_directory()
 
         return True
