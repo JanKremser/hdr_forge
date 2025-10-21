@@ -1,6 +1,9 @@
 import subprocess
+import threading
 from pathlib import Path
 from typing import Optional
+
+from ehdr.cli.cli_output import monitor_process_progress
 
 
 def extract_hevc(input_mkv: str, output_hevc: Optional[str] = None) -> str:
@@ -28,13 +31,24 @@ def extract_hevc(input_mkv: str, output_hevc: Optional[str] = None) -> str:
             stderr=subprocess.DEVNULL
         )
 
+        # Start a thread to monitor and show progress
+        monitor_thread = threading.Thread(
+            target=monitor_process_progress,
+            args=(ffmpeg_process, "Extracting HEVC:"),
+            daemon=True
+        )
+        monitor_thread.start()
+
         # Wait for ffmpeg to complete
         ffmpeg_process.wait()
+
+        # Wait for the monitor thread to finish
+        monitor_thread.join(timeout=1.0)
 
         if not hevc_output_path.exists():
             raise RuntimeError("HEVC file was not created")
 
-        print(f"HEVC extracted successfully: {hevc_output_path}")
+        print(f"- HEVC extracted successfully: {hevc_output_path}")
         return str(hevc_output_path)
 
     except FileNotFoundError as e:
@@ -84,13 +98,24 @@ def mux_hevc_to_mkv(input_hevc: str, input_mkv: Optional[str] = None, output_mkv
             stderr=subprocess.DEVNULL
         )
 
+        # Start a thread to monitor and show progress
+        monitor_thread = threading.Thread(
+            target=monitor_process_progress,
+            args=(mkvmerge_process, "Muxing HEVC to MKV:"),
+            daemon=True
+        )
+        monitor_thread.start()
+
         # Wait for mkvmerge to complete
         mkvmerge_process.wait()
+
+        # Wait for the monitor thread to finish
+        monitor_thread.join(timeout=1.0)
 
         if not mkv_output_path.exists():
             raise RuntimeError("MKV file was not created")
 
-        print(f"HEVC muxed to MKV successfully: {mkv_output_path}")
+        print(f"- HEVC muxed to MKV successfully: {mkv_output_path}")
         return str(mkv_output_path)
 
     except FileNotFoundError as e:

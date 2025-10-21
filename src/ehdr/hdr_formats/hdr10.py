@@ -4,7 +4,7 @@ from multiprocessing import Pool, cpu_count, Manager
 import time
 import math
 
-from ehdr.cli_output import create_progress_bar
+from ehdr.cli.cli_output import create_progress_bar
 
 SEGMENT_DURATION = 30  # Sekunden pro Segment (anpassbar)
 
@@ -81,7 +81,7 @@ def process_segment(video_path, start, duration, width, height, frame_sample_rat
     while True:
         if process.stdout is None:
             break
-        
+
         raw = process.stdout.read(frame_size)
         if len(raw) < frame_size:
             break

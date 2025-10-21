@@ -1,8 +1,11 @@
 """Dolby Vision metadata extraction and handling."""
 
 import subprocess
+import threading
 from pathlib import Path
 from typing import Optional
+
+from ehdr.cli.cli_output import monitor_process_progress
 
 
 def extract_base_layer(input_file: str, output_hevc: Optional[str] = None) -> str:
@@ -25,8 +28,6 @@ def extract_base_layer(input_file: str, output_hevc: Optional[str] = None) -> st
         output_hevc = str(input_path.with_suffix('.hevc'))
 
     hevc_base_layer_path = Path(output_hevc)
-
-    print(f"Extracting Dolby Vision base layer from {input_path.name}...")
 
     # Get path to local dovi_tool (in project root)
     project_root = Path(__file__).parent.parent.parent
@@ -76,8 +77,19 @@ def extract_base_layer(input_file: str, output_hevc: Optional[str] = None) -> st
         if ffmpeg_process.stdout:
             ffmpeg_process.stdout.close()
 
+        # Start a thread to monitor and show progress
+        monitor_thread = threading.Thread(
+            target=monitor_process_progress,
+            args=(dovi_process, "Extracting base layer:"),
+            daemon=True
+        )
+        monitor_thread.start()
+
         # Wait for dovi_tool to complete
         stdout, stderr = dovi_process.communicate()
+
+        # Wait for the monitor thread to finish
+        monitor_thread.join(timeout=1.0)
 
         if dovi_process.returncode != 0:
             error_msg = stderr.decode('utf-8', errors='ignore')
@@ -89,7 +101,7 @@ def extract_base_layer(input_file: str, output_hevc: Optional[str] = None) -> st
         if not hevc_base_layer_path.exists():
             raise RuntimeError("HEVC BaseLayer file was not created")
 
-        print(f"HEVC Base Layer extracted successfully: {hevc_base_layer_path}")
+        print(f"- HEVC Base Layer extracted successfully: {hevc_base_layer_path}")
         return str(hevc_base_layer_path)
 
     except FileNotFoundError as e:
@@ -99,6 +111,7 @@ def extract_base_layer(input_file: str, output_hevc: Optional[str] = None) -> st
         )
     except Exception as e:
         raise RuntimeError(f"Failed to extract base layer: {e}")
+
 
 def inject_rpu(input_file: str, input_rpu: str, output_hevc: Optional[str] = None) -> str:
     """Inject Dolby Vision RPU metadata into HEVC base layer.
@@ -121,8 +134,6 @@ def inject_rpu(input_file: str, input_rpu: str, output_hevc: Optional[str] = Non
         output_hevc = str(input_path.with_name(f"{input_path.stem}_BL+RPU.hevc"))
 
     hevc_bl_and_rpu_path = Path(output_hevc)
-
-    print(f"Injecting Dolby Vision RPU metadata to {input_path.name}...")
 
     # Get path to local dovi_tool (in project root)
     project_root = Path(__file__).parent.parent.parent
@@ -149,13 +160,24 @@ def inject_rpu(input_file: str, input_rpu: str, output_hevc: Optional[str] = Non
             stderr=subprocess.DEVNULL
         )
 
+        # Start a thread to monitor and show progress
+        monitor_thread = threading.Thread(
+            target=monitor_process_progress,
+            args=(dovi_process, "Injecting RPU metadata:"),
+            daemon=True
+        )
+        monitor_thread.start()
+
         # Wait for dovi_tool to complete
         dovi_process.wait()
+
+        # Wait for the monitor thread to finish
+        monitor_thread.join(timeout=1.0)
 
         if not hevc_bl_and_rpu_path.exists():
             raise RuntimeError("HEVC file with RPU was not created")
 
-        print(f"RPU injected successfully: {hevc_bl_and_rpu_path}")
+        print(f"- RPU injected successfully: {hevc_bl_and_rpu_path}")
         return str(hevc_bl_and_rpu_path)
 
     except FileNotFoundError as e:
@@ -165,6 +187,7 @@ def inject_rpu(input_file: str, input_rpu: str, output_hevc: Optional[str] = Non
         )
     except Exception as e:
         raise RuntimeError(f"Failed to inject RPU: {e}")
+
 
 def extract_rpu(input_file: str, output_rpu: Optional[str] = None) -> str:
     """Extract Dolby Vision RPU (Reference Processing Unit) metadata.
@@ -186,8 +209,6 @@ def extract_rpu(input_file: str, output_rpu: Optional[str] = None) -> str:
         output_rpu = str(input_path.with_suffix('.rpu'))
 
     rpu_path = Path(output_rpu)
-
-    print(f"Extracting Dolby Vision RPU metadata from {input_path.name}...")
 
     # Get path to local dovi_tool (in project root)
     project_root = Path(__file__).parent.parent.parent
@@ -236,8 +257,19 @@ def extract_rpu(input_file: str, output_rpu: Optional[str] = None) -> str:
         if ffmpeg_process.stdout:
             ffmpeg_process.stdout.close()
 
+        # Start a thread to monitor and show progress
+        monitor_thread = threading.Thread(
+            target=monitor_process_progress,
+            args=(dovi_process, "Extracting RPU metadata:"),
+            daemon=True
+        )
+        monitor_thread.start()
+
         # Wait for dovi_tool to complete
         stdout, stderr = dovi_process.communicate()
+
+        # Wait for the monitor thread to finish
+        monitor_thread.join(timeout=1.0)
 
         if dovi_process.returncode != 0:
             error_msg = stderr.decode('utf-8', errors='ignore')
@@ -249,7 +281,7 @@ def extract_rpu(input_file: str, output_rpu: Optional[str] = None) -> str:
         if not rpu_path.exists():
             raise RuntimeError("RPU file was not created")
 
-        print(f"RPU extracted successfully: {rpu_path}")
+        print(f"- RPU extracted successfully: {rpu_path}")
         return str(rpu_path)
 
     except FileNotFoundError as e:
@@ -261,35 +293,35 @@ def extract_rpu(input_file: str, output_rpu: Optional[str] = None) -> str:
         raise RuntimeError(f"Failed to extract RPU: {e}")
 
 
-def build_dolby_vision_params(video, crf: int, preset: str) -> list:
-    """Build x265 parameters for Dolby Vision encoding.
+# def build_dolby_vision_params(video, crf: int, preset: str) -> list:
+#     """Build x265 parameters for Dolby Vision encoding.
 
-    Args:
-        video: Video object with metadata
-        crf: Constant Rate Factor for quality
-        preset: Encoding preset
+#     Args:
+#         video: Video object with metadata
+#         crf: Constant Rate Factor for quality
+#         preset: Encoding preset
 
-    Returns:
-        List of x265 parameter strings
-    """
-    params = [
-        f"crf={crf}",
-        f"preset={preset}",
-        "profile=main10",  # 10-bit profile required for Dolby Vision
-        "level-idc=5.1",
-        "high-tier=1",
-        "hdr10=1",
-        "repeat-headers=1",
-        "colorprim=bt2020",
-        "transfer=smpte2084",
-        "colormatrix=bt2020nc",
-        "vbv-bufsize=20000",
-        "vbv-maxrate=20000",
-    ]
+#     Returns:
+#         List of x265 parameter strings
+#     """
+#     params = [
+#         f"crf={crf}",
+#         f"preset={preset}",
+#         "profile=main10",  # 10-bit profile required for Dolby Vision
+#         "level-idc=5.1",
+#         "high-tier=1",
+#         "hdr10=1",
+#         "repeat-headers=1",
+#         "colorprim=bt2020",
+#         "transfer=smpte2084",
+#         "colormatrix=bt2020nc",
+#         "vbv-bufsize=20000",
+#         "vbv-maxrate=20000",
+#     ]
 
-    # Add master display metadata if available
-    master_display = video.get_master_display()
-    if master_display:
-        params.append(f"master-display={master_display}")
+#     # Add master display metadata if available
+#     master_display = video.get_master_display()
+#     if master_display:
+#         params.append(f"master-display={master_display}")
 
-    return params
+#     return params

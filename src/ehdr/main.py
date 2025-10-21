@@ -6,7 +6,9 @@ from pathlib import Path
 from typing import Optional
 
 from ehdr import __version__
-from ehdr.cli_output import callback_handler_crop_video, create_progress_handler, finish_progress, print_conversion_summary, print_encoding_params, print_video_infos
+from ehdr.cli.cli_output import create_progress_handler, finish_progress, print_conversion_summary
+from ehdr.cli.encoder import callback_handler_crop_video, print_encoding_params
+from ehdr.cli.video import print_video_infos
 from ehdr.dataclass import ColorFormat
 from ehdr.encoder import Encoder
 from ehdr.video import Video

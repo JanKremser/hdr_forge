@@ -1,14 +1,12 @@
 """CLI output and progress tracking functionality."""
 
-import re
+import time
+import subprocess
 from datetime import timedelta
-from typing import Callable, IO, Tuple
+from typing import Callable
 
 from ffmpeg import Progress
 
-from ehdr.dataclass import CropHandler, DolbyVisionInfo
-from ehdr.encoder import Encoder
-from ehdr.video import Video
 
 # Constants
 SUMMARY_LINE_WIDTH = 60
@@ -187,71 +185,6 @@ def create_progress_handler(duration: float, total_frames: int = 0) -> Callable[
     return on_progress
 
 
-def monitor_x265_progress(stderr: IO[str], total_frames: int) -> None:
-    """Monitor and display x265 encoding progress in real-time.
-
-    Args:
-        stderr: x265 process stderr stream
-        total_frames: Total number of frames in the video
-    """
-    # Regex pattern to match x265 progress output
-    # Format: 160 frames: 20.64 fps, 483.46 kb/s
-    progress_pattern: re.Pattern[str] = re.compile(
-        pattern=r'(\d+)\s+frames:\s+([\d.]+)\s+fps,\s+([\d.]+)\s+kb/s'
-    )
-
-    # Regex for info, warning, and error outputs - accepts arbitrary prefixes
-    info_pattern: re.Pattern[str] = re.compile(
-        pattern=r'(\S+)\s+\[(info|warning|error)\]:\s+(.*)'
-    )
-
-    first_update = True
-
-    for line in stderr:
-        line: str = line.strip()
-
-        # Try to match progress line
-        match: re.Match[str] | None = progress_pattern.search(line)
-        if match:
-            current_frame = int(match.group(1))
-            fps = float(match.group(2))
-            bitrate = float(match.group(3))  # Extract the bitrate
-
-            print_progress_info(
-                first_update=first_update,
-                current_frame=current_frame,
-                total_frames=total_frames,
-                fps=fps,
-                speed=None,
-                time_seconds=None,
-                bitrate_kbs=bitrate,
-                size_bytes=None,
-            )
-            if first_update:
-                first_update = False
-
-        # First check for Info/Warning/Error lines
-        info_match: re.Match[str] | None = info_pattern.search(line)
-        if info_match:
-            prefix = info_match.group(1)  # Any prefix
-            level = info_match.group(2)   # info, warning, or error
-            message = info_match.group(3) # The actual message
-
-            # Choose color based on level
-            color = ""
-            if level == "warning":
-                color = YELLOW
-            elif level == "error":
-                color = RED
-
-            if DEBUG_MODE == False and level == "info":
-                continue
-
-            # Output the message with color
-            print(color_str(value=f"\r{prefix} [{level}]: {message}", color=color))
-            continue
-
-
 def print_conversion_summary(success_count: int, fail_count: int) -> None:
     """Print conversion summary.
 
@@ -266,86 +199,28 @@ def print_conversion_summary(success_count: int, fail_count: int) -> None:
     print(f"  Failed:  {fail_count}")
     print(f"{color_str('_', color)}" * 70)
 
-def print_video_infos(video: Video) -> None:
-    """Print extracted video information.
+
+def monitor_process_progress(process: subprocess.Popen, description: str) -> None:
+    """Monitor a running process and display a progress bar.
 
     Args:
-        video: Video object with metadata
+        process: The subprocess.Popen process to monitor
+        description: Description text to show before the progress bar
     """
-    resolution: str = f"{video.get_width()}x{video.get_height()}"
-
-    color = BLUE
-    print()
-    print(f"{color_str('_', color)}" * 70)
-    print("Video Information:")
-    print(f"  Input File: {color_str(str(video.get_filepath()), color)}")
-    print(f"  Resolution: {color_str(resolution, color)}")
-    print(f"  Frame Rate: {color_str(video.get_fps(), color)}")
-    print(f"  Color Primaries: {color_str(video.get_color_primaries(), color)}")
-    print(f"  Color Transfer: {color_str(video.get_color_transfer(), color)}")
-    print(f"  Color Space: {color_str(video.get_color_space(), color)}")
-    print(f"  HDR/SDR: {color_str(video.get_color_format().value.upper(), color)}")
-    if video.is_hdr_video():
-        print("  HDR10 Metadata:")
-        max_cll_max_fall = video.get_max_cll_max_fall()
-        print(f"    MasterDisplay: {color_str(video.get_master_display() or 'N/A', color)}")
-        if max_cll_max_fall:
-            max_cll, max_fall = max_cll_max_fall
-            print(f"    MaxCLL/MaxFALL: {color_str(f'{max_cll}, {max_fall}', color)}")
-        else:
-            print(f"    MaxCLL/MaxFALL: {color_str('N/A', color)}")
-
-    dolby_vision_info: DolbyVisionInfo | None = video.get_dolby_vision_infos()
-    if dolby_vision_info:
-        print("  Dolby Vision Metadata:")
-        print(f"    Profile: {color_str(dolby_vision_info.dv_profile or 'N/A', color)}")
-        print(f"    Level: {color_str(dolby_vision_info.dv_level or 'N/A', color)}")
-        print(f"    RPU Present: {color_str('YES' if dolby_vision_info.rpu_present_flag == 1 else 'NO', color)}")
-    print(f"{color_str('_', color)}" * 70)
-    print()
-
-def print_encoding_params(encoder: Encoder) -> None:
-    """Print encoding parameters.
-
-    Args:
-        encoder: Encoder object with encoding configuration
-    """
-    color = BLUE
-    print()
-    print(f"{color_str('_', color)}" * 70)
-    print("Encoding Parameters:")
-    print(f"  Output File: {color_str(str(encoder.get_target_file()), color)}")
-    print(f"  CRF: {color_str(encoder.crf, color)}")
-    print(f"  Preset: {color_str(encoder.preset, color)}")
-    print(f"  Color-Format: {color_str(encoder.get_color_format().value.upper(), color)}")
-    if encoder._is_cropped():
-        crop_filter: str | None = encoder.get_crop_filter()
-        print(f"  Crop: {color_str(crop_filter, color)}")
-    else:
-        print(f"  Crop: {color_str('No cropping applied', color)}")
-    scale_dimensions: Tuple[int, int] | None = encoder._get_scale_dimensions()
-    if scale_dimensions:
-        w, h = scale_dimensions
-        print(f"  Scale: {color_str(f"{w}x{h}", color)}")
-    print(f"{color_str('_', color)}" * 70)
-    print()
-
-def callback_handler_crop_video(crop_handler: CropHandler) -> None:
-    """Callback handler for crop video progress.
-
-    Args:
-        crop_handler: CropHandler instance
-        message: Optional message to display
-    """
-
-    if crop_handler.finish_progress:
-        print()  # New line on completion
+    if not process:
         return
 
-    completed_samples = crop_handler.completed_samples
-    total_samples = crop_handler.total_samples
-    percent: float = (completed_samples / total_samples * 100) if total_samples > 0 else 0.0
-    progress_bar: str = create_progress_bar(percent=percent)
-    if completed_samples == 0:
-        print("\nCropping Progress:")
-    print(f"\r{progress_bar} {percent:.1f}% | {completed_samples}/{total_samples}", end="", flush=True)
+    print(f"{description}", flush=True)
+
+    spinner = ['|', '/', '-', '\\']
+    i = 0
+
+    while process.poll() is None:
+        bar = create_progress_bar(percent=(i % 20) * 5)  # Indeterminate progress
+        status = f"{CLEAR_LINE}{MOVE_TO_START}{spinner[i % 4]} {bar} Processing..."
+        print(status, end='', flush=True)
+        time.sleep(0.1)
+        i += 1
+
+    # Clear the progress line after completion
+    print(f"{CLEAR_LINE}{MOVE_TO_START}", end='', flush=True)

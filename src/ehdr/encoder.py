@@ -450,7 +450,7 @@ class Encoder:
                 output_options['vf'] = scale_filter
 
         # Add format-specific parameters
-        if self.is_hdr10_encoding():
+        if self.is_hdr10_encoding() or self.is_dolby_vision_encoding():
             x265_params: list[str] = self._build_hdr_x265_params()
             output_options['pix_fmt'] = self.HDR_PIXEL_FORMAT
             output_options['x265-params'] = ':'.join(x265_params)
@@ -649,6 +649,8 @@ class Encoder:
         if only_hdr10_or_sdr_encoding:
             self._cleanup_temp_directory()
             return True
+
+        print()
 
         # Step 4: Extract encoded HEVC video stream from MKV
         encoded_hevc_path: str = mkv.extract_hevc(
