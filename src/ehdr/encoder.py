@@ -392,6 +392,36 @@ class Encoder:
         """
         return self.target_file
 
+    def _get_temp_directory(self) -> Path:
+        """Get or create temporary directory for intermediate files.
+
+        Creates a temp directory in the same location as target_file:
+        {target_file_dir}/.ehdr_temp_{target_file_stem}/
+
+        Returns:
+            Path to temporary directory
+        """
+        temp_dir = self.target_file.parent / f".ehdr_temp_{self.target_file.stem}"
+        temp_dir.mkdir(parents=True, exist_ok=True)
+        return temp_dir
+
+    def _cleanup_temp_directory(self) -> None:
+        """Remove temporary directory and all its contents.
+
+        Deletes the temp directory created by _get_temp_directory().
+        Handles errors gracefully and prints warnings if cleanup fails.
+        """
+        import shutil
+
+        temp_dir = self.target_file.parent / f".ehdr_temp_{self.target_file.stem}"
+
+        if temp_dir.exists() and temp_dir.is_dir():
+            try:
+                shutil.rmtree(temp_dir)
+                print(f"Cleaned up temporary files: {temp_dir}")
+            except Exception as e:
+                print(f"Warning: Failed to clean up temporary directory {temp_dir}: {e}")
+
     def build_ffmpeg_output_options(self) -> Dict[str, str]:
         """Build FFmpeg output options dictionary for encoding.
 
@@ -468,52 +498,6 @@ class Encoder:
             params.append('max-cll=0,0')
         return params
 
-    def build_x265_command_for_dolby_vision_source(self, output_file: Path, rpu_file: str) -> list[str]:
-        """Build x265 command for Dolby Vision encoding.
-
-        Args:
-            output_file: Output file path
-            rpu_file: Path to RPU file for Dolby Vision (required if is_dolby_vision)
-
-        Returns:
-            list of x265 command arguments
-        """
-        crf = self.crf
-        preset = self.preset
-
-        x265_cmd: list[str] = [
-            'x265',
-            '-',
-            '--input-depth', '10',
-            '--output-depth', '10',
-            '--y4m',
-            '--preset', preset,
-            '--crf', str(crf),
-        ]
-
-        # Dolby Vision specific parameters
-        master_display = self.video.get_master_display()
-        if master_display:
-            x265_cmd.extend(['--master-display', master_display])
-
-        max_cll_max_fall: Tuple[int, int] | None = self.video.get_max_cll_max_fall(return_fallback=True)
-        if max_cll_max_fall:
-            max_cll, max_fall = max_cll_max_fall
-            x265_cmd.extend(['--max-cll', f'{max_cll},{max_fall}'])
-
-        x265_cmd.extend([
-            '--colormatrix', self.video.get_color_space(),
-            '--colorprim', self.video.get_color_primaries(),
-            '--transfer', self.video.get_color_transfer(),
-            '--dolby-vision-rpu', rpu_file,
-            '--dolby-vision-profile', '8.1',
-            '--vbv-bufsize', '20000',
-            '--vbv-maxrate', '20000',
-            f'{str(output_file)}.hevc'
-        ])
-
-        return x265_cmd
-
     def get_format_name(self) -> str:
         """Get human-readable format name.
 
@@ -584,152 +568,92 @@ class Encoder:
             finish_callback=finish_callback,
         )
 
-    def test_convert_dolby_vision(
+    def convert_dolby_vision(
         self,
         progress_callback: Optional[Callable] = None,
         finish_callback: Optional[Callable] = None,
     ) -> bool:
-        input_file = self.video.get_filepath()
+        """Convert Dolby Vision video by re-encoding base layer and re-injecting RPU.
 
-        # Extract RPU metadata
-        rpu_file: str = dolby_vision.extract_rpu(str(input_file))
+        This workflow:
+        1. Extracts RPU metadata from original video
+        2. Extracts base layer (HEVC without RPU)
+        3. Muxes base layer into MKV with original audio/subtitles
+        4. Re-encodes the base layer with FFmpeg
+        5. Extracts encoded HEVC from MKV
+        6. Injects original RPU back into encoded HEVC
+        7. Muxes final video with audio/subtitles into target file
+        8. Cleans up temporary directory
 
-        # base Layer
-        base_layer_file: str = dolby_vision.extract_base_layer(
-            input_file=str(input_file),
-        )
-
-        bl_mkv_file: str = mkv.mux_hevc_to_mkv(
-            input_hevc=base_layer_file,
-            input_mkv=str(input_file),
-        )
-        bl_path = Path(bl_mkv_file)
-
-        bl_encode_file = input_file.with_name(f"{input_file.stem}_BL_Encoding.mkv")
-
-        s: bool = self._start_ffmpeg_process(
-            input_file=bl_path,
-            target_file=bl_encode_file,
-            progress_callback=progress_callback,
-            finish_callback=finish_callback,
-        )
-
-        if s is False:
-            return False
-
-        bl_encode_hevc_file: str = mkv.extract_hevc(
-            input_mkv=str(bl_encode_file),
-            output_hevc=str(bl_encode_file.with_suffix('.hevc'))
-        )
-
-        bl_rpu_hevc_file: str = dolby_vision.inject_rpu(
-            input_file=bl_encode_hevc_file,
-            input_rpu=rpu_file,
-        )
-
-        bl_mkv_file: str = mkv.mux_hevc_to_mkv(
-            input_hevc=bl_rpu_hevc_file,
-            input_mkv=str(bl_encode_file),
-            output_mkv=str(self.target_file),
-        )
-
-        return True
-
-    def convert_dolby_vision(
-        self,
-        progress_callback: Optional[Callable] = None,
-    ) -> bool:
-        """Execute Dolby Vision conversion using x265 with RPU injection.
+        All intermediate files are stored in a temporary directory, which is
+        automatically removed upon successful completion.
 
         Args:
-            progress_callback: Optional progress monitor callback (receives stderr and total_frames)
+            progress_callback: Optional progress handler callback
+            finish_callback: Optional finish callback
 
         Returns:
             True if conversion succeeded, False otherwise
         """
         input_file = self.video.get_filepath()
 
-        try:
-            if self.video.is_dolby_vision_video() is False:
-                return False
+        # Create temporary directory for all intermediate files
+        temp_dir = self._get_temp_directory()
 
-            # Extract RPU metadata
-            rpu_file: str = dolby_vision.extract_rpu(str(input_file))
+        # Step 1: Extract RPU metadata from original Dolby Vision video
+        rpu_file_path: str = dolby_vision.extract_rpu(
+            input_file=str(input_file),
+            output_rpu=str(temp_dir / f"{input_file.stem}.rpu")
+        )
 
-            # # base Layer
-            # base_layer_file: str = dolby_vision.extract_base_layer(
-            #     input_file=str(input_file),
-            # )
+        # Step 2: Extract base layer (HEVC without RPU) from original video
+        base_layer_hevc_path: str = dolby_vision.extract_base_layer(
+            input_file=str(input_file),
+            output_hevc=str(temp_dir / f"{input_file.stem}_BL.hevc")
+        )
 
-            # bl_mkv_file: str = mkv.mux_hevc_to_mkv(
-            #     input_hevc=base_layer_file,
-            # )
+        # Step 3: Mux base layer HEVC with original audio/subtitles into temporary MKV
+        # This creates a playable MKV file with base layer video + original audio/subs
+        base_layer_mkv_path: str = mkv.mux_hevc_to_mkv(
+            input_hevc=base_layer_hevc_path,
+            input_mkv=str(input_file),
+            output_mkv=str(temp_dir / f"{input_file.stem}_BL.mkv")
+        )
 
-            # self._start_ffmpeg_process(
-            #     input_file=Path(bl_mkv_file),
-            #     progress_callback=progress_callback,
-            #     finish_callback=finish_callback,
-            # )
+        # Step 4: Re-encode the base layer MKV with FFmpeg (apply CRF, filters, etc.)
+        encoded_base_layer_mkv = temp_dir / f"{input_file.stem}_BL_Encoded.mkv"
 
-            # Build ffmpeg to x265 pipeline
-            ffmpeg_cmd: list[str] = [
-                'ffmpeg', '-y',
-                '-i', str(input_file),
-                '-f', 'yuv4mpegpipe',
-                '-strict', '-1',
-                '-pix_fmt', self.video.get_pix_fmt(),
-                '-'
-            ]
+        encoding_success: bool = self._start_ffmpeg_process(
+            input_file=Path(base_layer_mkv_path),
+            target_file=encoded_base_layer_mkv,
+            progress_callback=progress_callback,
+            finish_callback=finish_callback,
+        )
 
-            # Build x265 command using encoder
-            x265_cmd: list[str] = self.build_x265_command_for_dolby_vision_source(
-                output_file=self.target_file,
-                rpu_file=rpu_file,
-            )
-
-            # Calculate total frames for progress tracking
-            total_frames = self.video.get_total_frames()
-
-            # Create pipeline
-            ffmpeg_process = subprocess.Popen(
-                ffmpeg_cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.DEVNULL
-            )
-
-            x265_process = subprocess.Popen(
-                x265_cmd,
-                stdin=ffmpeg_process.stdout,
-                stderr=subprocess.PIPE,
-                text=True
-            )
-
-            # Close ffmpeg stdout in parent
-            if ffmpeg_process.stdout:
-                ffmpeg_process.stdout.close()
-
-            # Monitor x265 progress in real-time
-            if total_frames > 0 and x265_process.stderr and progress_callback:
-                progress_callback(x265_process.stderr, total_frames)
-                x265_process.wait()
-            else:
-                # Fallback: just wait for completion
-                _, stderr = x265_process.communicate()
-                if x265_process.returncode != 0:
-                    print("Error: x265 encoding failed")
-                    if stderr:
-                        print(stderr)
-                    return False
-
-            if x265_process.returncode != 0:
-                print("Error: x265 encoding failed")
-                return False
-
-            # Wait for ffmpeg
-            ffmpeg_process.wait()
-
-            return True
-
-        except Exception as e:
-            print(f"Error during Dolby Vision encoding: {e}")
+        if not encoding_success:
             return False
+
+        # Step 5: Extract encoded HEVC video stream from MKV
+        encoded_hevc_path: str = mkv.extract_hevc(
+            input_mkv=str(encoded_base_layer_mkv),
+            output_hevc=str(temp_dir / f"{input_file.stem}_BL_Encoded.hevc")
+        )
+
+        # Step 6: Inject original RPU metadata back into encoded HEVC
+        encoded_hevc_with_rpu_path: str = dolby_vision.inject_rpu(
+            input_file=encoded_hevc_path,
+            input_rpu=rpu_file_path,
+            output_hevc=str(temp_dir / f"{input_file.stem}_BL_Encoded_RPU.hevc")
+        )
+
+        # Step 7: Mux final HEVC (with RPU) + audio/subtitles into target file
+        mkv.mux_hevc_to_mkv(
+            input_hevc=encoded_hevc_with_rpu_path,
+            input_mkv=str(encoded_base_layer_mkv),
+            output_mkv=str(self.target_file),
+        )
+
+        # Step 8: Clean up temporary directory
+        self._cleanup_temp_directory()
+
+        return True

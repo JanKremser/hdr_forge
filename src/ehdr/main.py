@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Optional
 
 from ehdr import __version__
-from ehdr.cli_output import callback_handler_crop_video, create_progress_handler, finish_progress, monitor_x265_progress, print_conversion_summary, print_encoding_params, print_video_infos
+from ehdr.cli_output import callback_handler_crop_video, create_progress_handler, finish_progress, print_conversion_summary, print_encoding_params, print_video_infos
 from ehdr.dataclass import ColorFormat
 from ehdr.encoder import Encoder
 from ehdr.video import Video
@@ -301,7 +301,7 @@ def convert_video(
                 finish_callback = lambda: finish_progress(total_frames=total_frames, duration=duration)
 
             # Execute conversion
-            success: bool = encoder.test_convert_dolby_vision(
+            success: bool = encoder.convert_dolby_vision(
                 progress_callback=progress_handler,
                 finish_callback=finish_callback
             )
