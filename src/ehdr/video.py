@@ -227,6 +227,17 @@ class Video:
 
         return None
 
+    def get_dolby_vision_profile(self) -> Optional[int]:
+        """Get Dolby Vision profile number.
+
+        Returns:
+            Dolby Vision profile as integer or None if not found
+        """
+        dv_info: DolbyVisionInfo | None = self.get_dolby_vision_infos()
+        if dv_info:
+            return dv_info.dv_profile
+        return None
+
     def get_master_display(self) -> Optional[str]:
         """Extract HDR master display metadata.
 

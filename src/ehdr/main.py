@@ -9,7 +9,7 @@ from ehdr import __version__
 from ehdr.cli.cli_output import create_progress_handler, finish_progress, print_conversion_summary
 from ehdr.cli.encoder import callback_handler_crop_video, print_encoding_params
 from ehdr.cli.video import print_video_infos
-from ehdr.dataclass import ColorFormat
+from ehdr.dataclass import ColorFormat, DolbyVisionProfile
 from ehdr.encoder import Encoder
 from ehdr.video import Video
 
@@ -128,6 +128,13 @@ Examples:
         help='Target color format for output video (auto = keep source format, hdr10 = convert to HDR10, sdr = convert to SDR)'
     )
 
+    convert_parser.add_argument(
+        '--dv-profile',
+        choices=['auto', '8'],
+        default='auto',
+        help='Dolby Vision profile for encoding (auto = automatic detection, 8 = force profile 8.1)'
+    )
+
     return parser.parse_args()
 
 
@@ -174,6 +181,24 @@ def get_color_format_from_string(format_str: str | None) -> ColorFormat:
         return ColorFormat.DOLBY_VISION
     else:
         return ColorFormat.AUTO
+
+def get_dolby_vision_profile_from_string(profile_str: str | None) -> DolbyVisionProfile:
+    """Convert string to DolbyVision enum.
+
+    Args:
+        profile_str: Dolby Vision profile string
+
+    Returns:
+        Corresponding DolbyVision enum value
+    """
+    if profile_str is None:
+        return DolbyVisionProfile.AUTO
+
+    profile_str = profile_str.lower()
+    if profile_str == '8':
+        return DolbyVisionProfile._8
+
+    return DolbyVisionProfile.AUTO
 
 def get_video_files(path: Path, supported_formats: list[str]) -> list[Path]:
     """Get list of video files from path.
@@ -242,6 +267,7 @@ def convert_video(
     video: Video,
     target_file: Path,
     target_format: ColorFormat = ColorFormat.AUTO,
+    target_dv_profile: DolbyVisionProfile = DolbyVisionProfile.AUTO,
     crf: Optional[int] = None,
     preset: Optional[str] = None,
     scale_height: Optional[int] = None,
@@ -269,6 +295,7 @@ def convert_video(
         video=video,
         target_file=target_file,
         color_format=target_format,
+        dv_profile=target_dv_profile,
         crf=crf,
         preset=preset,
         scale_height=scale_height,
@@ -339,6 +366,7 @@ def process_convert_command(args) -> None:
     scale_height: int | None = get_scale_height(args.scale)
 
     color_format: ColorFormat = get_color_format_from_string(args.color_format)
+    dv_profile: DolbyVisionProfile = get_dolby_vision_profile_from_string(args.dv_profile)
 
     # Process each video file
     success_count = 0
@@ -355,6 +383,7 @@ def process_convert_command(args) -> None:
         success = convert_video(
             video=video,
             target_file=out_file,
+            target_dv_profile=dv_profile,
             target_format=color_format,
             crf=args.crf,
             preset=args.preset,

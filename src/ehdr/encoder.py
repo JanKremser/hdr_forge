@@ -10,7 +10,7 @@ from typing import Callable, Dict, Optional, Tuple
 from ffmpeg import FFmpeg
 
 from ehdr.container import mkv
-from ehdr.dataclass import ColorFormat, CropHandler
+from ehdr.dataclass import ColorFormat, CropHandler, DolbyVisionInfo, DolbyVisionProfile
 from ehdr.hdr_formats import dolby_vision
 from ehdr.video import Video
 
@@ -43,6 +43,7 @@ class Encoder:
         video: Video,
         target_file: Path,
         color_format: ColorFormat = ColorFormat.AUTO,
+        dv_profile: DolbyVisionProfile = DolbyVisionProfile.AUTO,
         crf: Optional[int] = None,
         preset: Optional[str] = None,
         enable_crop: bool = False,
@@ -55,6 +56,7 @@ class Encoder:
             video: Video object with metadata
             target_file: Target output file path
             color_format: Target color format (AUTO, SDR, HDR10, DOLBY_VISION)
+            dv_profile: Target Dolby Vision profile (AUTO, 8)
             crf: Optional CRF override (uses auto-calculation if None)
             preset: Optional preset override (uses auto-calculation if None)
             enable_crop: Enable automatic black bar detection and cropping
@@ -67,6 +69,11 @@ class Encoder:
         # Determine effective color format
         self.effective_format: ColorFormat = self._determine_effective_format(
             color_format=color_format
+        )
+
+        # Dolby Vision profile (only relevant if encoding to DV)
+        self.dv_profile_for_encoding: Optional[DolbyVisionProfile] = self._determine_dv_profile(
+            dv_profile=dv_profile
         )
 
         # Crop dimensions (initialized to full frame)
@@ -131,6 +138,28 @@ class Encoder:
 
         # Valid downgrade
         return color_format
+
+    def _determine_dv_profile(self, dv_profile: DolbyVisionProfile) -> Optional[DolbyVisionProfile]:
+        """Determine the Dolby Vision profile for encoding.
+
+        Args:
+            dv_profile: Desired Dolby Vision profile (AUTO, 8)
+
+        Returns:
+            Effective DolbyVisionProfile or None if not applicable
+        """
+        if not self.is_dolby_vision_encoding():
+            return None
+
+        source_dv_info: DolbyVisionInfo | None = self.video.get_dolby_vision_infos()
+        if source_dv_info is None or source_dv_info.dv_profile is None:
+            return DolbyVisionProfile.AUTO
+
+        profile: int = source_dv_info.dv_profile
+        if profile not in [5, 7, 8]:
+            raise ValueError(f"Unsupported source Dolby Vision profile: {profile}")
+
+        return dv_profile
 
     def get_color_format(self) -> ColorFormat:
         """Get the effective color format for encoding.
@@ -661,9 +690,19 @@ class Encoder:
 
         # Step 5: Extract RPU metadata from original Dolby Vision video
         rpu_file_path: str = dolby_vision.extract_rpu(
-            input_file=str(input_file),
-            output_rpu=str(temp_dir / f"RPU.rpu")
+            video=self.video,
+            output_rpu=str(temp_dir / f"RPU.rpu"),
+            dv_profile_encoding=self.dv_profile_for_encoding
         )
+
+        # # Setup 5.1: If AUTO profile and source is profile 7, demux EL profile 7 RPU
+        # if self.dv_profile_for_encoding == DolbyVisionProfile.AUTO:
+        #     if self.video.get_dolby_vision_profile() == 7:
+        #         # start demux EL profile 7 for profile 7 encoding
+        #         dolby_vision.start_demux_el_profile7(
+        #             input_file=str(input_file),
+        #             output_rpu=str(temp_dir / f"video_EL_Profile7.hevc")
+        #         )
 
         # Step 6: Inject original RPU metadata back into encoded HEVC
         encoded_hevc_with_rpu_path: str = dolby_vision.inject_rpu(

@@ -6,6 +6,10 @@ from pathlib import Path
 from typing import Optional
 
 from ehdr.cli.cli_output import monitor_process_progress
+from ehdr.dataclass import DolbyVisionProfile
+from ehdr.video import Video
+
+
 
 
 def extract_base_layer(input_file: str, output_hevc: Optional[str] = None) -> str:
@@ -52,8 +56,6 @@ def extract_base_layer(input_file: str, output_hevc: Optional[str] = None) -> st
 
         dovi_cmd: list[str] = [
             dovi_tool_cmd,
-            # '-m', '2',
-            # 'convert',
             'remove',
             '-',
             '-o', str(hevc_base_layer_path)
@@ -80,7 +82,7 @@ def extract_base_layer(input_file: str, output_hevc: Optional[str] = None) -> st
         # Start a thread to monitor and show progress
         monitor_thread = threading.Thread(
             target=monitor_process_progress,
-            args=(dovi_process, "Extracting base layer:"),
+            args=(dovi_process, "Extracting HDR10 Base Layer:"),
             daemon=True
         )
         monitor_thread.start()
@@ -93,15 +95,15 @@ def extract_base_layer(input_file: str, output_hevc: Optional[str] = None) -> st
 
         if dovi_process.returncode != 0:
             error_msg = stderr.decode('utf-8', errors='ignore')
-            raise RuntimeError(f"dovi_tool base layer extraction failed: {error_msg}")
+            raise RuntimeError(f"dovi_tool Base Layer extraction failed: {error_msg}")
 
         # Wait for ffmpeg to complete
         ffmpeg_process.wait()
 
         if not hevc_base_layer_path.exists():
-            raise RuntimeError("HEVC BaseLayer file was not created")
+            raise RuntimeError("HADR10 Base Layer file was not created")
 
-        print(f"- HEVC Base Layer extracted successfully: {hevc_base_layer_path}")
+        print(f"- HDR10 Base Layer extracted successfully: {hevc_base_layer_path}")
         return str(hevc_base_layer_path)
 
     except FileNotFoundError as e:
@@ -110,14 +112,14 @@ def extract_base_layer(input_file: str, output_hevc: Optional[str] = None) -> st
             "Please ensure ffmpeg and dovi_tool are installed."
         )
     except Exception as e:
-        raise RuntimeError(f"Failed to extract base layer: {e}")
+        raise RuntimeError(f"Failed to extract Base Layer: {e}")
 
 
 def inject_rpu(input_file: str, input_rpu: str, output_hevc: Optional[str] = None) -> str:
-    """Inject Dolby Vision RPU metadata into HEVC base layer.
+    """Inject Dolby Vision RPU metadata into HEVC HDR10 Base Layer.
 
     Args:
-        input_file: Path to input HEVC base layer file
+        input_file: Path to input HEVC HDR10 Base Layer file
         input_rpu: Path to RPU file to inject
         output_hevc: Optional path for output HEVC file. If None, generates
                     filename based on input (input.hevc -> input_BL+RPU.hevc)
@@ -131,7 +133,7 @@ def inject_rpu(input_file: str, input_rpu: str, output_hevc: Optional[str] = Non
     input_path = Path(input_file)
 
     if output_hevc is None:
-        output_hevc = str(input_path.with_name(f"{input_path.stem}_BL+RPU.hevc"))
+        output_hevc = str(input_path.with_name(f"{input_path.stem}_BL_RPU.hevc"))
 
     hevc_bl_and_rpu_path = Path(output_hevc)
 
@@ -189,11 +191,11 @@ def inject_rpu(input_file: str, input_rpu: str, output_hevc: Optional[str] = Non
         raise RuntimeError(f"Failed to inject RPU: {e}")
 
 
-def extract_rpu(input_file: str, output_rpu: Optional[str] = None) -> str:
+def extract_rpu(video: Video, output_rpu: Optional[str] = None, dv_profile_encoding: Optional[DolbyVisionProfile] = None) -> str:
     """Extract Dolby Vision RPU (Reference Processing Unit) metadata.
 
     Args:
-        input_file: Path to input video file
+        video: Video object with metadata
         output_rpu: Optional path for RPU output file. If None, generates
                    filename based on input (input.mkv -> input.rpu)
 
@@ -203,7 +205,7 @@ def extract_rpu(input_file: str, output_rpu: Optional[str] = None) -> str:
     Raises:
         RuntimeError: If RPU extraction fails
     """
-    input_path = Path(input_file)
+    input_path = video.get_filepath()
 
     if output_rpu is None:
         output_rpu = str(input_path.with_suffix('.rpu'))
@@ -220,6 +222,12 @@ def extract_rpu(input_file: str, output_rpu: Optional[str] = None) -> str:
     else:
         dovi_tool_cmd = "dovi_tool"
 
+    map_dv_profile8_mode: dict[int, str] = {
+        5: '3',
+        7: '2',
+        8: '2',
+    }
+
     try:
         # Extract HEVC bitstream from video file and pipe to dovi_tool
         ffmpeg_cmd: list[str] = [
@@ -233,11 +241,18 @@ def extract_rpu(input_file: str, output_rpu: Optional[str] = None) -> str:
 
         dovi_cmd: list[str] = [
             dovi_tool_cmd,
-            '-m', '2',
+        ]
+
+        if dv_profile_encoding and dv_profile_encoding != DolbyVisionProfile.AUTO:
+            profile: int | None = video.get_dolby_vision_profile()
+            if profile and profile in map_dv_profile8_mode:
+                dovi_cmd.extend(['-m', map_dv_profile8_mode[profile]])
+
+        dovi_cmd.extend([
             'extract-rpu',
             '-',
             '-o', str(rpu_path)
-        ]
+        ])
 
         # Create pipeline: ffmpeg | dovi_tool
         ffmpeg_process = subprocess.Popen(

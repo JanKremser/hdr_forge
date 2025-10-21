@@ -49,3 +49,8 @@ class ColorFormat(Enum):
     SDR = "sdr"
     HDR10 = "hdr10"
     DOLBY_VISION = "dolby_vision"
+
+class DolbyVisionProfile(Enum):
+    """Dolby Vision profile for encoding."""
+    AUTO = "auto"
+    _8 = "8"
