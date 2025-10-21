@@ -683,9 +683,9 @@ class Encoder:
         print()
 
         # Step 4: Extract encoded HEVC video stream from MKV
-        encoded_hevc_path: str = mkv.extract_hevc(
+        encoded_hevc_bl_path: Path = mkv.extract_hevc(
             input_mkv=str(encoded_base_layer_mkv),
-            output_hevc=str(temp_dir / f"video_BL_Encoded.hevc")
+            output_hevc=temp_dir / f"video_BL_Encoded.hevc"
         )
 
         # Step 5: Extract RPU metadata from original Dolby Vision video
@@ -696,23 +696,30 @@ class Encoder:
         )
 
         # # Setup 5.1: If AUTO profile and source is profile 7, demux EL profile 7 RPU
-        # if self.dv_profile_for_encoding == DolbyVisionProfile.AUTO:
-        #     if self.video.get_dolby_vision_profile() == 7:
-        #         # start demux EL profile 7 for profile 7 encoding
-        #         dolby_vision.start_demux_el_profile7(
-        #             input_file=str(input_file),
-        #             output_rpu=str(temp_dir / f"video_EL_Profile7.hevc")
-        #         )
+        if self.dv_profile_for_encoding == DolbyVisionProfile.AUTO:
+            if self.video.get_dolby_vision_profile() == 7:
+                # start demux EL profile 7 for profile 7 encoding
+                el_path: Path = dolby_vision.extract_enhancement_layer(
+                    input_file=input_file,
+                    output_el=temp_dir / f"video_EL_Profile7.hevc",
+                )
+                bl_el_hevc: Path = dolby_vision.inject_dolby_vision_layers(
+                    bl_path=encoded_hevc_bl_path,
+                    el_path=el_path,
+                    output_bl_el=temp_dir / f"video_BL_EL_Profile7.hevc",
+                )
+                encoded_hevc_bl_path.unlink(missing_ok=True)
+                encoded_hevc_bl_path = bl_el_hevc
 
         # Step 6: Inject original RPU metadata back into encoded HEVC
         encoded_hevc_with_rpu_path: str = dolby_vision.inject_rpu(
-            input_file=encoded_hevc_path,
+            input_file=str(encoded_hevc_bl_path),
             input_rpu=rpu_file_path,
             output_hevc=str(temp_dir / f"video_BL_Encoded_RPU.hevc")
         )
 
         # Cleanup: Delete encoded HEVC without RPU (no longer needed after RPU injection)
-        Path(encoded_hevc_path).unlink(missing_ok=True)
+        encoded_hevc_bl_path.unlink(missing_ok=True)
         # Cleanup: Delete RPU file (no longer needed after injection)
         Path(rpu_file_path).unlink(missing_ok=True)
 

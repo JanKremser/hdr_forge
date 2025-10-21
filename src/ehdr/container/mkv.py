@@ -6,13 +6,11 @@ from typing import Optional
 from ehdr.cli.cli_output import monitor_process_progress
 
 
-def extract_hevc(input_mkv: str, output_hevc: Optional[str] = None) -> str:
+def extract_hevc(input_mkv: str, output_hevc: Optional[Path] = None) -> Path:
     input_mkv_path = Path(input_mkv)
 
     if output_hevc is None:
-        output_hevc = str(input_mkv_path.with_name(f"{input_mkv_path.stem}_BL.hevc"))
-
-    hevc_output_path = Path(output_hevc)
+        output_hevc = input_mkv_path.with_name(f"{input_mkv_path.stem}_BL.hevc")
 
     try:
         ffmpeg_cmd: list[str] = [
@@ -21,7 +19,7 @@ def extract_hevc(input_mkv: str, output_hevc: Optional[str] = None) -> str:
             '-c:v', 'copy',
             '-bsf:v', 'hevc_mp4toannexb',
             '-f', 'hevc',
-            output_hevc
+            str(output_hevc)
         ]
 
         # Execute ffmpeg to extract HEVC
@@ -45,11 +43,11 @@ def extract_hevc(input_mkv: str, output_hevc: Optional[str] = None) -> str:
         # Wait for the monitor thread to finish
         monitor_thread.join(timeout=1.0)
 
-        if not hevc_output_path.exists():
+        if not output_hevc.exists():
             raise RuntimeError("HEVC file was not created")
 
-        print(f"- HEVC extracted successfully: {hevc_output_path}")
-        return str(hevc_output_path)
+        print(f"- HEVC extracted successfully: {str(output_hevc)}")
+        return output_hevc
 
     except FileNotFoundError as e:
         raise RuntimeError(
