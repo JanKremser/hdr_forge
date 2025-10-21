@@ -10,7 +10,7 @@ from typing import Callable, Dict, Optional, Tuple
 from ffmpeg import FFmpeg
 
 from ehdr.dataclass import ColorFormat, CropHandler
-from ehdr.dolby_vision import extract_rpu
+from ehdr.hdr_formats import dolby_vision
 from ehdr.video import Video
 
 
@@ -467,7 +467,7 @@ class Encoder:
             params.append('max-cll=0,0')
         return params
 
-    def build_x265_command_for_dolby_vision_source(self, output_file: Path, rpu_file: Optional[str] = None) -> list[str]:
+    def build_x265_command_for_dolby_vision_source(self, output_file: Path, rpu_file: str) -> list[str]:
         """Build x265 command for Dolby Vision encoding.
 
         Args:
@@ -490,59 +490,26 @@ class Encoder:
             '--crf', str(crf),
         ]
 
-        if self.is_dolby_vision():
-            # Dolby Vision specific parameters
-            master_display = self.video.get_master_display()
-            if master_display:
-                x265_cmd.extend(['--master-display', master_display])
+        # Dolby Vision specific parameters
+        master_display = self.video.get_master_display()
+        if master_display:
+            x265_cmd.extend(['--master-display', master_display])
 
-            max_cll_max_fall: Tuple[int, int] | None = self.video.get_max_cll_max_fall(return_fallback=True)
-            if max_cll_max_fall:
-                max_cll, max_fall = max_cll_max_fall
-                x265_cmd.extend(['--max-cll', f'{max_cll},{max_fall}'])
+        max_cll_max_fall: Tuple[int, int] | None = self.video.get_max_cll_max_fall(return_fallback=True)
+        if max_cll_max_fall:
+            max_cll, max_fall = max_cll_max_fall
+            x265_cmd.extend(['--max-cll', f'{max_cll},{max_fall}'])
 
-            x265_cmd.extend([
-                '--colormatrix', self.video.get_color_space(),
-                '--colorprim', self.video.get_color_primaries(),
-                '--transfer', self.video.get_color_transfer(),
-            ])
-
-            if rpu_file:
-                x265_cmd.extend([
-                    '--dolby-vision-rpu', rpu_file,
-                    '--dolby-vision-profile', '8.1',
-                ])
-
-            x265_cmd.extend([
-                '--vbv-bufsize', '20000',
-                '--vbv-maxrate', '20000',
-                f'{str(output_file)}.hevc'
-            ])
-        elif self.is_hdr10():
-            # HDR10 parameters for x265
-            master_display = self.video.get_master_display()
-            if master_display:
-                x265_cmd.extend(['--master-display', master_display])
-
-            max_cll_max_fall: Tuple[int, int] | None = self.video.get_max_cll_max_fall(return_fallback=True)
-            if max_cll_max_fall:
-                max_cll, max_fall = max_cll_max_fall
-                x265_cmd.extend(['--max-cll', f'{max_cll},{max_fall}'])
-
-            x265_cmd.extend([
-                '--colormatrix', 'bt2020nc',
-                '--colorprim', 'bt2020',
-                '--transfer', 'smpte2084',
-                f'{str(output_file)}.hevc'
-            ])
-        else:
-            # SDR parameters for x265
-            x265_cmd.extend([
-                '--colormatrix', 'bt709',
-                '--colorprim', 'bt709',
-                '--transfer', 'bt709',
-                f'{str(output_file)}.hevc'
-            ])
+        x265_cmd.extend([
+            '--colormatrix', self.video.get_color_space(),
+            '--colorprim', self.video.get_color_primaries(),
+            '--transfer', self.video.get_color_transfer(),
+            '--dolby-vision-rpu', rpu_file,
+            '--dolby-vision-profile', '8.1',
+            '--vbv-bufsize', '20000',
+            '--vbv-maxrate', '20000',
+            f'{str(output_file)}.hevc'
+        ])
 
         return x265_cmd
 
@@ -617,10 +584,11 @@ class Encoder:
         input_file = self.video.get_filepath()
 
         try:
-            # Extract RPU metadata
-            rpu_file: str | None = ""
             if self.video.is_dolby_vision_video():
-                rpu_file = extract_rpu(str(input_file))
+                return False
+
+            # Extract RPU metadata
+            rpu_file: str = dolby_vision.extract_rpu(str(input_file))
 
             # Build ffmpeg to x265 pipeline
             ffmpeg_cmd: list[str] = [

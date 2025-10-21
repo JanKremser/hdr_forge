@@ -419,7 +419,7 @@ def main() -> None:
     elif args.command == 'convert':
         process_convert_command(args)
     elif args.command == 'calc_maxcll':
-        from ehdr.hdr10 import calc_maxcll
+        from ehdr.hdr_formats.hdr10 import calc_maxcll
         input_path = Path(args.input)
         if not input_path.exists():
             print(f"Error: Input path does not exist: {input_path}")
