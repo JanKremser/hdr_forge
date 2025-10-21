@@ -437,17 +437,18 @@ class Encoder:
         }
 
 
-        # Add video filters (crop and scale)
-        crop_filter: str | None = self.get_crop_filter()
-        if crop_filter:
-            output_options['vf'] = crop_filter
+        # Add video filters (crop and scale), Only for SDR/HDR10 encoding
+        if self.is_dolby_vision_encoding() is False:
+            crop_filter: str | None = self.get_crop_filter()
+            if crop_filter:
+                output_options['vf'] = crop_filter
 
-        scale_filter: str | None = self.get_scale_filter()
-        if scale_filter:
-            if 'vf' in output_options:
-                output_options['vf'] += f',{scale_filter}'
-            else:
-                output_options['vf'] = scale_filter
+            scale_filter: str | None = self.get_scale_filter()
+            if scale_filter:
+                if 'vf' in output_options:
+                    output_options['vf'] += f',{scale_filter}'
+                else:
+                    output_options['vf'] = scale_filter
 
         # Add format-specific parameters
         if self.is_hdr10_encoding() or self.is_dolby_vision_encoding():
