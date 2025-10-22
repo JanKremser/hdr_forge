@@ -7,13 +7,15 @@ A powerful command-line tool for converting video files to H.265/HEVC format wit
 
 ## Features
 
--   **Multiple Format Support:** Convert HDR10, Dolby Vision, and SDR videos to H.265/HEVC
+-   **Multiple Format Support:** Convert between Dolby Vision, HDR10, and SDR formats
+-   **Format Conversion:** DV → HDR10 → SDR with tone mapping support
+-   **Dolby Vision Profiles:** Support for Profile 5, 7 (with EL), and 8
 -   **Automatic Black Bar Detection:** Multi-threaded crop analysis (can be disabled)
 -   **Resolution Scaling:** Scale videos to target resolutions (UHD, FHD, HD, etc.)
 -   **Intelligent Quality Control:** Resolution-based auto-scaling for CRF and preset
 -   **Batch Processing:** Convert entire folders with one command
 -   **HDR Metadata Preservation:** Maintains master display and content light level metadata
--   **Dolby Vision Support:** Automatic detection and RPU metadata handling
+-   **Dolby Vision Re-encoding:** Base layer re-encoding with RPU injection
 -   **Stream Copying:** Preserves all audio and subtitle tracks
 -   **Real-time Progress:** Live encoding progress with ETA and statistics
 
@@ -30,16 +32,16 @@ All videos are converted to H.265 (HEVC) with compression settings dynamically a
 ### Requirements
 
 -   **Python 3.7 or higher**
--   **[ffmpeg / ffprobe](https://ffmpeg.org/download.html)**
--   **[x265 >=4.1](https://github.com/videolan/x265)** (at least 10-bit version)
+-   **[ffmpeg / ffprobe](https://ffmpeg.org/download.html)** with libx265 support
+-   **[x265 >=4.1](https://github.com/videolan/x265)** for libx265
     -   [Windows builds](http://msystem.waw.pl/x265/)
-    -   **Linux:** It is in the repositories.
+    -   **Linux:** Available in the repositories
 
 **Only for Dolby Vision:**
 
--   **[dovi_tool](https://github.com/quietvoid/dovi_tool)** - For RPU metadata extraction
-    -   **for Arch Linux:** It is in the repositories.
-    -   **for the others:** Store binary globally.
+-   **[dovi_tool](https://github.com/quietvoid/dovi_tool)** - For RPU/EL extraction and injection
+    -   **for Arch Linux:** Available in the repositories
+    -   **for the others:** Download from releases and place in PATH or project root
 
 ### Install EHDR
 
@@ -93,13 +95,59 @@ ehdr convert -i input.mkv -o output.mkv --ncrop
 
 ### Dolby Vision
 
-Dolby Vision videos are automatically detected based on RPU metadata flags. No special parameter needed.
+Dolby Vision videos are automatically detected based on RPU metadata flags.
 
-**Important:** Dolby Vision does NOT support cropping or scaling (RPU metadata is position-dependent), so always use `--ncrop` and avoid `--scale`:
+**Supported Profiles:**
+- Profile 5 (IPTPQc2, BL+RPU) → Preserves Profile 5 or converts to Profile 8.1
+- Profile 7 (MEL, BL+EL+RPU) → Preserves Profile 7 or converts to Profile 8.1
+- Profile 8 (BL+RPU) → Keeps Profile 8.1
+
+**Preserve Dolby Vision (re-encode with DV):**
+```bash
+# Must disable cropping when preserving DV
+ehdr convert -i dolby_vision.mkv -o output.mkv --ncrop
+
+# Force conversion to Profile 8.1
+ehdr convert -i dolby_vision.mkv -o output.mkv --dv-profile 8 --ncrop
+```
+
+**Convert to HDR10 (extract base layer only):**
+```bash
+# Cropping and scaling supported when converting to HDR10
+ehdr convert -i dolby_vision.mkv -o output.mkv --color-format hdr10
+ehdr convert -i dolby_vision.mkv -o output.mkv --color-format hdr10 --scale FHD
+```
+
+**Convert to SDR (with tone mapping):**
+```bash
+# Converts DV → HDR10 base layer → SDR with tone mapping
+ehdr convert -i dolby_vision.mkv -o output.mkv --color-format sdr
+```
+
+**Important Notes:**
+- Dolby Vision does NOT support cropping or scaling when preserving DV format (use `--ncrop` and avoid `--scale`)
+- Cropping and scaling ARE supported when converting DV → HDR10 or DV → SDR
+- Profile 7 with Enhancement Layer is preserved only with `--dv-profile auto` (default)
+
+### Format Conversion
+
+Convert between different HDR/SDR formats. Only downgrades are supported (DV → HDR10 → SDR):
 
 ```bash
-ehdr convert -i dolby_vision.mkv -o output.mkv --ncrop
+# Convert HDR10 to SDR with tone mapping
+ehdr convert -i hdr10_video.mkv -o output.mkv --color-format sdr
+
+# Convert Dolby Vision to HDR10 (extracts base layer)
+ehdr convert -i dolby_vision.mkv -o output.mkv --color-format hdr10
+
+# Keep source format (default behavior)
+ehdr convert -i input.mkv -o output.mkv --color-format auto
 ```
+
+**Tone Mapping:**
+- HDR to SDR conversion uses zscale filter with Hable tone mapping algorithm
+- Automatically removes HDR metadata for SDR output
+- Adjusts color space to BT.709 for SDR
 
 ### Batch Processing
 
@@ -195,6 +243,13 @@ Optional Arguments:
   --ncrop                   Disable automatic black bar cropping
   --scale RESOLUTION        Scale video to target resolution
                             (UHD, FHD, HD, SD, or numeric height)
+  --color-format FORMAT     Target color format (auto, hdr10, sdr)
+                            auto = keep source format (default)
+                            hdr10 = convert to HDR10
+                            sdr = convert to SDR with tone mapping
+  --dv-profile PROFILE      Dolby Vision profile (auto, 8)
+                            auto = automatic detection (default)
+                            8 = force Profile 8.1 output
 ```
 
 ## Automatic Quality Optimization
@@ -236,6 +291,15 @@ ehdr convert -i input.mkv -o preview.mkv --crf 22 --preset ultrafast
 
 # High-quality conversion for archiving
 ehdr convert -i input.mkv -o archive.mkv --crf 12 --preset veryslow
+
+# Convert Dolby Vision library to HDR10 with scaling
+ehdr convert -i ./dv_movies -o ./hdr10_movies --color-format hdr10 --scale FHD
+
+# Create SDR copies from HDR10 content
+ehdr convert -i ./hdr10_videos -o ./sdr_videos --color-format sdr
+
+# Re-encode Dolby Vision with custom quality
+ehdr convert -i dolby_vision.mkv -o output.mkv --ncrop --crf 14 --preset slow
 ```
 
 ## Technical Details
@@ -254,10 +318,28 @@ ehdr convert -i input.mkv -o archive.mkv --crf 12 --preset veryslow
 
 ### Dolby Vision Processing
 
-1. Extracts RPU metadata using `dovi_tool`
-2. Caches RPU file to avoid re-extraction
-3. Creates pipeline: `ffmpeg | x265` with RPU injection
-4. Uses Dolby Vision profile 8.1
+**Multi-Stage Workflow:**
+1. Extracts HDR10 base layer (strips RPU) using `dovi_tool remove`
+2. Muxes base layer with audio/subtitles into temporary MKV
+3. Re-encodes base layer with FFmpeg (applies CRF, filters)
+4. Extracts RPU metadata with profile-specific conversion mode
+5. For Profile 7: Extracts Enhancement Layer and multiplexes with base layer
+6. Injects RPU back into encoded video using `dovi_tool inject-rpu`
+7. Final muxing with all streams into target MKV
+
+**Profile Handling:**
+- Profile 5 (IPTPQc2) → Preserves Profile 5 or converts to Profile 8.1 (mode 3 conversion)
+- Profile 7 (MEL+EL) → Profile 7 preserved or Profile 8.1 (mode 2 conversion)
+- Profile 8 → Profile 8.1 (mode 2 conversion)
+
+**Format Downgrade:**
+- DV → HDR10: Stops after step 3 (base layer only, no RPU)
+- DV → SDR: Base layer with tone mapping applied
+
+**Temporary Files:**
+- Stored in `.ehdr_temp_{filename}/` directory
+- Incrementally deleted during workflow
+- Final cleanup removes entire temp directory
 
 ## Troubleshooting
 
@@ -276,6 +358,16 @@ Crop detection analyzes 10 video samples. For very large files, consider using `
 ### Black bars still visible after conversion
 
 Some videos have irregular black bars that vary throughout the video. Crop detection uses the most common dimensions found. You can manually specify crop parameters in the source code if needed.
+
+### "Cannot crop/scale Dolby Vision" warning
+
+When preserving Dolby Vision format, cropping and scaling are not supported because RPU metadata is frame-position dependent. Options:
+- Use `--ncrop` to disable cropping for DV preservation
+- Convert to HDR10 or SDR to enable cropping/scaling: `--color-format hdr10`
+
+### High disk usage during Dolby Vision conversion
+
+Dolby Vision conversion creates temporary files that can use up to 2x the source file size. These are automatically cleaned up after conversion. Ensure sufficient disk space in the output directory.
 
 ## Contributing
 
