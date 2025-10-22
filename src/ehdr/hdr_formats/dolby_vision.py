@@ -1,13 +1,13 @@
 """Dolby Vision metadata extraction and handling."""
 
+import re
 import subprocess
 import threading
 from pathlib import Path
 from typing import Optional
 
 from ehdr.cli.cli_output import monitor_process_progress
-from ehdr.dataclass import DolbyVisionProfile
-from ehdr.video import Video
+from ehdr.typing.dolby_vision_typing import DolbyVisionProfileEncodingMode, DolbyVisionRpuInfo
 
 
 def get_dovi_tool_path() -> str:
@@ -192,7 +192,7 @@ def inject_rpu(input_file: str, input_rpu: str, output_hevc: Optional[str] = Non
         raise RuntimeError(f"Failed to inject RPU: {e}")
 
 
-def extract_rpu(video: Video, output_rpu: Optional[str] = None, dv_profile_encoding: Optional[DolbyVisionProfile] = None) -> str:
+def extract_rpu(input_path: Path, output_rpu: Optional[str] = None, dv_profile_source: Optional[int] = None, dv_profile_encoding: Optional[DolbyVisionProfileEncodingMode] = None) -> str:
     """Extract Dolby Vision RPU (Reference Processing Unit) metadata.
 
     Args:
@@ -206,8 +206,6 @@ def extract_rpu(video: Video, output_rpu: Optional[str] = None, dv_profile_encod
     Raises:
         RuntimeError: If RPU extraction fails
     """
-    input_path = video.get_filepath()
-
     if output_rpu is None:
         output_rpu = str(input_path.with_suffix('.rpu'))
 
@@ -236,10 +234,9 @@ def extract_rpu(video: Video, output_rpu: Optional[str] = None, dv_profile_encod
             dovi_tool_exec,
         ]
 
-        if dv_profile_encoding and dv_profile_encoding != DolbyVisionProfile.AUTO:
-            profile: int | None = video.get_dolby_vision_profile()
-            if profile and profile in map_dv_profile8_mode:
-                dovi_cmd.extend(['-m', map_dv_profile8_mode[profile]])
+        if dv_profile_encoding and dv_profile_encoding != DolbyVisionProfileEncodingMode.AUTO:
+            if dv_profile_source and dv_profile_source in map_dv_profile8_mode:
+                dovi_cmd.extend(['-m', map_dv_profile8_mode[dv_profile_source]])
 
         dovi_cmd.extend([
             'extract-rpu',
@@ -495,3 +492,157 @@ def extract_enhancement_layer(input_file: Path, output_el: Optional[Path] = None
 #     params = [
 #         f"crf={crf}",urn params
 #         f"preset={preset}",#         "profile=main10",  # 10-bit profile required for Dolby Vision#         "level-idc=5.1",#         "high-tier=1",#         "hdr10=1",#         "repeat-headers=1",#         "colorprim=bt2020",#         "transfer=smpte2084",#         "colormatrix=bt2020nc",#         "vbv-bufsize=20000",#         "vbv-maxrate=20000",#     ]#     # Add master display metadata if available#     master_display = video.get_master_display()#     if master_display:#         params.append(f"master-display={master_display}")#     return params
+
+
+def _parse_rpu_info(output: str) -> DolbyVisionRpuInfo:
+    """Parse dovi_tool info --summary output into RpuInfo dataclass.
+
+    Args:
+        output: The text output from dovi_tool info --summary command
+
+    Returns:
+        RpuInfo dataclass with parsed data
+
+    Raises:
+        ValueError: If required fields cannot be parsed
+    """
+    # Extract frames
+    frames_match = re.search(r'Frames:\s+(\d+)', output)
+    if not frames_match:
+        raise ValueError("Could not parse frames from RPU info")
+    frames = int(frames_match.group(1))
+
+    # Extract profile and profile name (name is optional, e.g. Profile 8 has no name)
+    profile_match = re.search(r'Profile:\s+(\d+)(?:\s+\(([^)]+)\))?', output)
+    if not profile_match:
+        raise ValueError("Could not parse profile from RPU info")
+    profile = int(profile_match.group(1))
+    profile_el = profile_match.group(2) if profile_match.group(2) else None
+
+    # Extract DM version
+    dm_version_match = re.search(r'DM version:\s+(\d+)\s+\(([^)]+)\)', output)
+    if not dm_version_match:
+        raise ValueError("Could not parse DM version from RPU info")
+    dm_version = int(dm_version_match.group(1))
+    cm_version = dm_version_match.group(2)
+
+    # Extract scene/shot count
+    scene_shot_match = re.search(r'Scene/shot count:\s+(\d+)', output)
+    if not scene_shot_match:
+        raise ValueError("Could not parse scene/shot count from RPU info")
+    scene_shot_count = int(scene_shot_match.group(1))
+
+    # Extract RPU mastering display
+    rpu_display_match = re.search(r'RPU mastering display:\s+([\d.]+)/([\d.]+)\s+nits', output)
+    if not rpu_display_match:
+        raise ValueError("Could not parse RPU mastering display from RPU info")
+    rpu_min_nits = float(rpu_display_match.group(1))
+    rpu_max_nits = float(rpu_display_match.group(2))
+
+    # Extract L1 content light level
+    l1_match = re.search(r'RPU content light level \(L1\):\s+MaxCLL:\s+([\d.]+)\s+nits,\s+MaxFALL:\s+([\d.]+)\s+nits', output)
+    if not l1_match:
+        raise ValueError("Could not parse L1 content light level from RPU info")
+    l1_max_cll = float(l1_match.group(1))
+    l1_max_fall = float(l1_match.group(2))
+
+    # Extract L6 metadata (optional)
+    l6_min_nits = None
+    l6_max_nits = None
+    l6_max_cll = None
+    l6_max_fall = None
+
+    l6_match = re.search(r'L6 metadata:\s+Mastering display:\s+([\d.]+)/([\d.]+)\s+nits\.\s+MaxCLL:\s+(\d+)\s+nits,\s+MaxFALL:\s+(\d+)\s+nits', output)
+    if l6_match:
+        l6_min_nits = float(l6_match.group(1))
+        l6_max_nits = float(l6_match.group(2))
+        l6_max_cll = int(l6_match.group(3))
+        l6_max_fall = int(l6_match.group(4))
+
+    # Extract L5 offsets (optional, may be N/A)
+    l5_offset_top = None
+    l5_offset_bottom = None
+    l5_offset_left = None
+    l5_offset_right = None
+
+    l5_match = re.search(r'L5 offsets:\s+top=([^,]+),\s+bottom=([^,]+),\s+left=([^,]+),\s+right=(.+)', output)
+    if l5_match:
+        try:
+            top_str = l5_match.group(1).strip()
+            bottom_str = l5_match.group(2).strip()
+            left_str = l5_match.group(3).strip()
+            right_str = l5_match.group(4).strip()
+
+            l5_offset_top = None if top_str == "N/A" else int(top_str)
+            l5_offset_bottom = None if bottom_str == "N/A" else int(bottom_str)
+            l5_offset_left = None if left_str == "N/A" else int(left_str)
+            l5_offset_right = None if right_str == "N/A" else int(right_str)
+        except ValueError:
+            # If parsing fails, leave as None
+            pass
+
+    return DolbyVisionRpuInfo(
+        frames=frames,
+        profile=profile,
+        profile_el=profile_el,
+        dm_version=dm_version,
+        cm_version=cm_version,
+        scene_shot_count=scene_shot_count,
+        rpu_min_nits=rpu_min_nits,
+        rpu_max_nits=rpu_max_nits,
+        l1_max_cll=l1_max_cll,
+        l1_max_fall=l1_max_fall,
+        l6_min_nits=l6_min_nits,
+        l6_max_nits=l6_max_nits,
+        l6_max_cll=l6_max_cll,
+        l6_max_fall=l6_max_fall,
+        l5_offset_top=l5_offset_top,
+        l5_offset_bottom=l5_offset_bottom,
+        l5_offset_left=l5_offset_left,
+        l5_offset_right=l5_offset_right
+    )
+
+
+def get_rpu_info(rpu_path: Path) -> DolbyVisionRpuInfo:
+    """Get detailed information about a Dolby Vision RPU file.
+
+    Args:
+        rpu_file: Path to the RPU file (.bin or .rpu)
+
+    Returns:
+        RpuInfo dataclass with parsed information
+
+    Raises:
+        RuntimeError: If dovi_tool execution fails
+        ValueError: If output parsing fails
+    """
+    if not rpu_path.exists():
+        raise FileNotFoundError(f"RPU file not found: {str(rpu_path)}")
+
+    dovi_tool_exec = get_dovi_tool_path()
+
+    try:
+        dovi_cmd: list[str] = [
+            dovi_tool_exec,
+            'info',
+            '--input', str(rpu_path),
+            '--summary'
+        ]
+
+        result = subprocess.run(
+            dovi_cmd,
+            capture_output=True,
+            text=True,
+            check=True
+        )
+
+        return _parse_rpu_info(result.stdout)
+
+    except subprocess.CalledProcessError as e:
+        error_msg = e.stderr if e.stderr else str(e)
+        raise RuntimeError(f"dovi_tool info failed: {error_msg}")
+    except FileNotFoundError as e:
+        raise RuntimeError(
+            f"Required tool not found: {e.filename}. "
+            "Please ensure dovi_tool is installed."
+        )

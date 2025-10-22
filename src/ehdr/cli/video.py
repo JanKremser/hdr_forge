@@ -3,7 +3,7 @@
 
 
 from ehdr.cli.cli_output import BLUE, color_str
-from ehdr.dataclass import DolbyVisionInfo
+from ehdr.typing.dolby_vision_typing import DolbyVisionInfo, DolbyVisionSiteDataInfo
 from ehdr.video import Video
 
 def print_video_infos(video: Video) -> None:
@@ -35,11 +35,12 @@ def print_video_infos(video: Video) -> None:
         else:
             print(f"    MaxCLL/MaxFALL: {color_str('N/A', color)}")
 
-    dolby_vision_info: DolbyVisionInfo | None = video.get_dolby_vision_infos()
+    dolby_vision_info: DolbyVisionInfo | None = video.get_dolby_vision_info()
     if dolby_vision_info:
         print("  Dolby Vision Metadata:")
         print(f"    Profile: {color_str(dolby_vision_info.dv_profile or 'N/A', color)}")
         print(f"    Level: {color_str(dolby_vision_info.dv_level or 'N/A', color)}")
-        print(f"    RPU Present: {color_str('YES' if dolby_vision_info.rpu_present_flag == 1 else 'NO', color)}")
+        print(f"    EL: {color_str(dolby_vision_info.dv_profile_el or 'N/A', color)}")
+        print(f"    Format: {color_str(dolby_vision_info.dv_format, color)}")
     print(f"{color_str('_', color)}" * 70)
     print()

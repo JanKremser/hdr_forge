@@ -4,7 +4,7 @@ from typing import Tuple
 
 
 from ehdr.cli.cli_output import BLUE, color_str, create_progress_bar
-from ehdr.dataclass import CropHandler
+from ehdr.typing.encoder_typing import CropHandler
 from ehdr.encoder import Encoder
 
 

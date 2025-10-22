@@ -10,7 +10,8 @@ from typing import Callable, Dict, Optional, Tuple
 from ffmpeg import FFmpeg
 
 from ehdr.container import mkv
-from ehdr.dataclass import ColorFormat, CropHandler, DolbyVisionInfo, DolbyVisionProfile
+from ehdr.typing.encoder_typing import ColorFormat, CropHandler
+from ehdr.typing.dolby_vision_typing import DolbyVisionSiteDataInfo, DolbyVisionProfileEncodingMode
 from ehdr.hdr_formats import dolby_vision
 from ehdr.video import Video
 
@@ -43,7 +44,7 @@ class Encoder:
         video: Video,
         target_file: Path,
         color_format: ColorFormat = ColorFormat.AUTO,
-        dv_profile: DolbyVisionProfile = DolbyVisionProfile.AUTO,
+        dv_profile: DolbyVisionProfileEncodingMode = DolbyVisionProfileEncodingMode.AUTO,
         crf: Optional[int] = None,
         preset: Optional[str] = None,
         enable_crop: bool = False,
@@ -72,7 +73,7 @@ class Encoder:
         )
 
         # Dolby Vision profile (only relevant if encoding to DV)
-        self.dv_profile_for_encoding: Optional[DolbyVisionProfile] = self._determine_dv_profile(
+        self.dv_profile_for_encoding: Optional[DolbyVisionProfileEncodingMode] = self._determine_dv_profile(
             dv_profile=dv_profile
         )
 
@@ -139,7 +140,7 @@ class Encoder:
         # Valid downgrade
         return color_format
 
-    def _determine_dv_profile(self, dv_profile: DolbyVisionProfile) -> Optional[DolbyVisionProfile]:
+    def _determine_dv_profile(self, dv_profile: DolbyVisionProfileEncodingMode) -> Optional[DolbyVisionProfileEncodingMode]:
         """Determine the Dolby Vision profile for encoding.
 
         Args:
@@ -151,11 +152,11 @@ class Encoder:
         if not self.is_dolby_vision_encoding():
             return None
 
-        source_dv_info: DolbyVisionInfo | None = self.video.get_dolby_vision_infos()
-        if source_dv_info is None or source_dv_info.dv_profile is None:
-            return DolbyVisionProfile.AUTO
+        source_dv_profile: int | None = self.video.get_dolby_vision_profile()
+        if source_dv_profile is None or source_dv_profile is None:
+            return DolbyVisionProfileEncodingMode.AUTO
 
-        profile: int = source_dv_info.dv_profile
+        profile: int = source_dv_profile
         if profile not in [5, 7, 8]:
             raise ValueError(f"Unsupported source Dolby Vision profile: {profile}")
 
@@ -170,10 +171,10 @@ class Encoder:
         if not self.is_dolby_vision_encoding():
             return None
 
-        if self.dv_profile_for_encoding == DolbyVisionProfile.AUTO:
+        if self.dv_profile_for_encoding == DolbyVisionProfileEncodingMode.AUTO:
             profile: int | None = self.video.get_dolby_vision_profile()
             return profile
-        elif self.dv_profile_for_encoding == DolbyVisionProfile._8:
+        elif self.dv_profile_for_encoding == DolbyVisionProfileEncodingMode._8:
             return 8
 
         return None
@@ -707,14 +708,15 @@ class Encoder:
 
         # Step 5: Extract RPU metadata from original Dolby Vision video
         rpu_file_path: str = dolby_vision.extract_rpu(
-            video=self.video,
+            input_path=self.video.get_filepath(),
             output_rpu=str(temp_dir / f"RPU.rpu"),
+            dv_profile_source=self.video.get_dolby_vision_profile(),
             dv_profile_encoding=self.dv_profile_for_encoding
         )
 
         add_el_profile7: bool = False
         # Setup 5.1: If AUTO profile and source is profile 7, demux EL profile 7 RPU
-        if self.dv_profile_for_encoding == DolbyVisionProfile.AUTO and self.video.get_dolby_vision_profile() == 7:
+        if self.dv_profile_for_encoding == DolbyVisionProfileEncodingMode.AUTO and self.video.get_dolby_vision_profile() == 7:
             # start demux EL profile 7 for profile 7 encoding
             el_path: Path = dolby_vision.extract_enhancement_layer(
                 input_file=input_file,

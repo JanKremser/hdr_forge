@@ -6,7 +6,10 @@ import subprocess
 from pathlib import Path
 from typing import Dict, LiteralString, Optional, Tuple
 
-from ehdr.dataclass import ColorFormat, ContentLightLevelMetadata, DolbyVisionInfo, HdrMetadata, MasterDisplayMetadata
+from ehdr.hdr_formats import dolby_vision
+from ehdr.typing.encoder_typing import ColorFormat
+from ehdr.typing.dolby_vision_typing import DolbyVisionInfo, DolbyVisionSiteDataInfo, DolbyVisionRpuInfo
+from ehdr.typing.video_typing import ContentLightLevelMetadata, HdrMetadata, MasterDisplayMetadata
 
 
 DEFAULT_MASTER_DISPLAY: LiteralString = (
@@ -39,6 +42,18 @@ class Video:
         video_stream: dict = self._get_video_stream()
         self.width = video_stream.get('width', 0)
         self.height = video_stream.get('height', 0)
+
+        self.dolby_vision_rpu_info: Optional[DolbyVisionRpuInfo] = None
+        if self.is_dolby_vision_video():
+            ## get dolby vision rpu infos
+            rpu_file_path: str = dolby_vision.extract_rpu(
+                input_path=self.get_filepath(),
+                output_rpu=str(f"/tmp/RPU.rpu"),
+                dv_profile_source=self.get_dolby_vision_profile(),
+            )
+            self.dolby_vision_rpu_info = dolby_vision.get_rpu_info(
+                rpu_path=Path(rpu_file_path)
+            )
 
 
     def extract_hdr_metadata(self) -> HdrMetadata:
@@ -106,7 +121,6 @@ class Video:
             mastering_display_metadata=mastering_data,
             content_light_level_metadata=light_data,
         )
-
 
     def _extract_metadata(self) -> dict:
         """Extract video metadata using ffprobe.
@@ -208,7 +222,7 @@ class Video:
         """
         return self._get_video_stream().get('color_transfer', '')
 
-    def get_dolby_vision_infos(self) -> Optional[DolbyVisionInfo]:
+    def _get_dolby_vision_side_data_infos(self) -> Optional[DolbyVisionSiteDataInfo]:
         """Extract Dolby Vision metadata.
 
         Returns:
@@ -219,7 +233,7 @@ class Video:
 
         for data in side_data:
             if data.get('side_data_type') == 'DOVI configuration record':
-                return DolbyVisionInfo(
+                return DolbyVisionSiteDataInfo(
                     dv_profile=data.get('dv_profile'),
                     dv_level=data.get('dv_level'),
                     rpu_present_flag=data.get('rpu_present_flag', 0)
@@ -227,13 +241,52 @@ class Video:
 
         return None
 
+    def _get_dolby_vision_rpu_info(self) -> Optional[DolbyVisionRpuInfo]:
+        """Get Dolby Vision RPU information.
+
+        Returns:
+            RpuInfo object containing RPU metadata or None if not available
+        """
+        return self.dolby_vision_rpu_info
+
+    def get_dolby_vision_info(self) -> Optional[DolbyVisionInfo]:
+        """Get Dolby Vision detailed information.
+
+        Returns:
+            DolbyVisionInfo object containing detailed Dolby Vision metadata or None if not available
+        """
+        if not self.is_dolby_vision_video():
+            return None
+        dv_rpu_info: DolbyVisionRpuInfo | None = self._get_dolby_vision_rpu_info()
+
+        if not dv_rpu_info:
+            return None
+        dv_site_data: DolbyVisionSiteDataInfo | None = self._get_dolby_vision_side_data_infos()
+
+        dv_level: Optional[int] = None
+        if dv_site_data:
+            dv_level = dv_site_data.dv_level
+
+        dv_map_el: str = ''
+        if dv_rpu_info.profile_el:
+            dv_map_el = f"EL+"
+
+        return DolbyVisionInfo(
+            dv_profile=dv_rpu_info.profile,
+            dv_profile_el=dv_rpu_info.profile_el,
+            dv_level=dv_level,
+            dm_version=dv_rpu_info.dm_version,
+            cm_version=dv_rpu_info.cm_version,
+            dv_format=f"BL+{dv_map_el}RPU",
+        )
+
     def get_dolby_vision_profile(self) -> Optional[int]:
         """Get Dolby Vision profile number.
 
         Returns:
             Dolby Vision profile as integer or None if not found
         """
-        dv_info: DolbyVisionInfo | None = self.get_dolby_vision_infos()
+        dv_info: DolbyVisionInfo | None = self.get_dolby_vision_info()
         if dv_info:
             return dv_info.dv_profile
         return None
@@ -310,7 +363,7 @@ class Video:
         Returns:
             True if Dolby Vision metadata is present, False otherwise
         """
-        dv_info: DolbyVisionInfo | None = self.get_dolby_vision_infos()
+        dv_info: DolbyVisionSiteDataInfo | None = self._get_dolby_vision_side_data_infos()
         return dv_info is not None and dv_info.rpu_present_flag == 1
 
     def get_color_format(self) -> ColorFormat:
