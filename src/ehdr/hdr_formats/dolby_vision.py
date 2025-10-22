@@ -29,11 +29,11 @@ def get_dovi_tool_path() -> str:
         return "dovi_tool"
 
 
-def extract_base_layer(input_file: str, output_hevc: Optional[str] = None) -> str:
+def extract_base_layer(input_path: Path, output_hevc: Optional[Path] = None) -> Path:
     """Extract Dolby Vision base layer (HEVC without RPU).
 
     Args:
-        input_file: Path to input video file
+        input_path: Path to input video file
         output_hevc: Optional path for HEVC output file. If None, generates
                     filename based on input (input.mkv -> input.hevc)
 
@@ -43,12 +43,8 @@ def extract_base_layer(input_file: str, output_hevc: Optional[str] = None) -> st
     Raises:
         RuntimeError: If base layer extraction fails
     """
-    input_path = Path(input_file)
-
     if output_hevc is None:
-        output_hevc = str(input_path.with_suffix('.hevc'))
-
-    hevc_base_layer_path = Path(output_hevc)
+        output_hevc = input_path.with_suffix('.hevc')
 
     dovi_tool_exec = get_dovi_tool_path()
 
@@ -67,7 +63,7 @@ def extract_base_layer(input_file: str, output_hevc: Optional[str] = None) -> st
             dovi_tool_exec,
             'remove',
             '-',
-            '-o', str(hevc_base_layer_path)
+            '-o', str(output_hevc)
         ]
 
         # Create pipeline: ffmpeg | dovi_tool
@@ -109,11 +105,11 @@ def extract_base_layer(input_file: str, output_hevc: Optional[str] = None) -> st
         # Wait for ffmpeg to complete
         ffmpeg_process.wait()
 
-        if not hevc_base_layer_path.exists():
+        if not output_hevc.exists():
             raise RuntimeError("HADR10 Base Layer file was not created")
 
-        print(f"- HDR10 Base Layer extracted successfully: {hevc_base_layer_path}")
-        return str(hevc_base_layer_path)
+        print(f"- HDR10 Base Layer extracted successfully: {str(output_hevc)}")
+        return output_hevc
 
     except FileNotFoundError as e:
         raise RuntimeError(
@@ -124,7 +120,7 @@ def extract_base_layer(input_file: str, output_hevc: Optional[str] = None) -> st
         raise RuntimeError(f"Failed to extract Base Layer: {e}")
 
 
-def inject_rpu(input_file: str, input_rpu: str, output_hevc: Optional[str] = None) -> str:
+def inject_rpu(input_path: Path, input_rpu: Path, output_hevc: Optional[Path] = None) -> Path:
     """Inject Dolby Vision RPU metadata into HEVC HDR10 Base Layer.
 
     Args:
@@ -139,22 +135,18 @@ def inject_rpu(input_file: str, input_rpu: str, output_hevc: Optional[str] = Non
     Raises:
         RuntimeError: If RPU injection fails
     """
-    input_path = Path(input_file)
-
     if output_hevc is None:
-        output_hevc = str(input_path.with_name(f"{input_path.stem}_BL_RPU.hevc"))
+        output_hevc = input_path.with_name(f"{input_path.stem}_BL_RPU.hevc")
 
-    hevc_bl_and_rpu_path = Path(output_hevc)
-
-    dovi_tool_exec = get_dovi_tool_path()
+    dovi_tool_exec: str = get_dovi_tool_path()
 
     try:
         dovi_cmd: list[str] = [
             dovi_tool_exec,
             'inject-rpu',
-            '-i', input_file,
-            '--rpu-in', input_rpu,
-            '-o', str(hevc_bl_and_rpu_path)
+            '-i', str(output_hevc),
+            '--rpu-in', str(input_rpu),
+            '-o', str(output_hevc)
         ]
 
         dovi_process = subprocess.Popen(
@@ -177,11 +169,11 @@ def inject_rpu(input_file: str, input_rpu: str, output_hevc: Optional[str] = Non
         # Wait for the monitor thread to finish
         monitor_thread.join(timeout=1.0)
 
-        if not hevc_bl_and_rpu_path.exists():
+        if not output_hevc.exists():
             raise RuntimeError("HEVC file with RPU was not created")
 
-        print(f"- RPU injected successfully: {hevc_bl_and_rpu_path}")
-        return str(hevc_bl_and_rpu_path)
+        print(f"- RPU injected successfully: {str(output_hevc)}")
+        return output_hevc
 
     except FileNotFoundError as e:
         raise RuntimeError(
@@ -192,7 +184,7 @@ def inject_rpu(input_file: str, input_rpu: str, output_hevc: Optional[str] = Non
         raise RuntimeError(f"Failed to inject RPU: {e}")
 
 
-def extract_rpu(input_path: Path, output_rpu: Optional[str] = None, dv_profile_source: Optional[DolbyVisionProfile] = None, dv_profile_encoding: Optional[DolbyVisionProfile] = None) -> str:
+def extract_rpu(input_path: Path, output_rpu: Optional[Path] = None, dv_profile_source: Optional[DolbyVisionProfile] = None, dv_profile_encoding: Optional[DolbyVisionProfile] = None) -> Path:
     """Extract Dolby Vision RPU (Reference Processing Unit) metadata.
 
     Args:
@@ -207,9 +199,7 @@ def extract_rpu(input_path: Path, output_rpu: Optional[str] = None, dv_profile_s
         RuntimeError: If RPU extraction fails
     """
     if output_rpu is None:
-        output_rpu = str(input_path.with_suffix('.rpu'))
-
-    rpu_path = Path(output_rpu)
+        output_rpu = input_path.with_suffix('.rpu')
 
     dovi_tool_exec = get_dovi_tool_path()
 
@@ -242,7 +232,7 @@ def extract_rpu(input_path: Path, output_rpu: Optional[str] = None, dv_profile_s
         dovi_cmd.extend([
             'extract-rpu',
             '-',
-            '-o', str(rpu_path)
+            '-o', str(output_rpu)
         ])
 
         # Create pipeline: ffmpeg | dovi_tool
@@ -284,11 +274,11 @@ def extract_rpu(input_path: Path, output_rpu: Optional[str] = None, dv_profile_s
         # Wait for ffmpeg to complete
         ffmpeg_process.wait()
 
-        if not rpu_path.exists():
+        if not output_rpu.exists():
             raise RuntimeError("RPU file was not created")
 
-        print(f"- RPU extracted successfully: {rpu_path}")
-        return str(rpu_path)
+        print(f"- RPU extracted successfully: {str(output_rpu)}")
+        return output_rpu
 
     except FileNotFoundError as e:
         raise RuntimeError(

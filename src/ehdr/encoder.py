@@ -672,23 +672,23 @@ class Encoder:
     def convert_dolby_vision_to_hdr10_without_re_encoding(
         self,
     ) -> bool:
-        input_file = self._video.get_filepath()
+        input_file: Path = self._video.get_filepath()
 
         # Create temporary directory for all intermediate files
-        temp_dir = self._get_temp_directory()
+        temp_dir: Path = self._get_temp_directory()
 
-        # Step 1: Extract base layer (HEVC without RPU) from original video
-        base_layer_hevc_path: str = dolby_vision.extract_base_layer(
-            input_file=str(input_file),
-            output_hevc=str(temp_dir / f"video_BL.hevc")
+        # Step 1: Extract base layer (HEVC without EL+RPU) from original video
+        base_layer_hevc_path: Path = dolby_vision.extract_base_layer(
+            input_path=input_file,
+            output_hevc=temp_dir / f"video_BL.hevc"
         )
 
         # Step 2: Mux base layer HEVC with original audio/subtitles into final MKV
         # This creates a playable MKV file with base layer video + original audio/subs
-        _base_layer_mkv_path: str = mkv.mux_hevc_to_mkv(
-            input_hevc=base_layer_hevc_path,
-            input_mkv=str(input_file),
-            output_mkv=str(self._target_file)
+        _base_layer_mkv_path: Path = mkv.mux_hevc_to_mkv(
+            input_hevc_path=base_layer_hevc_path,
+            input_mkv=input_file,
+            output_mkv=self._target_file,
         )
 
         self._cleanup_temp_directory()
@@ -730,30 +730,30 @@ class Encoder:
         """
         only_hdr10_or_sdr_encoding: bool = not self.is_dolby_vision_encoding()
 
-        input_file = self._video.get_filepath()
+        input_file: Path = self._video.get_filepath()
 
         # Create temporary directory for all intermediate files
-        temp_dir = self._get_temp_directory()
+        temp_dir: Path = self._get_temp_directory()
 
         # Step 1: Extract base layer (HEVC without RPU) from original video
-        base_layer_hevc_path: str = dolby_vision.extract_base_layer(
-            input_file=str(input_file),
-            output_hevc=str(temp_dir / f"video_BL.hevc")
+        base_layer_hevc_path: Path = dolby_vision.extract_base_layer(
+            input_path=input_file,
+            output_hevc=temp_dir / f"video_BL.hevc",
         )
 
         # Step 2: Mux base layer HEVC with original audio/subtitles into temporary MKV
         # This creates a playable MKV file with base layer video + original audio/subs
-        base_layer_mkv_path: str = mkv.mux_hevc_to_mkv(
-            input_hevc=base_layer_hevc_path,
-            input_mkv=str(input_file),
-            output_mkv=str(temp_dir / f"video_BL.mkv")
+        base_layer_mkv_path: Path = mkv.mux_hevc_to_mkv(
+            input_hevc_path=base_layer_hevc_path,
+            input_mkv=input_file,
+            output_mkv=temp_dir / f"video_BL.mkv",
         )
 
         # Cleanup: Delete base layer HEVC (no longer needed after muxing)
-        Path(base_layer_hevc_path).unlink(missing_ok=True)
+        base_layer_hevc_path.unlink(missing_ok=True)
 
         # Step 3: Re-encode the base layer MKV with FFmpeg (apply CRF, filters, etc.)
-        encoded_base_layer_mkv = temp_dir / f"video_BL_Encoded.mkv"
+        encoded_base_layer_mkv: Path = temp_dir / f"video_BL_Encoded.mkv"
 
         # For HDR10 or SDR encoding, we can write directly to target file
         if only_hdr10_or_sdr_encoding:
@@ -765,12 +765,11 @@ class Encoder:
             progress_callback=progress_callback,
             finish_callback=finish_callback,
         )
+        # Cleanup: Delete base layer MKV (no longer needed after encoding)
+        base_layer_mkv_path.unlink(missing_ok=True)
 
         if not encoding_success:
             return False
-
-        # Cleanup: Delete base layer MKV (no longer needed after encoding)
-        Path(base_layer_mkv_path).unlink(missing_ok=True)
 
         # For HDR10 or SDR encoding, we are done here
         if only_hdr10_or_sdr_encoding:
@@ -781,14 +780,14 @@ class Encoder:
 
         # Step 4: Extract encoded HEVC video stream from MKV
         encoded_hevc_bl_path: Path = mkv.extract_hevc(
-            input_mkv=str(encoded_base_layer_mkv),
+            input_path=encoded_base_layer_mkv,
             output_hevc=temp_dir / f"video_encoded_BL.hevc"
         )
 
         # Step 5: Extract RPU metadata from original Dolby Vision video
-        rpu_file_path: str = dolby_vision.extract_rpu(
+        rpu_file_path: Path = dolby_vision.extract_rpu(
             input_path=self._video.get_filepath(),
-            output_rpu=str(temp_dir / f"RPU.rpu"),
+            output_rpu=temp_dir / f"RPU.rpu",
             dv_profile_source=self._video.get_dolby_vision_profile(),
             dv_profile_encoding=self._target_dv_profile
         )
@@ -809,22 +808,20 @@ class Encoder:
             encoded_hevc_bl_path = bl_el_hevc
 
         # Step 6: Inject original RPU metadata back into encoded HEVC
-        encoded_hevc_with_rpu_path: str = dolby_vision.inject_rpu(
-            input_file=str(encoded_hevc_bl_path),
+        encoded_hevc_with_rpu_path: Path = dolby_vision.inject_rpu(
+            input_path=encoded_hevc_bl_path,
             input_rpu=rpu_file_path,
-            output_hevc=str(temp_dir / f"video_encoded_BL_{'EL_' if self._target_dv_el else ''}RPU.hevc")
+            output_hevc=temp_dir / f"video_encoded_BL_{'EL_' if self._target_dv_el else ''}RPU.hevc"
         )
 
         # Cleanup: Delete encoded HEVC without RPU (no longer needed after RPU injection)
         encoded_hevc_bl_path.unlink(missing_ok=True)
-        # Cleanup: Delete RPU file (no longer needed after injection)
-        Path(rpu_file_path).unlink(missing_ok=True)
 
         # Step 7: Mux final HEVC (with RPU) + audio/subtitles into target file
         mkv.mux_hevc_to_mkv(
-            input_hevc=encoded_hevc_with_rpu_path,
-            input_mkv=str(encoded_base_layer_mkv),
-            output_mkv=str(self._target_file),
+            input_hevc_path=encoded_hevc_with_rpu_path,
+            input_mkv=encoded_base_layer_mkv,
+            output_mkv=self._target_file,
         )
 
         # Step 8: Clean up temporary directory (should be empty now, but removes it anyway)

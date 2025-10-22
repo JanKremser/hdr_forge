@@ -46,14 +46,14 @@ class Video:
         self.dolby_vision_rpu_info: Optional[DolbyVisionRpuInfo] = None
         if self.is_dolby_vision_video():
             ## get dolby vision rpu infos
-            rpu_file_path: str = dolby_vision.extract_rpu(
+            rpu_file_path: Path = dolby_vision.extract_rpu(
                 input_path=self.get_filepath(),
-                output_rpu=str(f"/tmp/RPU.rpu"),
                 dv_profile_source=self.get_dolby_vision_profile(),
             )
             self.dolby_vision_rpu_info = dolby_vision.get_rpu_info(
                 rpu_path=Path(rpu_file_path)
             )
+            rpu_file_path.unlink(missing_ok=True)
 
 
     def extract_hdr_metadata(self) -> HdrMetadata:
