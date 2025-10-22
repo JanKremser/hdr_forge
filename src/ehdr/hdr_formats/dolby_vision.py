@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Optional
 
 from ehdr.cli.cli_output import monitor_process_progress
-from ehdr.typing.dolby_vision_typing import DolbyVisionProfileEncodingMode, DolbyVisionRpuInfo
+from ehdr.typing.dolby_vision_typing import DolbyVisionProfile, DolbyVisionProfileEncodingMode, DolbyVisionRpuInfo
 
 
 def get_dovi_tool_path() -> str:
@@ -192,7 +192,7 @@ def inject_rpu(input_file: str, input_rpu: str, output_hevc: Optional[str] = Non
         raise RuntimeError(f"Failed to inject RPU: {e}")
 
 
-def extract_rpu(input_path: Path, output_rpu: Optional[str] = None, dv_profile_source: Optional[int] = None, dv_profile_encoding: Optional[DolbyVisionProfileEncodingMode] = None) -> str:
+def extract_rpu(input_path: Path, output_rpu: Optional[str] = None, dv_profile_source: Optional[DolbyVisionProfile] = None, dv_profile_encoding: Optional[DolbyVisionProfile] = None) -> str:
     """Extract Dolby Vision RPU (Reference Processing Unit) metadata.
 
     Args:
@@ -234,9 +234,10 @@ def extract_rpu(input_path: Path, output_rpu: Optional[str] = None, dv_profile_s
             dovi_tool_exec,
         ]
 
-        if dv_profile_encoding and dv_profile_encoding != DolbyVisionProfileEncodingMode.AUTO:
-            if dv_profile_source and dv_profile_source in map_dv_profile8_mode:
-                dovi_cmd.extend(['-m', map_dv_profile8_mode[dv_profile_source]])
+        if dv_profile_source and dv_profile_encoding and dv_profile_source != dv_profile_encoding:
+            if dv_profile_encoding == DolbyVisionProfile._8:
+                if dv_profile_source.value in map_dv_profile8_mode:
+                    dovi_cmd.extend(['-m', map_dv_profile8_mode[dv_profile_source.value]])
 
         dovi_cmd.extend([
             'extract-rpu',

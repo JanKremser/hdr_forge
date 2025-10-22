@@ -7,8 +7,8 @@ from pathlib import Path
 from typing import Dict, LiteralString, Optional, Tuple
 
 from ehdr.hdr_formats import dolby_vision
-from ehdr.typing.encoder_typing import ColorFormat
-from ehdr.typing.dolby_vision_typing import DolbyVisionInfo, DolbyVisionSiteDataInfo, DolbyVisionRpuInfo
+from ehdr.typing.encoder_typing import HdrSdrFormat
+from ehdr.typing.dolby_vision_typing import DolbyVisionEnhancementLayer, DolbyVisionInfo, DolbyVisionProfile, DolbyVisionSiteDataInfo, DolbyVisionRpuInfo
 from ehdr.typing.video_typing import ContentLightLevelMetadata, HdrMetadata, MasterDisplayMetadata
 
 
@@ -277,19 +277,37 @@ class Video:
             dv_level=dv_level,
             dm_version=dv_rpu_info.dm_version,
             cm_version=dv_rpu_info.cm_version,
-            dv_format=f"BL+{dv_map_el}RPU",
+            dv_layout=f"BL+{dv_map_el}RPU",
         )
 
-    def get_dolby_vision_profile(self) -> Optional[int]:
+    def get_dolby_vision_enhancement_layer(self) -> Optional[DolbyVisionEnhancementLayer]:
+        """Get Dolby Vision Enhancement Layer type.
+
+        Returns:
+            DolbyVisionEnhancementLayer enum value or None if not available
+        """
+        dv_info: DolbyVisionInfo | None = self.get_dolby_vision_info()
+        if dv_info and dv_info.dv_profile_el:
+            if dv_info.dv_profile_el.upper() == DolbyVisionEnhancementLayer.FEL.value:
+                return DolbyVisionEnhancementLayer.FEL
+            elif dv_info.dv_profile_el.upper() == DolbyVisionEnhancementLayer.MEL.value:
+                return DolbyVisionEnhancementLayer.MEL
+        return None
+
+    def get_dolby_vision_profile(self) -> Optional[DolbyVisionProfile]:
         """Get Dolby Vision profile number.
 
         Returns:
             Dolby Vision profile as integer or None if not found
         """
         dv_info: DolbyVisionInfo | None = self.get_dolby_vision_info()
-        if dv_info:
-            return dv_info.dv_profile
-        return None
+        if dv_info is None:
+            return None
+
+        try:
+            return DolbyVisionProfile(dv_info.dv_profile)
+        except ValueError:
+            return None
 
     def get_master_display(self) -> Optional[str]:
         """Extract HDR master display metadata.
@@ -366,18 +384,18 @@ class Video:
         dv_info: DolbyVisionSiteDataInfo | None = self._get_dolby_vision_side_data_infos()
         return dv_info is not None and dv_info.rpu_present_flag == 1
 
-    def get_color_format(self) -> ColorFormat:
+    def get_hdr_sdr_format(self) -> HdrSdrFormat:
         """Determine the color format of the video.
 
         Returns:
             ColorFormat enum value representing the color format
         """
         if self.is_dolby_vision_video():
-            return ColorFormat.DOLBY_VISION
+            return HdrSdrFormat.DOLBY_VISION
         elif self.is_hdr_video():
-            return ColorFormat.HDR10
+            return HdrSdrFormat.HDR10
         else:
-            return ColorFormat.SDR
+            return HdrSdrFormat.SDR
 
     def get_fps(self) -> float:
         """Get video frame rate (frames per second).

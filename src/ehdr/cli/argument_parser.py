@@ -3,7 +3,7 @@
 import argparse
 
 from ehdr import __version__
-from ehdr.typing.encoder_typing import ColorFormat
+from ehdr.typing.encoder_typing import HdrSdrFormat, EncoderSettings, VideoCodec
 from ehdr.typing.dolby_vision_typing import DolbyVisionProfileEncodingMode
 
 
@@ -89,6 +89,12 @@ Examples:
     )
 
     convert_parser.add_argument(
+        '-v', '--video-codec',
+        choices=['x265', 'copy'],
+        help='Video Encoding mode (auto = re-encode if needed x265, copy = copy stream without re-encoding)'
+    )
+
+    convert_parser.add_argument(
         '--crf',
         type=int,
         help='Constant Rate Factor for quality (lower = higher quality). Auto-calculated if not specified.'
@@ -113,7 +119,7 @@ Examples:
     )
 
     convert_parser.add_argument(
-        '--color-format',
+        '--hdr-sdr-format',
         choices=['auto', 'hdr10', 'sdr'],
         default='auto',
         help='Target color format for output video (auto = keep source format, hdr10 = convert to HDR10, sdr = convert to SDR)'
@@ -151,7 +157,7 @@ def get_scale_height(scale: str | None) -> int | None:
     return target_height
 
 
-def get_color_format_from_string(format_str: str | None) -> ColorFormat:
+def get_hdr_sdr_format_from_string(format_str: str | None) -> HdrSdrFormat:
     """Convert string to ColorFormat enum.
 
     Args:
@@ -161,17 +167,17 @@ def get_color_format_from_string(format_str: str | None) -> ColorFormat:
         Corresponding ColorFormat enum value
     """
     if format_str is None:
-        return ColorFormat.AUTO
+        return HdrSdrFormat.AUTO
 
     format_str = format_str.lower()
     if format_str == 'sdr':
-        return ColorFormat.SDR
+        return HdrSdrFormat.SDR
     elif format_str == 'hdr10':
-        return ColorFormat.HDR10
+        return HdrSdrFormat.HDR10
     elif format_str == 'dolby_vision':
-        return ColorFormat.DOLBY_VISION
+        return HdrSdrFormat.DOLBY_VISION
     else:
-        return ColorFormat.AUTO
+        return HdrSdrFormat.AUTO
 
 def get_dolby_vision_profile_from_string(profile_str: str | None) -> DolbyVisionProfileEncodingMode:
     """Convert string to DolbyVision enum.
@@ -190,3 +196,42 @@ def get_dolby_vision_profile_from_string(profile_str: str | None) -> DolbyVision
         return DolbyVisionProfileEncodingMode._8
 
     return DolbyVisionProfileEncodingMode.AUTO
+
+
+def get_video_codec_from_string(codec_str: str | None) -> VideoCodec:
+    """Convert string to VideoEncoder enum.
+
+    Args:
+        codec_str: Video codec string
+
+    Returns:
+        Corresponding VideoEncoder enum value
+    """
+    if codec_str is None:
+        return VideoCodec.X265
+
+    codec_str = codec_str.lower()
+    if codec_str == 'copy':
+        return VideoCodec.COPY
+
+    return VideoCodec.X265
+
+
+def create_encoder_settings_from_args(args) -> EncoderSettings:
+    """Create EncoderSettings object from parsed command-line arguments.
+
+    Args:
+        args: Parsed arguments from parse_args()
+
+    Returns:
+        EncoderSettings object with all encoding parameters
+    """
+    return EncoderSettings(
+        video_codec=get_video_codec_from_string(args.video_codec),
+        hdr_sdr_format=get_hdr_sdr_format_from_string(args.hdr_sdr_format),
+        target_dv_profile=get_dolby_vision_profile_from_string(args.dv_profile),
+        crf=args.crf,
+        preset=args.preset,
+        scale_height=get_scale_height(args.scale),
+        enable_crop=not args.ncrop,
+    )

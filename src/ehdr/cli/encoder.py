@@ -4,7 +4,8 @@ from typing import Tuple
 
 
 from ehdr.cli.cli_output import BLUE, color_str, create_progress_bar
-from ehdr.typing.encoder_typing import CropHandler
+from ehdr.typing.dolby_vision_typing import DolbyVisionEnhancementLayer, DolbyVisionProfile
+from ehdr.typing.encoder_typing import CropHandler, VideoCodec
 from ehdr.encoder import Encoder
 
 
@@ -21,21 +22,37 @@ def print_encoding_params(encoder: Encoder) -> None:
     print(f"{color_str('_', color)}" * 70)
     print("Encoding Parameters:")
     print(f"  Output File: {color_str(str(encoder.get_target_file()), color)}")
-    print(f"  CRF: {color_str(encoder.crf, color)}")
-    print(f"  Preset: {color_str(encoder.preset, color)}")
-    if encoder._is_cropped():
-        crop_filter: str | None = encoder.get_crop_filter()
-        print(f"  Crop: {color_str(crop_filter, color)}")
-    else:
-        print(f"  Crop: {color_str('No cropping applied', color)}")
-    scale_dimensions: Tuple[int, int] | None = encoder._get_scale_dimensions()
-    if scale_dimensions:
-        w, h = scale_dimensions
-        print(f"  Scale: {color_str(f"{w}x{h}", color)}")
-    print(f"  HDR/SDR: {color_str(encoder.get_color_format().value.upper(), color)}")
+
+    video_codec = encoder.get_encoding_video_codec()
+    print(f"  Video Codec: {color_str(video_codec.value, color)}")
+    if video_codec != VideoCodec.COPY:
+        encoding_video_library = encoder.get_encoding_video_library()
+        print(f"  Video Encoder Library: {color_str(encoding_video_library.value, color)}")
+        print(f"  CRF: {color_str(encoder._crf, color)}")
+        print(f"  Preset: {color_str(encoder._preset, color)}")
+        if encoder._is_cropped():
+            crop_filter: str | None = encoder.get_crop_filter()
+            print(f"  Crop: {color_str(crop_filter, color)}")
+        else:
+            print(f"  Crop: {color_str('-', color)}")
+        scale_dimensions: Tuple[int, int] | None = encoder._get_scale_dimensions()
+        if scale_dimensions:
+            w, h = scale_dimensions
+            print(f"  Scale: {color_str(f"{w}x{h}", color)}")
+        print(f"  HDR/SDR: {color_str(encoder.get_hdr_sdr_format().value.upper(), color)}")
     if encoder.is_dolby_vision_encoding():
+        dv_profile: DolbyVisionProfile | None = encoder.get_encoding_dolby_vision_profile()
+        assert dv_profile is not None
         print(f"  Dolby Vision:")
-        print(f"    Profile: {color_str(encoder.get_encoding_dolby_vision_profile(), color)}")
+        print(f"    Profile: {color_str(dv_profile.value, color)}")
+
+        dv_el: DolbyVisionEnhancementLayer | None = encoder.get_encoding_dolby_vision_enhancement_layer()
+
+        dv_layout: str = f"BL+{'EL+' if dv_el else ''}RPU"
+        print(f"    Layout: {color_str(dv_layout, color)}")
+
+        dv_el_str: str | None = dv_el.value if dv_el else None
+        print(f"    Enhancement Layer (EL): {color_str(dv_el_str or '-', color)}")
     print(f"{color_str('_', color)}" * 70)
     print()
 

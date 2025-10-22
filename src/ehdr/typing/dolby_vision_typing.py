@@ -39,6 +39,17 @@ class DolbyVisionProfileEncodingMode(Enum):
     AUTO = "auto"
     _8 = "8"
 
+class DolbyVisionProfile(Enum):
+    """Dolby Vision profile."""
+    _5 = 5
+    _7 = 7
+    _8 = 8
+
+class DolbyVisionEnhancementLayer(Enum):
+    """Dolby Vision Enhancement Layer."""
+    FEL = "FEL"
+    MEL = "MEL"
+
 @dataclass
 class DolbyVisionInfo:
     """Structure for Dolby Vision RPU information from dovi_tool info."""
@@ -47,4 +58,4 @@ class DolbyVisionInfo:
     dv_level: Optional[int]
     dm_version: int
     cm_version: str
-    dv_format: str
+    dv_layout: str

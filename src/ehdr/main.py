@@ -2,14 +2,12 @@
 
 import sys
 from pathlib import Path
-from typing import Optional
 
 from ehdr.cli import argument_parser
 from ehdr.cli.cli_output import create_progress_handler, finish_progress, print_conversion_summary
 from ehdr.cli.encoder import callback_handler_crop_video, print_encoding_params
 from ehdr.cli.video import print_video_infos
-from ehdr.typing.encoder_typing import ColorFormat
-from ehdr.typing.dolby_vision_typing import DolbyVisionProfileEncodingMode
+from ehdr.typing.encoder_typing import EncoderSettings
 from ehdr.encoder import Encoder
 from ehdr.video import Video
 from ehdr.hdr_formats.hdr10 import calc_maxcll
@@ -84,40 +82,25 @@ def show_video_info(input_file: Path) -> bool:
 def convert_video(
     video: Video,
     target_file: Path,
-    target_format: ColorFormat = ColorFormat.AUTO,
-    target_dv_profile: DolbyVisionProfileEncodingMode = DolbyVisionProfileEncodingMode.AUTO,
-    crf: Optional[int] = None,
-    preset: Optional[str] = None,
-    scale_height: Optional[int] = None,
-    enable_crop: bool = False,
+    settings: EncoderSettings,
 ) -> bool:
     """Convert SDR or HDR10 video using ffmpeg with libx265.
 
     Args:
         video: Video object with metadata
         target_file: Target output file path
-        target_format: Target color format (AUTO, SDR, HDR10)
-        crf: Optional CRF value (auto-calculated if None)
-        preset: Optional preset (auto-calculated if None)
-        scale_height: Optional target height for scaling
-        enable_crop: Enable automatic cropping
-        crop_callback: Optional crop detection progress callback
+        settings: Encoder settings containing all encoding parameters
 
     Returns:
         True if conversion succeeded, False otherwise
     """
     input_file: Path = video.get_filepath()
 
-    # Create encoder for Dolby Vision
+    # Create encoder with settings
     encoder = Encoder(
         video=video,
         target_file=target_file,
-        color_format=target_format,
-        dv_profile=target_dv_profile,
-        crf=crf,
-        preset=preset,
-        scale_height=scale_height,
-        enable_crop=enable_crop,
+        settings=settings,
         crop_callback=callback_handler_crop_video,
     )
 
@@ -180,11 +163,8 @@ def process_convert_command(args) -> None:
             print("Error: Output must be a directory for batch processing")
             sys.exit(1)
 
-    # Determine target height from scale argument if present
-    scale_height: int | None = argument_parser.get_scale_height(args.scale)
-
-    color_format: ColorFormat = argument_parser.get_color_format_from_string(args.color_format)
-    dv_profile: DolbyVisionProfileEncodingMode = argument_parser.get_dolby_vision_profile_from_string(args.dv_profile)
+    # Create encoder settings from CLI arguments
+    settings: EncoderSettings = argument_parser.create_encoder_settings_from_args(args)
 
     # Process each video file
     success_count = 0
@@ -201,12 +181,7 @@ def process_convert_command(args) -> None:
         success = convert_video(
             video=video,
             target_file=out_file,
-            target_dv_profile=dv_profile,
-            target_format=color_format,
-            crf=args.crf,
-            preset=args.preset,
-            scale_height=scale_height,
-            enable_crop=not args.ncrop,
+            settings=settings,
         )
 
         if success:
