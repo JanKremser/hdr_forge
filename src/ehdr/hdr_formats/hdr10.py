@@ -1,51 +1,123 @@
+"""
+HDR10 MaxCLL/MaxFALL analyzer using parallel video segment processing.
+
+This module provides functions to calculate Maximum Content Light Level (MaxCLL)
+and Maximum Frame-Average Light Level (MaxFALL) from HDR10 video files using
+parallel processing with hardware acceleration support.
+"""
+
 import subprocess
-import numpy as np
-from multiprocessing import Pool, cpu_count, Manager
-import time
 import math
+import time
+from typing import Tuple, List, Dict, Any
+from multiprocessing import Pool, cpu_count, Manager
+from multiprocessing.managers import SyncManager
+
+import numpy as np
 
 from ehdr.cli.cli_output import create_progress_bar
 
-SEGMENT_DURATION = 30  # Sekunden pro Segment (anpassbar)
+# Constants
+SEGMENT_DURATION = 30  # Duration per segment in seconds (adjustable)
+RGB48LE_BYTES_PER_PIXEL = 6  # 3 channels * 2 bytes (16-bit per channel)
 
-def pq_to_nits(pq):
-    # ITU-R BT.2100 EOTF (ST.2084)
-    m1 = 2610 / 16384
-    m2 = 2523 / 32
-    c1 = 3424 / 4096
-    c2 = 2413 / 128
-    c3 = 2392 / 128
-    L = ((np.maximum(pq ** (1/m2) - c1, 0)) / (c2 - c3 * pq ** (1/m2))) ** (1/m1)
-    return L * 10000  # nits
+# ITU-R BT.2100 PQ EOTF (ST.2084) constants
+PQ_M1 = 2610 / 16384
+PQ_M2 = 2523 / 32
+PQ_C1 = 3424 / 4096
+PQ_C2 = 2413 / 128
+PQ_C3 = 2392 / 128
+PQ_NITS_SCALE = 10000
 
-def get_video_info(video_path):
-    # Stream-Infos
+# BT.2020 luminance coefficients
+LUMA_RED = 0.2627
+LUMA_GREEN = 0.6780
+LUMA_BLUE = 0.0593
+
+
+def pq_to_nits(pq: np.ndarray) -> np.ndarray:
+    """
+    Convert PQ (Perceptual Quantizer) values to nits using ITU-R BT.2100 EOTF.
+
+    Args:
+        pq: Normalized PQ values (0.0-1.0)
+
+    Returns:
+        Luminance values in nits (cd/m²)
+    """
+    pq_inv = np.maximum(pq ** (1 / PQ_M2) - PQ_C1, 0)
+    denominator = PQ_C2 - PQ_C3 * pq ** (1 / PQ_M2)
+    luminance = (pq_inv / denominator) ** (1 / PQ_M1)
+    return luminance * PQ_NITS_SCALE
+
+
+def _get_video_stream_info(video_path: str) -> Tuple[int, int, float]:
+    """
+    Extract video stream information using ffprobe.
+
+    Args:
+        video_path: Path to video file
+
+    Returns:
+        Tuple of (width, height, fps)
+    """
     cmd = [
         "ffprobe", "-v", "error",
         "-select_streams", "v:0",
         "-show_entries", "stream=width,height,r_frame_rate",
         "-of", "csv=p=0:s=x", video_path
     ]
-    out = subprocess.check_output(cmd).decode().strip()
-    width, height, fps = out.split("x")
-    width = int(width)
-    height = int(height)
-    fps = eval(fps)
+    output = subprocess.check_output(cmd).decode().strip()
+    width, height, fps_str = output.split("x")
+    return int(width), int(height), eval(fps_str)
 
-    # Dauer aus Format-Ebene
-    cmd_dur = [
+
+def _get_video_duration(video_path: str) -> float:
+    """
+    Extract video duration using ffprobe.
+
+    Args:
+        video_path: Path to video file
+
+    Returns:
+        Duration in seconds
+    """
+    cmd = [
         "ffprobe", "-v", "error",
         "-show_entries", "format=duration",
         "-of", "default=noprint_wrappers=1:nokey=1",
         video_path
     ]
-    duration = float(subprocess.check_output(cmd_dur).decode().strip())
+    return float(subprocess.check_output(cmd).decode().strip())
 
+
+def get_video_info(video_path: str) -> Tuple[int, int, float, float]:
+    """
+    Get complete video information including dimensions, framerate and duration.
+
+    Args:
+        video_path: Path to video file
+
+    Returns:
+        Tuple of (width, height, fps, duration)
+    """
+    width, height, fps = _get_video_stream_info(video_path)
+    duration = _get_video_duration(video_path)
     return width, height, fps, duration
 
-def detect_gpu_acceleration():
+
+def detect_gpu_acceleration() -> str:
+    """
+    Detect available hardware acceleration method.
+
+    Returns:
+        Hardware acceleration type: "cuda", "qsv", or "cpu"
+    """
     try:
-        result = subprocess.check_output(["ffmpeg", "-hwaccels"]).decode()
+        result = subprocess.check_output(
+            ["ffmpeg", "-hwaccels"],
+            stderr=subprocess.DEVNULL
+        ).decode()
         if "cuda" in result:
             return "cuda"
         elif "qsv" in result:
@@ -54,27 +126,126 @@ def detect_gpu_acceleration():
         pass
     return "cpu"
 
-def build_ffmpeg_cmd(video_path, start, duration, hw_accel):
-    base = ["-ss", str(start), "-t", str(duration), "-i", video_path,
-            "-f", "rawvideo", "-pix_fmt", "rgb48le", "-"]
-    if hw_accel == "cpu":
-        cmd = ["ffmpeg"] + base
-    elif hw_accel == "cuda":
-        # Wichtig: keine hwaccel_output_format cuda, damit rgb48le im CPU-Space ankommt
-        cmd = ["ffmpeg", "-hwaccel", "cuda"] + base
+
+def build_ffmpeg_cmd(
+    video_path: str,
+    start: float,
+    duration: float,
+    hw_accel: str
+) -> List[str]:
+    """
+    Build ffmpeg command for frame extraction with optional hardware acceleration.
+
+    Args:
+        video_path: Path to video file
+        start: Start time in seconds
+        duration: Duration to extract in seconds
+        hw_accel: Hardware acceleration type ("cpu", "cuda", or "qsv")
+
+    Returns:
+        ffmpeg command as list of strings
+    """
+    base_args = [
+        "-ss", str(start),
+        "-t", str(duration),
+        "-i", video_path,
+        "-f", "rawvideo",
+        "-pix_fmt", "rgb48le",
+        "-"
+    ]
+
+    if hw_accel == "cuda":
+        # Note: No hwaccel_output_format cuda to ensure rgb48le arrives in CPU space
+        return ["ffmpeg", "-hwaccel", "cuda"] + base_args
     elif hw_accel == "qsv":
-        cmd = ["ffmpeg", "-hwaccel", "qsv", "-c:v", "h264_qsv"] + base
+        return ["ffmpeg", "-hwaccel", "qsv", "-c:v", "h264_qsv"] + base_args
     else:
-        cmd = ["ffmpeg"] + base
-    return cmd
+        return ["ffmpeg"] + base_args
 
-def process_segment(video_path, start, duration, width, height, frame_sample_rate, hw_accel, progress_dict, segment_id):
+
+def _calculate_luminance(rgb_frame: np.ndarray) -> np.ndarray:
+    """
+    Calculate luminance from RGB frame using BT.2020 coefficients.
+
+    Args:
+        rgb_frame: RGB frame with normalized values (0.0-1.0)
+
+    Returns:
+        Luminance values
+    """
+    return (
+        LUMA_RED * rgb_frame[..., 0] +
+        LUMA_GREEN * rgb_frame[..., 1] +
+        LUMA_BLUE * rgb_frame[..., 2]
+    )
+
+
+def _process_raw_frame(
+    raw_data: bytes,
+    width: int,
+    height: int
+) -> Tuple[float, float]:
+    """
+    Process a single raw frame to extract MaxCLL and MaxFALL values.
+
+    Args:
+        raw_data: Raw frame data in rgb48le format
+        width: Frame width
+        height: Frame height
+
+    Returns:
+        Tuple of (max_cll, max_fall) for this frame
+    """
+    # Convert raw bytes to numpy array (16-bit RGB)
+    frame = np.frombuffer(raw_data, np.uint16).reshape((height, width, 3))
+    rgb_normalized = frame.astype(np.float32) / 65535.0
+
+    # Calculate luminance and convert to nits
+    luminance = _calculate_luminance(rgb_normalized)
+    nits = pq_to_nits(luminance)
+
+    # Return max pixel value (CLL) and average (FALL)
+    return float(np.max(nits)), float(np.mean(nits))
+
+
+def process_segment(
+    video_path: str,
+    start: float,
+    duration: float,
+    width: int,
+    height: int,
+    frame_sample_rate: int,
+    hw_accel: str,
+    progress_dict: Dict,
+    segment_id: int
+) -> Tuple[float, float]:
+    """
+    Process a single video segment to calculate MaxCLL and MaxFALL.
+
+    Args:
+        video_path: Path to video file
+        start: Segment start time in seconds
+        duration: Segment duration in seconds
+        width: Video width
+        height: Video height
+        frame_sample_rate: Process every Nth frame
+        hw_accel: Hardware acceleration type
+        progress_dict: Shared dictionary for progress tracking
+        segment_id: Unique segment identifier
+
+    Returns:
+        Tuple of (max_cll, max_fall) for this segment
+    """
     ffmpeg_cmd = build_ffmpeg_cmd(video_path, start, duration, hw_accel)
-    process = subprocess.Popen(ffmpeg_cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+    process = subprocess.Popen(
+        ffmpeg_cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL
+    )
 
-    frame_size = width * height * 3 * 2  # rgb48le = 16 bit per channel
+    frame_size = width * height * RGB48LE_BYTES_PER_PIXEL
     total_read_frames = 0
-    processed_frames = 0  # nur die Frames, die tatsächlich analysiert werden
+    processed_frames = 0
     max_cll = 0.0
     max_fall = 0.0
 
@@ -86,114 +257,314 @@ def process_segment(video_path, start, duration, width, height, frame_sample_rat
         if len(raw) < frame_size:
             break
 
-        # gezählte gelesene Frames (unabhängig vom Sampling)
         total_read_frames += 1
 
-        # Sampling: nur jedes n-te Frame verarbeiten
-        if (total_read_frames - 1) % frame_sample_rate != 0:  # -1 weil wir bei 0 starten wollen
+        # Frame sampling: only process every Nth frame
+        if (total_read_frames - 1) % frame_sample_rate != 0:
             continue
 
-        # Jetzt wird wirklich verarbeitet
         processed_frames += 1
-        frame = np.frombuffer(raw, np.uint16).reshape((height, width, 3))
-        rgb = frame.astype(np.float32) / 65535.0
+        frame_cll, frame_fall = _process_raw_frame(raw, width, height)
 
-        luminance = 0.2627 * rgb[...,0] + 0.6780 * rgb[...,1] + 0.0593 * rgb[...,2]
-        nits = pq_to_nits(luminance)
+        max_cll = max(max_cll, frame_cll)
+        max_fall = max(max_fall, frame_fall)
 
-        max_cll = max(max_cll, float(np.max(nits)))
-        max_fall = max(max_fall, float(np.mean(nits)))
-
-        # Fortschritt (nur verarbeitete Frames)
+        # Update progress (only for processed frames)
         progress_dict[segment_id] = processed_frames
 
     process.wait()
-    # sicherstellen, dass das Ende korrekt gemeldet wird
-    progress_dict[segment_id] = progress_dict.get(segment_id, 0)
     return max_cll, max_fall
 
-def calculate_maxcll_maxfall_parallel(video_path, frame_sample_rate=10):
-    width, height, fps, duration = get_video_info(video_path)
-    hw_accel = detect_gpu_acceleration()
-    print(f"Analysiere {video_path} ({width}x{height}, {fps:.2f} fps, {duration:.2f}s) mit {hw_accel}")
 
-    # Segmente erstellen
+def _create_video_segments(
+    video_path: str,
+    duration: float,
+    width: int,
+    height: int,
+    fps: float,
+    frame_sample_rate: int,
+    hw_accel: str
+) -> List[Tuple]:
+    """
+    Split video into time-based segments for parallel processing.
+
+    Args:
+        video_path: Path to video file
+        duration: Total video duration in seconds
+        width: Video width
+        height: Video height
+        fps: Video framerate
+        frame_sample_rate: Process every Nth frame
+        hw_accel: Hardware acceleration type
+
+    Returns:
+        List of segment tuples with processing parameters
+    """
     segments = []
     start = 0.0
     segment_id = 0
+
     while start < duration:
-        seg_duration = min(SEGMENT_DURATION, duration - start)
-        segments.append((video_path, start, seg_duration, width, height, frame_sample_rate, hw_accel, segment_id, fps))
+        segment_duration = min(SEGMENT_DURATION, duration - start)
+        segments.append((
+            video_path,
+            start,
+            segment_duration,
+            width,
+            height,
+            frame_sample_rate,
+            hw_accel,
+            segment_id,
+            fps
+        ))
         start += SEGMENT_DURATION
         segment_id += 1
 
-    manager = Manager()
+    return segments
+
+
+def _calculate_total_frames(
+    segments: List[Tuple],
+    frame_sample_rate: int
+) -> int:
+    """
+    Calculate total number of frames that will be processed.
+
+    Args:
+        segments: List of video segments
+        frame_sample_rate: Process every Nth frame
+
+    Returns:
+        Total estimated frame count after sampling
+    """
+    total = 0
+    for segment in segments:
+        seg_duration = segment[2]  # Duration is at index 2
+        seg_fps = segment[8]  # FPS is at index 8
+        frames_in_segment = int(math.ceil(seg_duration * seg_fps))
+        sampled_frames = (frames_in_segment + frame_sample_rate - 1) // frame_sample_rate
+        total += sampled_frames
+    return total
+
+
+def _initialize_progress_dict(
+    manager: SyncManager,
+    segments: List[Tuple]
+) -> Any:
+    """
+    Initialize shared progress dictionary for all segments.
+
+    Args:
+        manager: Multiprocessing manager
+        segments: List of video segments
+
+    Returns:
+        Initialized progress dictionary
+    """
     progress_dict = manager.dict()
-    # initialisiere Fortschritt für alle Segmente mit 0 (wichtig für Summierung)
-    for seg in segments:
-        progress_dict[seg[7]] = 0
+    for segment in segments:
+        segment_id = segment[7]  # Segment ID is at index 7
+        progress_dict[segment_id] = 0
+    return progress_dict
 
-    # Berechne total_frames_estimate korrekt (Summe der tatsächlich zu verarbeitenden Frames)
-    total_frames_estimate = 0
-    for (_, _, seg_dur, _, _, fsr, _, seg_id, seg_fps) in segments:
-        frames_in_segment = int(math.ceil(seg_dur * seg_fps))
-        sampled = (frames_in_segment + fsr - 1) // fsr  # Ganzzahliges Ceil für sampling
-        total_frames_estimate += sampled
 
-    # Pool vorbereiten
-    pool_args = [(v[0], v[1], v[2], v[3], v[4], v[5], v[6], progress_dict, v[7]) for v in segments]
-    num_processes = min(cpu_count(), len(segments))
-    pool = Pool(processes=num_processes)
+def _format_eta(seconds: float) -> str:
+    """
+    Format ETA seconds into HH:MM:SS string.
 
-    # Async Map starten
-    results_async = pool.starmap_async(process_segment, pool_args)
+    Args:
+        seconds: Remaining seconds
 
-    # Globale Fortschrittsanzeige
-    start_time = time.time()
-    frames_done = 0
-    percent = 0.0
-    total_frames_estimate = math.ceil((fps * duration) / frame_sample_rate)
+    Returns:
+        Formatted time string
+    """
+    return time.strftime("%H:%M:%S", time.gmtime(seconds))
+
+
+def _monitor_progress(
+    results_async,
+    progress_dict: Dict,
+    num_segments: int,
+    total_frames: int,
+    start_time: float
+) -> None:
+    """
+    Monitor and display progress of parallel segment processing.
+
+    Args:
+        results_async: Async result object from pool.starmap_async
+        progress_dict: Shared progress dictionary
+        num_segments: Total number of segments
+        total_frames: Total estimated frames to process
+        start_time: Processing start time
+    """
     try:
         while not results_async.ready():
-            frames_done = sum(progress_dict.get(i, 0) for i in range(len(segments)))
+            frames_done = sum(
+                progress_dict.get(i, 0) for i in range(num_segments)
+            )
             elapsed = time.time() - start_time
+
             if frames_done > 0:
-                est_total_time = elapsed / frames_done * total_frames_estimate
+                est_total_time = elapsed / frames_done * total_frames
                 remaining = est_total_time - elapsed
-                eta = time.strftime("%H:%M:%S", time.gmtime(remaining))
+                eta = _format_eta(remaining)
             else:
                 eta = "--:--:--"
 
-            percent = min((frames_done / total_frames_estimate) * 100 if total_frames_estimate > 0 else 100, 100.0)
+            percent = min(
+                (frames_done / total_frames * 100) if total_frames > 0 else 100,
+                100.0
+            )
             bar = create_progress_bar(percent=percent, width=40)
-            print(f"{bar} {percent:.2f}% | ETA: {eta} | {frames_done}/{total_frames_estimate} Frames", end='\r')
+            print(
+                f"{bar} {percent:.2f}% | ETA: {eta} | "
+                f"{frames_done}/{total_frames} Frames",
+                end='\r'
+            )
             time.sleep(0.5)
+    except KeyboardInterrupt:
+        raise
+
+
+def _display_final_progress(
+    progress_dict: Dict,
+    num_segments: int,
+    total_frames: int
+) -> None:
+    """
+    Display final 100% progress bar.
+
+    Args:
+        progress_dict: Shared progress dictionary
+        num_segments: Total number of segments
+        total_frames: Total estimated frames
+    """
+    frames_done = sum(progress_dict.get(i, 0) for i in range(num_segments))
+    percent = min(
+        (frames_done / total_frames * 100) if total_frames > 0 else 100,
+        100.0
+    )
+    bar = create_progress_bar(percent=percent, width=40)
+    print(
+        f"{bar} {percent:.2f}% | ETA: 00:00:00 | "
+        f"{frames_done}/{total_frames} Frames",
+        end='\r'
+    )
+
+
+def _aggregate_results(results: List[Tuple[float, float]]) -> Tuple[float, float]:
+    """
+    Aggregate MaxCLL and MaxFALL results from all segments.
+
+    Args:
+        results: List of (max_cll, max_fall) tuples from each segment
+
+    Returns:
+        Tuple of overall (max_cll, max_fall) rounded to 2 decimals
+    """
+    if not results:
+        return 0.0, 0.0
+
+    max_cll = max(result[0] for result in results)
+    max_fall = max(result[1] for result in results)
+
+    return round(max_cll, 2), round(max_fall, 2)
+
+
+def calculate_maxcll_maxfall_parallel(
+    video_path: str,
+    frame_sample_rate: int = 10
+) -> Tuple[float, float]:
+    """
+    Calculate MaxCLL and MaxFALL using parallel segment processing.
+
+    This function splits the video into time-based segments and processes them
+    in parallel using multiple CPU cores. Each segment is analyzed to find the
+    maximum and average luminance values.
+
+    Args:
+        video_path: Path to video file
+        frame_sample_rate: Process every Nth frame (default: 10)
+
+    Returns:
+        Tuple of (max_cll, max_fall) in nits, rounded to 2 decimals
+
+    Raises:
+        KeyboardInterrupt: If user cancels the operation
+    """
+    # Get video information
+    width, height, fps, duration = get_video_info(video_path)
+    hw_accel = detect_gpu_acceleration()
+
+    print(
+        f"Analyzing {video_path} "
+        f"({width}x{height}, {fps:.2f} fps, {duration:.2f}s) "
+        f"with {hw_accel}"
+    )
+
+    # Create processing segments
+    segments = _create_video_segments(
+        video_path, duration, width, height, fps, frame_sample_rate, hw_accel
+    )
+
+    # Initialize progress tracking
+    manager = Manager()
+    progress_dict = _initialize_progress_dict(manager, segments)
+    total_frames = _calculate_total_frames(segments, frame_sample_rate)
+
+    # Prepare multiprocessing pool
+    pool_args = [
+        (seg[0], seg[1], seg[2], seg[3], seg[4], seg[5], seg[6], progress_dict, seg[7])
+        for seg in segments
+    ]
+    num_processes = min(cpu_count(), len(segments))
+    pool = Pool(processes=num_processes)
+
+    # Start async processing
+    results_async = pool.starmap_async(process_segment, pool_args)
+
+    # Monitor progress
+    start_time = time.time()
+    try:
+        _monitor_progress(
+            results_async,
+            progress_dict,
+            len(segments),
+            total_frames,
+            start_time
+        )
     except KeyboardInterrupt:
         pool.terminate()
         pool.join()
         raise
 
+    # Collect results
     results = results_async.get()
     pool.close()
     pool.join()
 
-    # final: setze frames_done = total_frames_estimate um 100% anzuzeigen
-    frames_done = sum(progress_dict.get(i, 0) for i in range(len(segments)))
-    percent = min((frames_done / total_frames_estimate) * 100 if total_frames_estimate > 0 else 100, 100.0)
-    bar = create_progress_bar(percent=percent, width=40)
-    print(f"{bar} {percent:.2f}% | ETA: 00:00:00 | {frames_done}/{total_frames_estimate} Frames", end='\r')
+    # Display final progress
+    _display_final_progress(progress_dict, len(segments), total_frames)
 
-    # Ergebnis zusammenführen und sauber runden
-    max_cll_val = max(r[0] for r in results) if results else 0.0
-    max_fall_val = max(r[1] for r in results) if results else 0.0
+    # Aggregate and return results
+    return _aggregate_results(results)
 
-    max_cll = float(round(float(max_cll_val), 2))
-    max_fall = float(round(float(max_fall_val), 2))
 
-    return max_cll, max_fall
+def calc_maxcll(video_path: str) -> None:
+    """
+    Calculate and print MaxCLL/MaxFALL values for a video file.
 
-def calc_maxcll(video_path: str):
-    maxcll, maxfall = calculate_maxcll_maxfall_parallel(video_path=video_path, frame_sample_rate=24)
-    print(f"\nErgebnis:")
+    This is a convenience function that calculates the values and prints
+    them to stdout.
+
+    Args:
+        video_path: Path to video file
+    """
+    maxcll, maxfall = calculate_maxcll_maxfall_parallel(
+        video_path=video_path,
+        frame_sample_rate=24
+    )
+    print(f"\nResult:")
     print(f"  MaxCLL : {maxcll:.2f} nits")
     print(f"  MaxFALL: {maxfall:.2f} nits")

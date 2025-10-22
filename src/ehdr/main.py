@@ -12,6 +12,7 @@ from ehdr.cli.video import print_video_infos
 from ehdr.dataclass import ColorFormat, DolbyVisionProfile
 from ehdr.encoder import Encoder
 from ehdr.video import Video
+from ehdr.hdr_formats.hdr10 import calc_maxcll
 
 # Supported input video formats
 SUPPORTED_FORMATS: list[str] = ['.mkv', '.m2ts', '.ts', '.mp4']
@@ -59,16 +60,16 @@ def parse_args():
         help='Video file for information display'
     )
 
-    # "info" subcommand
-    info_parser = subparsers.add_parser('calc_maxcll',
-        description='Shows information about a video file',
-        help='Display video information'
+    # "maccll" subcommand
+    maxcll_parser = subparsers.add_parser('calc_maxcll',
+        description='BETA function. Calculate MaxCLL and MaxFALL values for HDR videos',
+        help='Calculate MaxCLL and MaxFALL'
     )
 
-    info_parser.add_argument(
+    maxcll_parser.add_argument(
         '-i', '--input',
         required=True,
-        help='Video file for information display'
+        help='Video file for MaxCLL and MaxFALL calculation'
     )
 
     # "convert" subcommand
@@ -436,7 +437,6 @@ def main() -> None:
     elif args.command == 'convert':
         process_convert_command(args)
     elif args.command == 'calc_maxcll':
-        from ehdr.hdr_formats.hdr10 import calc_maxcll
         input_path = Path(args.input)
         if not input_path.exists():
             print(f"Error: Input path does not exist: {input_path}")

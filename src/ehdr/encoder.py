@@ -509,7 +509,7 @@ class Encoder:
                 # Tone mapping for HDR to SDR conversion
                 output_options['vf'] = (
                     (output_options.get('vf', '') + ',') if 'vf' in output_options else ''
-                ) + 'zscale=primaries=bt2020:transfer=smpte2084:matrix=bt2020nc:t=linear:npl=100,format=gbrpf32le,zscale=primaries=bt709:transfer=bt709:matrix=bt709:range=tv,tonemap=hable,format=yuv420p'
+                ) + 'zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,tonemap=tonemap=hable:desat=0,zscale=t=bt709:m=bt709:r=tv,format=yuv420p'
 
         return output_options
 
