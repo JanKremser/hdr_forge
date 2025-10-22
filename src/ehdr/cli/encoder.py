@@ -39,7 +39,7 @@ def print_encoding_params(encoder: Encoder) -> None:
         if scale_dimensions:
             w, h = scale_dimensions
             print(f"  Scale: {color_str(f"{w}x{h}", color)}")
-        print(f"  HDR/SDR: {color_str(encoder.get_hdr_sdr_format().value.upper(), color)}")
+        print(f"  HDR/SDR: {color_str(encoder.get_encoding_hdr_sdr_format().value.upper(), color)}")
     if encoder.is_dolby_vision_encoding():
         dv_profile: DolbyVisionProfile | None = encoder.get_encoding_dolby_vision_profile()
         assert dv_profile is not None

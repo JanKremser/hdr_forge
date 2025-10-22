@@ -59,7 +59,7 @@ class Encoder:
         self._target_video_codec: VideoCodec = settings.video_codec
 
         # Determine effective color format
-        self._effective_hdr_sdr_format: HdrSdrFormat = self._determine_effective_hdr_sdr_format(
+        self._target_hdr_sdr_format: HdrSdrFormat = self._determine_effective_hdr_sdr_format(
             hdr_sdr_format=settings.hdr_sdr_format
         )
 
@@ -78,7 +78,7 @@ class Encoder:
         self._crop_y = 0
 
         # Apply cropping if enabled (not supported for Dolby Vision)
-        if settings.enable_crop and not self.is_dolby_vision_encoding():
+        if settings.enable_crop:
             self._crop_video(callback=crop_callback)
 
         # Scale dimensions
@@ -93,8 +93,8 @@ class Encoder:
             self._scale_height = settings.scale_height
 
         # Calculate or use provided CRF and preset
-        self._crf = settings.crf if settings.crf is not None else self._get_auto_crf()
-        self._preset = settings.preset if settings.preset is not None else self._get_auto_preset()
+        self._crf: int = settings.crf if settings.crf is not None else self._get_auto_crf()
+        self._preset: str = settings.preset if settings.preset is not None else self._get_auto_preset()
 
     def _determine_dv_enhancement_layer(
         self,
@@ -200,25 +200,25 @@ class Encoder:
         """
         return self._target_video_codec
 
-    def get_hdr_sdr_format(self) -> HdrSdrFormat:
+    def get_encoding_hdr_sdr_format(self) -> HdrSdrFormat:
         """Get the effective color format for encoding.
 
         Returns:
             Effective ColorFormat
         """
-        return self._effective_hdr_sdr_format
+        return self._target_hdr_sdr_format
 
     def is_dolby_vision_encoding(self) -> bool:
         """Check if encoding to Dolby Vision format."""
-        return self._effective_hdr_sdr_format == HdrSdrFormat.DOLBY_VISION
+        return self._target_hdr_sdr_format == HdrSdrFormat.DOLBY_VISION
 
     def is_hdr10_encoding(self) -> bool:
         """Check if encoding to HDR10 format."""
-        return self._effective_hdr_sdr_format == HdrSdrFormat.HDR10
+        return self._target_hdr_sdr_format == HdrSdrFormat.HDR10
 
     def is_sdr_encoding(self) -> bool:
         """Check if encoding to SDR format."""
-        return self._effective_hdr_sdr_format == HdrSdrFormat.SDR
+        return self._target_hdr_sdr_format == HdrSdrFormat.SDR
 
     def _is_cropped(self) -> bool:
         """Check if video has cropping applied.
@@ -366,14 +366,23 @@ class Encoder:
 
         return None
 
-    def _crop_video(self, num_threads: int = 10,
-                   callback: Optional[Callable[[CropHandler], None]] = None) -> None:
+    def _crop_video(
+        self,
+        num_threads: int = 10,
+        callback: Optional[Callable[[CropHandler], None]] = None,
+    ) -> None:
         """Detect and apply optimal crop parameters using multi-threaded analysis.
 
         Args:
             num_threads: Number of concurrent threads for crop detection
             callback: Optional callback function for progress updates
         """
+        if (
+            self.is_dolby_vision_encoding() or
+            self._target_video_codec == VideoCodec.COPY
+        ):
+            return
+
         if callback:
             callback(CropHandler(
                 finish_progress=False,
@@ -660,6 +669,32 @@ class Encoder:
             finish_callback=finish_callback,
         )
 
+    def convert_dolby_vision_to_hdr10_without_re_encoding(
+        self,
+    ) -> bool:
+        input_file = self._video.get_filepath()
+
+        # Create temporary directory for all intermediate files
+        temp_dir = self._get_temp_directory()
+
+        # Step 1: Extract base layer (HEVC without RPU) from original video
+        base_layer_hevc_path: str = dolby_vision.extract_base_layer(
+            input_file=str(input_file),
+            output_hevc=str(temp_dir / f"video_BL.hevc")
+        )
+
+        # Step 2: Mux base layer HEVC with original audio/subtitles into final MKV
+        # This creates a playable MKV file with base layer video + original audio/subs
+        _base_layer_mkv_path: str = mkv.mux_hevc_to_mkv(
+            input_hevc=base_layer_hevc_path,
+            input_mkv=str(input_file),
+            output_mkv=str(self._target_file)
+        )
+
+        self._cleanup_temp_directory()
+
+        return True
+
     def convert_dolby_vision(
         self,
         progress_callback: Optional[Callable] = None,
@@ -758,7 +793,6 @@ class Encoder:
             dv_profile_encoding=self._target_dv_profile
         )
 
-        add_el_profile7: bool = False
         # Setup 5.1: If AUTO profile and source is profile 7, demux EL profile 7 RPU
         if self._target_dv_el is not None:
             # start demux EL profile 7 for profile 7 encoding
@@ -771,7 +805,6 @@ class Encoder:
                 el_path=el_path,
                 output_bl_el=temp_dir / f"video_encoded_BL_EL.hevc",
             )
-            add_el_profile7 = True
             encoded_hevc_bl_path.unlink(missing_ok=True)
             encoded_hevc_bl_path = bl_el_hevc
 
@@ -779,7 +812,7 @@ class Encoder:
         encoded_hevc_with_rpu_path: str = dolby_vision.inject_rpu(
             input_file=str(encoded_hevc_bl_path),
             input_rpu=rpu_file_path,
-            output_hevc=str(temp_dir / f"video_encoded_BL_{'EL_' if add_el_profile7 else ''}RPU.hevc")
+            output_hevc=str(temp_dir / f"video_encoded_BL_{'EL_' if self._target_dv_el else ''}RPU.hevc")
         )
 
         # Cleanup: Delete encoded HEVC without RPU (no longer needed after RPU injection)
@@ -804,15 +837,22 @@ class Encoder:
         progress_callback: Optional[Callable] = None,
         finish_callback: Optional[Callable] = None,
     ) -> bool:
-        success: bool = False
         if self._video.is_dolby_vision_video():
-            success: bool = self.convert_dolby_vision(
+
+            # Convert Dolby Vision to HDR10, without re-encoding
+            if (
+                self.is_hdr10_encoding() and
+                self.get_encoding_video_codec() == VideoCodec.COPY
+            ):
+                return self.convert_dolby_vision_to_hdr10_without_re_encoding()
+
+            # Dolby Vision encoding workflow
+            return self.convert_dolby_vision(
                 progress_callback=progress_callback,
                 finish_callback=finish_callback
             )
-        else:
-            success: bool = self.convert_sdr_hdr10(
-                progress_callback=progress_callback,
-                finish_callback=finish_callback
-            )
-        return success
+
+        return self.convert_sdr_hdr10(
+            progress_callback=progress_callback,
+            finish_callback=finish_callback
+        )
