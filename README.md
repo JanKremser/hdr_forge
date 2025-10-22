@@ -328,7 +328,7 @@ ehdr convert -i dolby_vision.mkv -o output.mkv --ncrop --crf 14 --preset slow
 7. Final muxing with all streams into target MKV
 
 **Profile Handling:**
-- Profile 5 (IPTPQc2) → Preserves Profile 5 or converts to Profile 8.1 (mode 3 conversion)
+- Profile 5 (IPTPQc2) → Profile 5 preserved or converts to Profile 8.1 (mode 3 conversion)
 - Profile 7 (MEL+EL) → Profile 7 preserved or Profile 8.1 (mode 2 conversion)
 - Profile 8 → Profile 8.1 (mode 2 conversion)
 
