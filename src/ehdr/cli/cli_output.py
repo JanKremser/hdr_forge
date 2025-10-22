@@ -1,5 +1,6 @@
 """CLI output and progress tracking functionality."""
 
+import math
 import time
 import subprocess
 from datetime import timedelta
@@ -224,3 +225,48 @@ def monitor_process_progress(process: subprocess.Popen, description: str) -> Non
 
     # Clear the progress line after completion
     print(f"{CLEAR_LINE}{MOVE_TO_START}", end='', flush=True)
+
+def create_aspect_ratio_str(width: int, height: int, tolerance: float = 0.02) -> str:
+    """
+    Calculates the aspect ratio of a given resolution and returns a string like '16:9' or '21:9'.
+    Attempts to match known standard aspect ratios within a small tolerance.
+
+    Args:
+        width (int): Image or video width in pixels
+        height (int): Image or video height in pixels
+        tolerance (float): Allowed ratio deviation (default = 0.02 = 2%)
+
+    Returns:
+        str: Human-readable aspect ratio (e.g. '16:9', '21:9', '4:3')
+    """
+
+    if width <= 0 or height <= 0:
+        raise ValueError("Width and height must be positive integers")
+
+    # calculate exact ratio
+    ratio = width / height
+
+    # known common aspect ratios
+    common_ratios = {
+        "1:1": 1.0,
+        "5:4": 1.25,
+        "4:3": 1.3333,
+        "3:2": 1.5,
+        "16:10": 1.6,
+        "16:9": 1.7777,
+        "18:9": 2.0,
+        "21:9": 2.3333,
+        "32:9": 3.5555,
+    }
+
+    # try to match a known ratio within tolerance
+    for label, value in common_ratios.items():
+        if math.isclose(ratio, value, rel_tol=tolerance):
+            return label
+
+    # fallback: compute reduced fraction
+    divisor = math.gcd(width, height)
+    w_ratio = width // divisor
+    h_ratio = height // divisor
+
+    return f"{w_ratio}:{h_ratio}"

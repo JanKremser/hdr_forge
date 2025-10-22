@@ -3,7 +3,7 @@
 import argparse
 
 from ehdr import __version__
-from ehdr.typing.encoder_typing import HdrSdrFormat, EncoderSettings, VideoCodec
+from ehdr.typing.encoder_typing import HdrSdrFormat, EncoderSettings, ScaleMode, VideoCodec
 from ehdr.typing.dolby_vision_typing import DolbyVisionProfileEncodingMode
 
 
@@ -65,7 +65,7 @@ def parse_args():
     # "convert" subcommand
     convert_parser = subparsers.add_parser('convert',
         description='Convert videos',
-        formatter_class=argparse.RawDescriptionHelpFormatter,
+        formatter_class=argparse.RawTextHelpFormatter,
         help='Convert videos',
         epilog="""
 Examples:
@@ -91,7 +91,10 @@ Examples:
     convert_parser.add_argument(
         '-v', '--video-codec',
         choices=['x265', 'copy'],
-        help='Video Encoding mode (auto = re-encode if needed x265, copy = copy stream without re-encoding)'
+        help="""Video codec to use for encoding.
+[x265] : auto = re-encode if needed x265
+[copy] : Copy stream without re-encoding\n
+"""
     )
 
     convert_parser.add_argument(
@@ -115,7 +118,20 @@ Examples:
 
     convert_parser.add_argument(
         '--scale',
-        help='Scale video to specified resolution (4K, 2K, UHD, FHD, HD, SD or width in pixels)'
+        help='Scale video to specified resolution (4K, 2K, UHD, FHD, HD, SD or height in pixels)'
+    )
+
+    convert_parser.add_argument(
+        '--scale-mode',
+        choices=['height', 'adaptive'],
+        default="height",
+        help="""Specifies how the video should be scaled after cropping.
+[height]   : Uses the target height as a fixed reference. The width is calculated
+             from the aspect ratio. Ideal for standardized output formats like 1080p or 4K.
+[adaptive] : Scales the video dynamically to fit optimally within the target resolution,
+             without exceeding the specified width or height. Maintains the aspect ratio
+             and avoids unnecessary upscaling.\n
+"""
     )
 
     convert_parser.add_argument(
@@ -233,5 +249,6 @@ def create_encoder_settings_from_args(args) -> EncoderSettings:
         crf=args.crf,
         preset=args.preset,
         scale_height=get_scale_height(args.scale),
+        scale_mode=ScaleMode(args.scale_mode),
         enable_crop=not args.ncrop,
     )

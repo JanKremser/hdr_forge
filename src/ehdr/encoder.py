@@ -10,7 +10,7 @@ from typing import Callable, Dict, Optional, Tuple
 from ffmpeg import FFmpeg
 
 from ehdr.container import mkv
-from ehdr.typing.encoder_typing import HdrSdrFormat, CropHandler, EncoderSettings, VideoCodec, VideoEncoderLibrary
+from ehdr.typing.encoder_typing import HdrSdrFormat, CropHandler, EncoderSettings, ScaleMode, VideoCodec, VideoEncoderLibrary
 from ehdr.typing.dolby_vision_typing import DolbyVisionEnhancementLayer, DolbyVisionProfile, DolbyVisionProfileEncodingMode
 from ehdr.hdr_formats import dolby_vision
 from ehdr.video import Video
@@ -72,8 +72,8 @@ class Encoder:
         )
 
         # Crop dimensions (initialized to full frame)
-        self._crop_width = video.width
-        self._crop_height = video.height
+        self._crop_width: int = video.width
+        self._crop_height: int = video.height
         self._crop_x = 0
         self._crop_y = 0
 
@@ -82,19 +82,80 @@ class Encoder:
             self._crop_video(callback=crop_callback)
 
         # Scale dimensions
-        self._scale_video = False
-        self._scale_width: Optional[int] = None
-        self._scale_height: Optional[int] = None
-
-        if settings.scale_height is not None and settings.scale_height < video.height:
-            aspect_ratio: float = video.width / video.height
-            self._scale_video = True
-            self._scale_width = math.ceil(settings.scale_height * aspect_ratio)
-            self._scale_height = settings.scale_height
+        self._scale_width: Optional[int]
+        self._scale_height: Optional[int]
+        self._scale_width, self._scale_height = self._determine_scale_width_height(
+            scale_mode=settings.scale_mode,
+            new_height=settings.scale_height,
+        )
 
         # Calculate or use provided CRF and preset
         self._crf: int = settings.crf if settings.crf is not None else self._get_auto_crf()
         self._preset: str = settings.preset if settings.preset is not None else self._get_auto_preset()
+
+    def get_encoding_resolution(self) -> Tuple[int, int]:
+        if self._scale_width and self._scale_height:
+            return self._scale_width, self._scale_height
+        return self._video.width, self._video.height
+
+    def _determine_scale_width_height(
+        self,
+        scale_mode: ScaleMode = ScaleMode.HEIGHT,
+        new_height: Optional[int] = None,
+    ) -> Tuple[Optional[int], Optional[int]]:
+        """Get target scale dimensions if scaling is enabled.
+
+        Returns:
+            Tuple of (width, height) or None if scaling is not applied
+        """
+        if new_height is None or new_height > self._video.height:
+            return None, None
+
+        orginal_aspect_ratio: float = self._video.width / self._video.height
+        new_scale_width = math.ceil(new_height * orginal_aspect_ratio)
+        new_scale_height = new_height
+
+        def __check_rounding(w: int, h: int) -> Tuple[int, int]:
+            new_w: int = w
+            new_h: int = h
+            if w % 2 != 0:
+                new_w -= 1
+            if h % 2 != 0:
+                new_h -= 1
+
+            return new_w, new_h
+
+        if self._is_cropped() is False:
+            return __check_rounding(new_scale_width, new_scale_height)
+
+        new_aspect_ratio: float = self._crop_width / self._crop_height
+
+        if scale_mode == ScaleMode.HEIGHT:
+            # scale-mode height
+
+            height: int
+            if self._crop_height < new_scale_height:
+                height = self._crop_height
+            else:
+                height = new_scale_height
+
+            width: int = math.floor(height * new_aspect_ratio)
+
+            return __check_rounding(width, height)
+
+        if scale_mode == ScaleMode.ADAPTIVE:
+            # scale-mode adaptive
+            if self._crop_width > new_scale_width:
+                new_scale_height = math.floor(new_scale_width / new_aspect_ratio)
+                return (new_scale_width, new_scale_height)
+
+            if self._crop_height > new_scale_height:
+                new_scale_width = math.ceil(new_scale_height * new_aspect_ratio)
+                return (new_scale_width, new_scale_height)
+
+            return __check_rounding(self._crop_width, self._crop_height)
+
+        return None, None
 
     def _determine_dv_enhancement_layer(
         self,
@@ -237,41 +298,10 @@ class Encoder:
         Returns:
             Total number of pixels for encoding
         """
-        scale_d = self._get_scale_dimensions()
-        if scale_d:
-            w, h = scale_d
-            return w * h
-
-        if self._is_cropped():
-            return self._crop_width * self._crop_height
+        if self._scale_width and self._scale_height:
+            return self._scale_width * self._scale_height
 
         return self._video.width * self._video.height
-
-    def _get_scale_dimensions(self) -> Optional[Tuple[int, int]]:
-        """Get target scale dimensions if scaling is enabled.
-
-        Returns:
-            Tuple of (width, height) or None if scaling is not applied
-        """
-        if self._scale_video and self._scale_width and self._scale_height:
-            if self._is_cropped():
-                width = self._crop_width
-                height = self._crop_height
-                new_aspect_ratio: float = width / height
-
-                if self._crop_width > self._scale_width:
-                    new_scale_height = math.floor(self._scale_width / new_aspect_ratio)
-                    return (self._scale_width, new_scale_height)
-
-                if self._crop_height > self._scale_height:
-                    new_scale_width = math.ceil(self._scale_height * new_aspect_ratio)
-                    return (new_scale_width, self._scale_height)
-
-                return (width, height)
-            else:
-                return (self._scale_width, self._scale_height)
-
-        return None
 
     def _get_auto_crf(self) -> int:
         """Calculate optimal CRF value based on resolution.
@@ -455,10 +485,8 @@ class Encoder:
         Returns:
             Scale filter string or None if no scaling needed
         """
-        scale_d = self._get_scale_dimensions()
-        if scale_d:
-            w, h = scale_d
-            return f"scale={w}:{h}"
+        if self._scale_width and self._scale_height:
+            return f"scale={self._scale_width}:{self._scale_height}"
         return None
 
     def get_target_file(self) -> Path:
@@ -512,7 +540,7 @@ class Encoder:
         else:
             raise ValueError(f"Unsupported video codec: {self._target_video_codec}")
 
-    def build_ffmpeg_output_options(self) -> Dict[str, str]:
+    def _build_ffmpeg_output_options(self) -> Dict[str, str]:
         """Build FFmpeg output options dictionary for encoding.
 
         Returns:
@@ -626,7 +654,7 @@ class Encoder:
             ffmpeg.input(str(input_file))
 
             # Build output options
-            output_options: dict = self.build_ffmpeg_output_options()
+            output_options: dict = self._build_ffmpeg_output_options()
             ffmpeg.output(url=str(target_file), options=output_options)
 
             # Execute with optional progress tracking

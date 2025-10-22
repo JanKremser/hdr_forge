@@ -2,7 +2,7 @@
 
 
 
-from ehdr.cli.cli_output import BLUE, color_str
+from ehdr.cli.cli_output import BLUE, color_str, create_aspect_ratio_str
 from ehdr.typing.dolby_vision_typing import DolbyVisionInfo
 from ehdr.video import Video
 
@@ -13,6 +13,7 @@ def print_video_infos(video: Video) -> None:
         video: Video object with metadata
     """
     resolution: str = f"{video.get_width()}x{video.get_height()}"
+    aspect_ratio: str = create_aspect_ratio_str(video.get_width(), video.get_height())
 
     color = BLUE
     print()
@@ -20,6 +21,7 @@ def print_video_infos(video: Video) -> None:
     print("Video Information:")
     print(f"  Input File: {color_str(str(video.get_filepath()), color)}")
     print(f"  Resolution: {color_str(resolution, color)}")
+    print(f"  Aspect Ratio: {color_str(aspect_ratio, color)}")
     print(f"  Frame Rate: {color_str(video.get_fps(), color)}")
     print(f"  Color Primaries: {color_str(video.get_color_primaries(), color)}")
     print(f"  Color Transfer: {color_str(video.get_color_transfer(), color)}")

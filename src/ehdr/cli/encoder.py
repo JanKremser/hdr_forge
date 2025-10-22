@@ -1,9 +1,8 @@
 """CLI output and progress tracking functionality."""
 
-from typing import Tuple
 
 
-from ehdr.cli.cli_output import BLUE, color_str, create_progress_bar
+from ehdr.cli.cli_output import BLUE, color_str, create_aspect_ratio_str, create_progress_bar
 from ehdr.typing.dolby_vision_typing import DolbyVisionEnhancementLayer, DolbyVisionProfile
 from ehdr.typing.encoder_typing import CropHandler, VideoCodec
 from ehdr.encoder import Encoder
@@ -35,10 +34,11 @@ def print_encoding_params(encoder: Encoder) -> None:
             print(f"  Crop: {color_str(crop_filter, color)}")
         else:
             print(f"  Crop: {color_str('-', color)}")
-        scale_dimensions: Tuple[int, int] | None = encoder._get_scale_dimensions()
-        if scale_dimensions:
-            w, h = scale_dimensions
-            print(f"  Scale: {color_str(f"{w}x{h}", color)}")
+
+        resolution_w, resolution_h = encoder.get_encoding_resolution()
+        aspect_ratio: str = create_aspect_ratio_str(resolution_w, resolution_h)
+        print(f"  Resolution: {color_str(f"{resolution_w}x{resolution_h}", color)}")
+        print(f"  Aspect Ratio: {color_str(aspect_ratio, color)}")
         print(f"  HDR/SDR: {color_str(encoder.get_encoding_hdr_sdr_format().value.upper(), color)}")
     if encoder.is_dolby_vision_encoding():
         dv_profile: DolbyVisionProfile | None = encoder.get_encoding_dolby_vision_profile()

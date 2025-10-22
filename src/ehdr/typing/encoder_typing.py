@@ -32,6 +32,11 @@ class VideoEncoderLibrary(Enum):
     LIBX265 = "libx265"
     COPY = "copy"
 
+class ScaleMode(Enum):
+    """Scaling mode for video resizing after cropping."""
+    ADAPTIVE = "adaptive"
+    HEIGHT = "height"
+
 
 @dataclass
 class EncoderSettings:
@@ -55,4 +60,5 @@ class EncoderSettings:
     crf: Optional[int] = None
     preset: Optional[str] = None
     scale_height: Optional[int] = None
+    scale_mode: ScaleMode = ScaleMode.HEIGHT
     enable_crop: bool = False

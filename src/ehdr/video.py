@@ -40,8 +40,8 @@ class Video:
 
         # Extract dimensions from video stream
         video_stream: dict = self._get_video_stream()
-        self.width = video_stream.get('width', 0)
-        self.height = video_stream.get('height', 0)
+        self.width: int = video_stream.get('width', 0)
+        self.height: int = video_stream.get('height', 0)
 
         self.dolby_vision_rpu_info: Optional[DolbyVisionRpuInfo] = None
         if self.is_dolby_vision_video():
