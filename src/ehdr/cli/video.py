@@ -4,6 +4,7 @@
 
 from ehdr.cli.cli_output import BLUE, color_str, create_aspect_ratio_str
 from ehdr.typing.dolby_vision_typing import DolbyVisionInfo
+from ehdr.typing.mkv_typing import MkvTrack
 from ehdr.video import Video
 
 def print_video_infos(video: Video) -> None:
@@ -12,12 +13,28 @@ def print_video_infos(video: Video) -> None:
     Args:
         video: Video object with metadata
     """
-    resolution: str = f"{video.get_width()}x{video.get_height()}"
-    aspect_ratio: str = create_aspect_ratio_str(video.get_width(), video.get_height())
 
     color = BLUE
     print()
     print(f"{color_str('_', color)}" * 70)
+
+    print("Container Information:")
+    print(f"  Container Type: {color_str(str(video.get_container_type()), color)}")
+    video_tracks: list[MkvTrack] = video.get_container_video_tracks()
+    for v_track in video_tracks:
+        print(f"  Video Tracks:")
+        print(f"    ID: {color_str(str(v_track.id), color)}")
+        print(f"    Codec: {color_str(v_track.codec, color)}")
+        print(f"    Language: {color_str(v_track.properties.language or '-', color)}")
+    audio_tracks: list[MkvTrack] = video.get_container_audio_tracks()
+    for a_track in audio_tracks:
+        print(f"  Audio Tracks:")
+        print(f"    ID: {color_str(str(a_track.id), color)}")
+        print(f"    Codec: {color_str(a_track.codec, color)}")
+        print(f"    Language: {color_str(a_track.properties.language or '-', color)}")
+
+    resolution: str = f"{video.get_width()}x{video.get_height()}"
+    aspect_ratio: str = create_aspect_ratio_str(video.get_width(), video.get_height())
     print("Video Information:")
     print(f"  Input File: {color_str(str(video.get_filepath()), color)}")
     print(f"  Resolution: {color_str(resolution, color)}")
@@ -44,5 +61,6 @@ def print_video_infos(video: Video) -> None:
         print(f"    Profile: {color_str(dolby_vision_info.dv_profile or '-', color)}")
         print(f"    Layout: {color_str(dolby_vision_info.dv_layout, color)}")
         print(f"    Enhancement Layer (EL): {color_str(dolby_vision_info.dv_profile_el or '-', color)}")
+
     print(f"{color_str('_', color)}" * 70)
     print()

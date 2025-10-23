@@ -6,10 +6,12 @@ import subprocess
 from pathlib import Path
 from typing import Dict, LiteralString, Optional, Tuple
 
+from ehdr.container import mkv
 from ehdr.hdr_formats import dolby_vision
 from ehdr.typing.encoder_typing import HdrSdrFormat
 from ehdr.typing.dolby_vision_typing import DolbyVisionEnhancementLayer, DolbyVisionInfo, DolbyVisionProfile, DolbyVisionSiteDataInfo, DolbyVisionRpuInfo
 from ehdr.typing.video_typing import ContentLightLevelMetadata, HdrMetadata, MasterDisplayMetadata
+from ehdr.typing.mkv_typing import MkvInfo, MkvTrack, MkvTrackType
 
 
 DEFAULT_MASTER_DISPLAY: LiteralString = (
@@ -33,24 +35,25 @@ class Video:
         Raises:
             RuntimeError: If ffprobe fails to extract metadata
         """
-        self.filepath: Path = filepath
-        self.metadata: dict = self._extract_metadata()
+        self._filepath: Path = filepath
+        self._video_metadata: dict = self._extract_video_metadata()
+        self._hdr_metadata: HdrMetadata = self.extract_hdr_metadata()
 
-        self.hdr_metadata: HdrMetadata = self.extract_hdr_metadata()
+        self._container_metadata: MkvInfo = mkv.extract_container_info_json(input_mkv_mp4_ts_file=filepath)
 
         # Extract dimensions from video stream
         video_stream: dict = self._get_video_stream()
         self.width: int = video_stream.get('width', 0)
         self.height: int = video_stream.get('height', 0)
 
-        self.dolby_vision_rpu_info: Optional[DolbyVisionRpuInfo] = None
+        self._dolby_vision_rpu_info: Optional[DolbyVisionRpuInfo] = None
         if self.is_dolby_vision_video():
             ## get dolby vision rpu infos
             rpu_file_path: Path = dolby_vision.extract_rpu(
                 input_path=self.get_filepath(),
                 dv_profile_source=self.get_dolby_vision_profile(),
             )
-            self.dolby_vision_rpu_info = dolby_vision.get_rpu_info(
+            self._dolby_vision_rpu_info = dolby_vision.get_rpu_info(
                 rpu_path=Path(rpu_file_path)
             )
             rpu_file_path.unlink(missing_ok=True)
@@ -60,7 +63,7 @@ class Video:
         # ffmpeg-Kommando: showinfo nur so lange laufen lassen, bis Daten auftauchen
         cmd: list = [
             "ffmpeg", "-hide_banner",
-            "-i", self.filepath,
+            "-i", self._filepath,
             "-vf", "showinfo",
             "-frames:v", "10",
             "-f", "null", "-",
@@ -122,7 +125,7 @@ class Video:
             content_light_level_metadata=light_data,
         )
 
-    def _extract_metadata(self) -> dict:
+    def _extract_video_metadata(self) -> dict:
         """Extract video metadata using ffprobe.
 
         Returns:
@@ -139,7 +142,7 @@ class Video:
                     '-print_format', 'json',
                     '-show_format',
                     '-show_streams',
-                    str(self.filepath)
+                    str(self._filepath)
                 ],
                 capture_output=True,
                 text=True,
@@ -160,7 +163,7 @@ class Video:
         Returns:
             Dictionary containing video stream information
         """
-        streams = self.metadata.get('streams', [])
+        streams = self._video_metadata.get('streams', [])
         for stream in streams:
             if stream.get('codec_type') == 'video':
                 return stream
@@ -172,7 +175,7 @@ class Video:
         Returns:
             Path object of the video file
         """
-        return self.filepath
+        return self._filepath
 
     def get_width(self) -> int:
         """Get video width.
@@ -222,6 +225,38 @@ class Video:
         """
         return self._get_video_stream().get('color_transfer', '')
 
+    def get_container_type(self) -> str:
+        """Get container format type.
+
+        Returns:
+            Container format string (e.g., 'matroska,webm' for MKV)
+        """
+        return self._container_metadata.container.type
+
+    def get_container_video_tracks(self) -> list[MkvTrack]:
+        """Get video tracks from the container metadata.
+
+        Returns:
+            List of MkvTrack objects representing video tracks
+        """
+        return [
+            track
+            for track in self._container_metadata.tracks
+            if track.type == MkvTrackType.VIDEO
+        ]
+
+    def get_container_audio_tracks(self) -> list[MkvTrack]:
+        """Get audio tracks from the container metadata.
+
+        Returns:
+            List of MkvTrack objects representing audio tracks
+        """
+        return [
+            track
+            for track in self._container_metadata.tracks
+            if track.type == MkvTrackType.AUDIO
+        ]
+
     def _get_dolby_vision_side_data_infos(self) -> Optional[DolbyVisionSiteDataInfo]:
         """Extract Dolby Vision metadata.
 
@@ -247,7 +282,7 @@ class Video:
         Returns:
             RpuInfo object containing RPU metadata or None if not available
         """
-        return self.dolby_vision_rpu_info
+        return self._dolby_vision_rpu_info
 
     def get_dolby_vision_info(self) -> Optional[DolbyVisionInfo]:
         """Get Dolby Vision detailed information.
@@ -315,8 +350,8 @@ class Video:
         Returns:
             Master display metadata string or None if not found
         """
-        if self.hdr_metadata.mastering_display_metadata:
-            md: MasterDisplayMetadata = self.hdr_metadata.mastering_display_metadata
+        if self._hdr_metadata.mastering_display_metadata:
+            md: MasterDisplayMetadata = self._hdr_metadata.mastering_display_metadata
             return (f"G({int(md.g_x*50000)},{int(md.g_y*50000)})"
                     f"B({int(md.b_x*50000)},{int(md.b_y*50000)})"
                     f"R({int(md.r_x*50000)},{int(md.r_y*50000)})"
@@ -357,9 +392,9 @@ class Video:
             Tuple of (MaxCLL, MaxFALL) or None if not found
         """
 
-        if self.hdr_metadata.content_light_level_metadata:
-            max_cll = self.hdr_metadata.content_light_level_metadata.maxcll
-            max_fall = self.hdr_metadata.content_light_level_metadata.maxfall
+        if self._hdr_metadata.content_light_level_metadata:
+            max_cll = self._hdr_metadata.content_light_level_metadata.maxcll
+            max_fall = self._hdr_metadata.content_light_level_metadata.maxfall
             if max_cll is not None and max_fall is not None:
                 return (int(max_cll), int(max_fall))
 
@@ -419,7 +454,7 @@ class Video:
         Returns:
             Total frame count
         """
-        duration = float(self.metadata.get('format', {}).get('duration', 0))
+        duration = float(self._video_metadata.get('format', {}).get('duration', 0))
         if duration <= 0:
             return 0
 
@@ -432,4 +467,4 @@ class Video:
         Returns:
             Duration in seconds
         """
-        return float(self.metadata.get('format', {}).get('duration', 0))
+        return float(self._video_metadata.get('format', {}).get('duration', 0))

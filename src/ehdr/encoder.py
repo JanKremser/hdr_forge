@@ -96,6 +96,9 @@ class Encoder:
     def get_encoding_resolution(self) -> Tuple[int, int]:
         if self._scale_width and self._scale_height:
             return self._scale_width, self._scale_height
+
+        if self._is_cropped():
+            return self._crop_width, self._crop_height
         return self._video.width, self._video.height
 
     def _determine_scale_width_height(
@@ -366,7 +369,7 @@ class Encoder:
         cmd = [
             'ffmpeg',
             '-ss', str(position_seconds),
-            '-i', str(self._video.filepath),
+            '-i', str(self._video._filepath),
             '-vf', 'cropdetect=24:16:0',
             '-frames:v', '10',
             '-f', 'null',

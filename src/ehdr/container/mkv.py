@@ -1,9 +1,11 @@
 import subprocess
 import threading
+import json
 from pathlib import Path
 from typing import Optional
 
 from ehdr.cli.cli_output import monitor_process_progress
+from ehdr.typing.mkv_typing import MkvInfo, parse_mkv_info
 
 def get_mkvmerge_path() -> str:
     """Get path to mkvmerge executable.
@@ -127,3 +129,57 @@ def mux_hevc_to_mkv(input_hevc_path: Path, input_mkv: Optional[Path] = None, out
         )
     except Exception as e:
         raise RuntimeError(f"Failed to mux HEVC to MKV: {e}")
+
+def extract_container_info_json(input_mkv_mp4_ts_file: Path) -> MkvInfo:
+    """Extracts JSON information from an MKV file using mkvmerge.
+
+    Args:
+        input_mkv: Path to the input MKV, TS, mp4 file
+
+    Returns:
+        MkvInfo object with typed information extracted from the MKV file
+
+    Raises:
+        RuntimeError: If mkvmerge is not installed or extraction fails
+    """
+    mkvmerge_exec: str = get_mkvmerge_path()
+
+    try:
+        # Create mkvmerge command
+        mkvmerge_cmd: list[str] = [
+            mkvmerge_exec,
+            '-J',
+            str(input_mkv_mp4_ts_file)
+        ]
+
+        # Execute mkvmerge to extract JSON information
+        process = subprocess.run(
+            mkvmerge_cmd,
+            capture_output=True,
+            text=True,
+            check=True
+        )
+
+        # Parse JSON output
+        mkv_info_dict = json.loads(process.stdout)
+
+        try:
+            # Try to parse into typed MkvInfo object
+            return parse_mkv_info(info_dict=mkv_info_dict)
+        except Exception as e:
+            # Fall back to returning the raw dictionary if parsing fails
+            raise RuntimeError(
+                f"Warning: Could not parse MKV info into typed object: {e}"
+            )
+
+    except FileNotFoundError as e:
+        raise RuntimeError(
+            f"Required tool not found: {e.filename}. "
+            "Please ensure that mkvmerge is installed."
+        )
+    except subprocess.CalledProcessError as e:
+        raise RuntimeError(f"Error extracting MKV information: {e.stderr}")
+    except json.JSONDecodeError as e:
+        raise RuntimeError(f"Error parsing MKV information: {e}")
+    except Exception as e:
+        raise RuntimeError(f"An error occurred while extracting MKV information: {e}")
