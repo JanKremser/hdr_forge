@@ -3,7 +3,7 @@
 import argparse
 
 from ehdr import __version__
-from ehdr.typedefs.encoder_typing import HdrSdrFormat, EncoderSettings, ScaleMode, VideoCodec
+from ehdr.typedefs.encoder_typing import CropMode, CropSettings, HdrSdrFormat, EncoderSettings, ScaleMode, VideoCodec
 from ehdr.typedefs.dolby_vision_typing import DolbyVisionProfileEncodingMode
 
 
@@ -111,9 +111,13 @@ Examples:
     )
 
     convert_parser.add_argument(
-        '--ncrop',
-        action='store_true',
-        help='Disable automatic black bar cropping'
+        '--crop',
+        help="""Crop black bars from video.
+[auto]             : Automatically detect and crop black bars
+[off]              : Disable cropping
+[width:height:x:y] : Manually specify crop dimensions. The basis for the calculation is the original video, not the target resolution.
+[ratio]            : 16:9, 21:9 etc. to crop to specific aspect ratio\n
+"""
     )
 
     convert_parser.add_argument(
@@ -233,6 +237,37 @@ def get_video_codec_from_string(codec_str: str | None) -> VideoCodec:
     return VideoCodec.X265
 
 
+def get_crop_settings_from_string(crop_str: str | None) -> CropSettings:
+    """Convert crop argument string to CropSettings object.
+
+    Args:
+        crop_str: Crop argument string
+
+    Returns:
+        CropSettings object
+    """
+    if crop_str is None or crop_str.lower() == 'auto':
+        return CropSettings(mode=CropMode.AUTO)
+    elif crop_str.lower() == 'off':
+        return CropSettings(mode=CropMode.OFF)
+    elif ':' in crop_str:
+        parts = crop_str.split(':')
+        if len(parts) == 4:
+            try:
+                w, h, x, y = map(int, parts)
+                return CropSettings(mode=CropMode.MANUAL, manual_crop=(x, y, w, h))
+            except ValueError:
+                pass
+        elif len(parts) == 2:
+            try:
+                ar_w, ar_h = map(int, parts)
+                return CropSettings(mode=CropMode.RATIO, ratio=(ar_w, ar_h))
+            except ValueError:
+                pass
+    print(f"Warning: Invalid crop value '{crop_str}', using automatic cropping")
+    return CropSettings(mode=CropMode.AUTO)
+
+
 def create_encoder_settings_from_args(args) -> EncoderSettings:
     """Create EncoderSettings object from parsed command-line arguments.
 
@@ -250,5 +285,5 @@ def create_encoder_settings_from_args(args) -> EncoderSettings:
         preset=args.preset,
         scale_height=get_scale_height(args.scale),
         scale_mode=ScaleMode(args.scale_mode),
-        enable_crop=not args.ncrop,
+        crop=get_crop_settings_from_string(args.crop)
     )

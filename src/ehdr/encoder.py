@@ -10,7 +10,7 @@ from typing import Callable, Dict, Optional, Tuple
 from ffmpeg import FFmpeg
 
 from ehdr.container import mkv
-from ehdr.typedefs.encoder_typing import HdrSdrFormat, CropHandler, EncoderSettings, ScaleMode, VideoCodec, VideoEncoderLibrary
+from ehdr.typedefs.encoder_typing import CropMode, CropSettings, HdrSdrFormat, CropHandler, EncoderSettings, ScaleMode, VideoCodec, VideoEncoderLibrary
 from ehdr.typedefs.dolby_vision_typing import DolbyVisionEnhancementLayer, DolbyVisionProfile, DolbyVisionProfileEncodingMode
 from ehdr.hdr_formats import dolby_vision
 from ehdr.video import Video
@@ -77,9 +77,11 @@ class Encoder:
         self._crop_x = 0
         self._crop_y = 0
 
-        # Apply cropping if enabled (not supported for Dolby Vision)
-        if settings.enable_crop:
-            self._crop_video(callback=crop_callback)
+        # crop video
+        self._crop_video(
+            crop_settings=settings.crop,
+            callback=crop_callback,
+        )
 
         # Scale dimensions
         self._scale_width: Optional[int]
@@ -399,23 +401,11 @@ class Encoder:
 
         return None
 
-    def _crop_video(
+    def _detect_crop_auto(
         self,
         num_threads: int = 10,
         callback: Optional[Callable[[CropHandler], None]] = None,
-    ) -> None:
-        """Detect and apply optimal crop parameters using multi-threaded analysis.
-
-        Args:
-            num_threads: Number of concurrent threads for crop detection
-            callback: Optional callback function for progress updates
-        """
-        if (
-            self.is_dolby_vision_encoding() or
-            self._target_video_codec == VideoCodec.COPY
-        ):
-            return
-
+    ) -> Optional[Tuple[int, int, int, int]]:
         if callback:
             callback(CropHandler(
                 finish_progress=False,
@@ -468,9 +458,69 @@ class Encoder:
 
         # Find most common crop dimensions
         crop_counter = Counter(crop_results)
-        most_common_crop = crop_counter.most_common(1)[0][0]
+        most_common_crop: Tuple[int, int, int, int] = crop_counter.most_common(1)[0][0]
 
-        self._crop_width, self._crop_height, self._crop_x, self._crop_y = most_common_crop
+        return most_common_crop
+
+    def _crop_video(
+        self,
+        crop_settings: CropSettings,
+        callback: Optional[Callable[[CropHandler], None]] = None,
+    ) -> None:
+        """Detect and apply optimal crop parameters using multi-threaded analysis.
+
+        Args:
+            num_threads: Number of concurrent threads for crop detection
+            callback: Optional callback function for progress updates
+        """
+
+        if (
+            self.is_dolby_vision_encoding() or
+            self._target_video_codec == VideoCodec.COPY
+        ):
+            return
+
+        if crop_settings.mode == CropMode.OFF:
+            return
+
+        if crop_settings.mode == CropMode.AUTO:
+            c: Tuple[int, int, int, int] | None = self._detect_crop_auto(
+                num_threads=10,
+                callback=callback,
+            )
+            if c is None:
+                return
+            self._crop_width, self._crop_height, self._crop_x, self._crop_y = c
+
+        if crop_settings.mode == CropMode.MANUAL:
+            if crop_settings.manual_crop is not None:
+                self._crop_x, self._crop_y, self._crop_width, self._crop_height = crop_settings.manual_crop
+
+        if crop_settings.mode == CropMode.RATIO:
+            if crop_settings.ratio is not None:
+                ar_w, ar_h = crop_settings.ratio
+                target_aspect_ratio: float = ar_w / ar_h
+                current_aspect_ratio: float = self._video.width / self._video.height
+
+                if current_aspect_ratio > target_aspect_ratio:
+                    # Video is wider than target aspect ratio - crop width
+                    new_width: int = int(self._video.height * target_aspect_ratio)
+                    self._crop_width = new_width
+                    self._crop_height = self._video.height
+                    self._crop_x = (self._video.width - new_width) // 2
+                    self._crop_y = 0
+                elif current_aspect_ratio < target_aspect_ratio:
+                    # Video is taller than target aspect ratio - crop height
+                    new_height: int = int(self._video.width / target_aspect_ratio)
+                    self._crop_width = self._video.width
+                    self._crop_height = new_height
+                    self._crop_x = 0
+                    self._crop_y = (self._video.height - new_height) // 2
+                else:
+                    # Aspect ratios match - no cropping needed
+                    pass
+
+
 
     def get_crop_filter(self) -> Optional[str]:
         """Get ffmpeg crop filter string if cropping is needed.

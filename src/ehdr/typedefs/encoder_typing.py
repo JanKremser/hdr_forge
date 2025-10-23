@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from typing import Optional
 
@@ -38,6 +38,21 @@ class ScaleMode(Enum):
     HEIGHT = "height"
 
 
+class CropMode(Enum):
+    """Crop mode for black bar detection."""
+    AUTO = "auto"
+    OFF = "off"
+    MANUAL = "manual"
+    RATIO = "ratio"
+
+@dataclass
+class CropSettings:
+    """Settings for cropping black bars from video."""
+    mode: CropMode = CropMode.AUTO
+    manual_crop: Optional[tuple[int, int, int, int]] = None  # x, y, width, height
+    ratio: Optional[tuple[int, int]] = None # Aspect ratio for RATIO mode
+
+
 @dataclass
 class EncoderSettings:
     """Container for all video encoding settings.
@@ -52,7 +67,7 @@ class EncoderSettings:
         crf: Constant Rate Factor for quality control (lower = better quality)
         preset: x265 encoding preset (slower = better compression)
         scale_height: Target height for video scaling (downscaling only)
-        enable_crop: Enable automatic black bar detection and cropping
+        crop: CropSettings object defining cropping behavior
     """
     video_codec: VideoCodec = VideoCodec.X265
     hdr_sdr_format: HdrSdrFormat = HdrSdrFormat.AUTO
@@ -61,4 +76,4 @@ class EncoderSettings:
     preset: Optional[str] = None
     scale_height: Optional[int] = None
     scale_mode: ScaleMode = ScaleMode.HEIGHT
-    enable_crop: bool = False
+    crop: CropSettings = field(default_factory=lambda: CropSettings(mode=CropMode.AUTO))
