@@ -50,7 +50,7 @@ class CropSettings:
     """Settings for cropping black bars from video."""
     mode: CropMode = CropMode.AUTO
     manual_crop: Optional[tuple[int, int, int, int]] = None  # x, y, width, height
-    ratio: Optional[tuple[int, int]] = None # Aspect ratio for RATIO mode
+    ratio: Optional[tuple[float, float]] = None # Aspect ratio for RATIO mode
 
 
 @dataclass

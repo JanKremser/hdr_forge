@@ -116,7 +116,9 @@ Examples:
 [auto]             : Automatically detect and crop black bars
 [off]              : Disable cropping
 [width:height:x:y] : Manually specify crop dimensions. The basis for the calculation is the original video, not the target resolution.
-[ratio]            : 16:9, 21:9 etc. to crop to specific aspect ratio\n
+[ratio]            : 16:9, 21:9 etc. to crop to specific aspect ratio
+[cinema]           : CinemaScope Classic 2.35:1 ratio\n
+[cinema-modern]    : CinemaScope Modern 2.39:1 ratio\n
 """
     )
 
@@ -246,7 +248,16 @@ def get_crop_settings_from_string(crop_str: str | None) -> CropSettings:
     Returns:
         CropSettings object
     """
-    if crop_str is None or crop_str.lower() == 'auto':
+    if crop_str is None:
+        return CropSettings(mode=CropMode.AUTO)
+
+    # Preset for cinema aspect ratios
+    if crop_str.lower() == 'cinema':
+        crop_str = '2.35:1'
+    elif crop_str.lower() == 'cinema-modern':
+        crop_str = '2.39:1'
+
+    if crop_str.lower() == 'auto':
         return CropSettings(mode=CropMode.AUTO)
     elif crop_str.lower() == 'off':
         return CropSettings(mode=CropMode.OFF)
@@ -260,7 +271,7 @@ def get_crop_settings_from_string(crop_str: str | None) -> CropSettings:
                 pass
         elif len(parts) == 2:
             try:
-                ar_w, ar_h = map(int, parts)
+                ar_w, ar_h = map(float, parts)
                 return CropSettings(mode=CropMode.RATIO, ratio=(ar_w, ar_h))
             except ValueError:
                 pass
