@@ -1,9 +1,10 @@
 """CLI output and progress tracking functionality."""
 
+import sys
 import time
 import subprocess
 from datetime import timedelta
-from typing import Callable
+from typing import Callable, Optional
 
 from ffmpeg import Progress
 
@@ -40,6 +41,22 @@ def color_str(value: str | int | float | None, color: str) -> str:
         Colored text string
     """
     return f"{color}{str(value)}{RESET}"
+
+def print_warn(msg: str) -> None:
+    """Print a warning message in yellow color.
+
+    Args:
+        message: The warning message to print
+    """
+    print(f"{color_str('Warning:', YELLOW)} {msg}")
+
+def print_err(msg: str) -> None:
+    """Print an error message in red color.
+
+    Args:
+        message: The error message to print
+    """
+    print(f"{color_str('Error:', RED)} {msg}")
 
 def create_progress_bar(percent: float, width: int = PROGRESS_BAR_WIDTH) -> str:
     """Create a visual progress bar.

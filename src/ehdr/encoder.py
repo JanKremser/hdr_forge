@@ -1,17 +1,18 @@
 """Video encoder configuration and parameter building."""
 
-from lzma import is_check_supported
 import math
 import subprocess
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
+import sys
 from typing import Callable, Dict, Optional, Tuple
 
 from ffmpeg import FFmpeg
 
+from ehdr.cli.cli_output import print_err, print_warn
 from ehdr.container import mkv
-from ehdr.typedefs.encoder_typing import CropMode, CropSettings, HdrSdrFormat, CropHandler, EncoderSettings, ScaleMode, VideoCodec, VideoEncoderLibrary
+from ehdr.typedefs.encoder_typing import CropMode, CropSettings, HdrSdrFormat, CropHandler, EncoderSettings, SampleSettings, ScaleMode, VideoCodec, VideoEncoderLibrary
 from ehdr.typedefs.dolby_vision_typing import DolbyVisionEnhancementLayer, DolbyVisionProfile, DolbyVisionProfileEncodingMode
 from ehdr.hdr_formats import dolby_vision
 from ehdr.video import Video
@@ -96,6 +97,11 @@ class Encoder:
         self._crf: int = settings.crf if settings.crf is not None else self._get_auto_crf()
         self._preset: str = settings.preset if settings.preset is not None else self._get_auto_preset()
 
+        #samples
+        self._video_sample_in_sec: Optional[Tuple[int, int]] = self._determine_video_sample(
+            sample_settings=settings.sample,
+        )
+
     def get_encoding_resolution(self) -> Tuple[int, int]:
         if self._scale_width and self._scale_height:
             return self._scale_width, self._scale_height
@@ -103,6 +109,39 @@ class Encoder:
         if self._is_cropped():
             return self._crop_width, self._crop_height
         return self._video.width, self._video.height
+
+    def _determine_video_sample(
+        self,
+        sample_settings: SampleSettings,
+    ) -> Optional[Tuple[int, int]]:
+        """Determine start and end times for video sampling.
+
+        Args:
+            sample_settings: SampleSettings object with sampling configuration
+        Returns:
+            Tuple of (start_time, end_time) in seconds or None if no sampling
+        """
+        if not sample_settings.enabled:
+            return None
+
+        if self.is_dolby_vision_encoding():
+            print_err(msg="Video sampling is not supported for Dolby Vision encoding.")
+            sys.exit(1)
+
+        video_duration: float = self._video.get_duration_seconds()
+        if video_duration <= 0:
+            return None
+
+        if sample_settings.start_time is not None and sample_settings.end_time is not None:
+            start_time: float = max(0, min(sample_settings.start_time, video_duration))
+            end_time: float = max(start_time, min(sample_settings.end_time, video_duration))
+            return (int(start_time), int(end_time))
+
+        # Auto sample: 30 seconds from middle of video
+        mid_point: float = video_duration / 2
+        start_time = max(0, mid_point - 15)
+        end_time = min(video_duration, mid_point + 15)
+        return (int(start_time), int(end_time))
 
     def _determine_scale_width_height(
         self,
@@ -480,7 +519,6 @@ class Encoder:
         """
 
         if (
-            self.is_dolby_vision_encoding() or
             self._target_video_codec == VideoCodec.COPY
         ):
             return
@@ -488,12 +526,19 @@ class Encoder:
         if crop_settings.mode == CropMode.OFF:
             return
 
+        if (
+            self.is_dolby_vision_encoding()
+        ):
+            print_err(msg="Crop detection is not supported for Dolby Vision encoding.")
+            sys.exit(1)
+
         if crop_settings.mode == CropMode.AUTO:
             c: Tuple[int, int, int, int] | None = self._detect_crop_auto(
-                check_samples=100,
+                check_samples=10,
                 callback=callback,
             )
             if c is None:
+                print_warn("Auto crop detection failed or no crop needed.")
                 return
             self._crop_width, self._crop_height, self._crop_x, self._crop_y = c
 
@@ -619,6 +664,11 @@ class Encoder:
             'c:a': 'copy',
             'c:s': 'copy'
         })
+
+        if self._video_sample_in_sec is not None:
+            start_time, end_time = self._video_sample_in_sec
+            output_options['ss'] = str(start_time)
+            output_options['t'] = str(end_time-start_time)
 
         if codec_lib == VideoCodec.COPY:
             return output_options

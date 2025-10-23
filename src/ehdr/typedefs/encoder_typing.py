@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 from enum import Enum
+from random import sample
 from typing import Optional
 
 from ehdr.typedefs.dolby_vision_typing import DolbyVisionProfileEncodingMode
@@ -54,6 +55,14 @@ class CropSettings:
 
 
 @dataclass
+class SampleSettings:
+    """Settings for processing a video sample."""
+    enabled: bool = False
+    start_time: Optional[float] = None  # in seconds
+    end_time: Optional[float] = None    # in seconds
+
+
+@dataclass
 class EncoderSettings:
     """Container for all video encoding settings.
 
@@ -77,3 +86,4 @@ class EncoderSettings:
     scale_height: Optional[int] = None
     scale_mode: ScaleMode = ScaleMode.HEIGHT
     crop: CropSettings = field(default_factory=lambda: CropSettings(mode=CropMode.AUTO))
+    sample: SampleSettings = field(default_factory=lambda: SampleSettings(enabled=False))

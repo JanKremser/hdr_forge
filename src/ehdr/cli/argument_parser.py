@@ -1,9 +1,11 @@
 """Command-line argument parsing for EHDR."""
 
 import argparse
+import sys
 
 from ehdr import __version__
-from ehdr.typedefs.encoder_typing import CropMode, CropSettings, HdrSdrFormat, EncoderSettings, ScaleMode, VideoCodec
+from ehdr.cli.cli_output import print_err
+from ehdr.typedefs.encoder_typing import CropMode, CropSettings, HdrSdrFormat, EncoderSettings, SampleSettings, ScaleMode, VideoCodec
 from ehdr.typedefs.dolby_vision_typing import DolbyVisionProfileEncodingMode
 
 
@@ -112,9 +114,8 @@ Examples:
 
     convert_parser.add_argument(
         '--crop',
-        help="""Crop black bars from video.
+        help="""Crop black bars from video. Not supported for Dolby Vision encoding.
 [auto]             : Automatically detect and crop black bars
-[off]              : Disable cropping
 [width:height:x:y] : Manually specify crop dimensions. The basis for the calculation is the original video, not the target resolution.
 [ratio]            : 16:9, 21:9 etc. to crop to specific aspect ratio
 [cinema]           : CinemaScope Classic 2.35:1 ratio\n
@@ -131,7 +132,7 @@ Examples:
         '--scale-mode',
         choices=['height', 'adaptive'],
         default="height",
-        help="""Specifies how the video should be scaled after cropping.
+        help="""Specifies how the video should be scaled after cropping. Not supported for Dolby Vision encoding.
 [height]   : Uses the target height as a fixed reference. The width is calculated
              from the aspect ratio. Ideal for standardized output formats like 1080p or 4K.
 [adaptive] : Scales the video dynamically to fit optimally within the target resolution,
@@ -152,6 +153,14 @@ Examples:
         choices=['auto', '8'],
         default='auto',
         help='Dolby Vision profile for encoding (auto = automatic detection, 8 = force profile 8.1)'
+    )
+
+    convert_parser.add_argument(
+        '--sample',
+        help="""Process only a short sample of the video for testing purposes. Not supported for Dolby Vision encoding
+[auto]      : Process a 30 seconds sample from the middle of the video
+[start:end] : Specify start and end time in seconds (e.g., 60:90 for a sample from 1:00 to 1:30)\n
+"""
     )
 
     return parser.parse_args()
@@ -249,7 +258,7 @@ def get_crop_settings_from_string(crop_str: str | None) -> CropSettings:
         CropSettings object
     """
     if crop_str is None:
-        return CropSettings(mode=CropMode.AUTO)
+        return CropSettings(mode=CropMode.OFF)
 
     # Preset for cinema aspect ratios
     if crop_str.lower() == 'cinema':
@@ -259,8 +268,6 @@ def get_crop_settings_from_string(crop_str: str | None) -> CropSettings:
 
     if crop_str.lower() == 'auto':
         return CropSettings(mode=CropMode.AUTO)
-    elif crop_str.lower() == 'off':
-        return CropSettings(mode=CropMode.OFF)
     elif ':' in crop_str:
         parts = crop_str.split(':')
         if len(parts) == 4:
@@ -275,8 +282,36 @@ def get_crop_settings_from_string(crop_str: str | None) -> CropSettings:
                 return CropSettings(mode=CropMode.RATIO, ratio=(ar_w, ar_h))
             except ValueError:
                 pass
-    print(f"Warning: Invalid crop value '{crop_str}', using automatic cropping")
-    return CropSettings(mode=CropMode.AUTO)
+    print_err(f"Invalid crop value '{crop_str}', using automatic cropping")
+    sys.exit(1)
+
+
+def get_sample_settings_from_string(sample_str: str | None) -> SampleSettings:
+    """Convert sample argument string to SampleSettings object.
+
+    Args:
+        sample_str: Sample argument string
+
+    Returns:
+        SampleSettings object
+    """
+    if sample_str is None:
+        return SampleSettings(enabled=False)
+
+    if sample_str.lower() == 'auto':
+        return SampleSettings(enabled=True, start_time=None, end_time=None)
+
+    if ':' in sample_str:
+        parts = sample_str.split(':')
+        if len(parts) == 2:
+            try:
+                start = float(parts[0])
+                end = float(parts[1])
+                return SampleSettings(enabled=True, start_time=start, end_time=end)
+            except ValueError:
+                pass
+    print(f"Warning: Invalid sample value '{sample_str}', not using sampling")
+    return SampleSettings(enabled=False)
 
 
 def create_encoder_settings_from_args(args) -> EncoderSettings:
@@ -296,5 +331,6 @@ def create_encoder_settings_from_args(args) -> EncoderSettings:
         preset=args.preset,
         scale_height=get_scale_height(args.scale),
         scale_mode=ScaleMode(args.scale_mode),
-        crop=get_crop_settings_from_string(args.crop)
+        crop=get_crop_settings_from_string(args.crop),
+        sample=get_sample_settings_from_string(args.sample),
     )
