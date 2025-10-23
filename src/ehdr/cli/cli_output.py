@@ -1,6 +1,5 @@
 """CLI output and progress tracking functionality."""
 
-import math
 import time
 import subprocess
 from datetime import timedelta
@@ -244,10 +243,10 @@ def create_aspect_ratio_str(width: int, height: int, tolerance: float = 0.02) ->
         raise ValueError("Width and height must be positive integers")
 
     # calculate exact ratio
-    ratio = width / height
+    ratio: float = width / height
 
     # known common aspect ratios
-    common_ratios = {
+    common_ratios: dict = {
         "1:1": 1.0,
         "5:4": 1.25,
         "4:3": 1.3333,
@@ -255,18 +254,28 @@ def create_aspect_ratio_str(width: int, height: int, tolerance: float = 0.02) ->
         "16:10": 1.6,
         "16:9": 1.7777,
         "18:9": 2.0,
+        "2.20:1 (70mm)": 2.20,
         "21:9": 2.3333,
+        "2.35:1 (Cinema)": 2.35,
+        "2.39:1 (Cinema-Modern)": 2.39,
         "32:9": 3.5555,
     }
 
-    # try to match a known ratio within tolerance
+    # Find the closest ratio within tolerance
+    closest_label = None
+    smallest_difference = float('inf')
+
     for label, value in common_ratios.items():
-        if math.isclose(ratio, value, rel_tol=tolerance):
-            return label
+        difference = abs(ratio - value)
+        max_allowed_difference = value * tolerance
 
-    # fallback: compute reduced fraction
-    divisor = math.gcd(width, height)
-    w_ratio = width // divisor
-    h_ratio = height // divisor
+        if difference <= max_allowed_difference and difference < smallest_difference:
+            smallest_difference = difference
+            closest_label = label
 
-    return f"{w_ratio}:{h_ratio}"
+    if closest_label:
+        return closest_label
+
+    # fallback: compute ratio in X:1 format
+    ratio_x_to_1: float = width / height
+    return f"{ratio_x_to_1:.2f}:1"
