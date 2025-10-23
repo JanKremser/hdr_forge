@@ -1,5 +1,6 @@
 """Video encoder configuration and parameter building."""
 
+from lzma import is_check_supported
 import math
 import subprocess
 from collections import Counter
@@ -368,18 +369,22 @@ class Encoder:
         Returns:
             Tuple of (width, height, x, y) or None if detection fails
         """
-        cmd = [
+        hdr_cropdetect_filter: str = ""
+        if self._video.is_hdr_video():
+            hdr_cropdetect_filter = "zscale=transfer=bt709,format=yuv420p,hqdn3d=1.5:1.5:6:6,"
+
+        cmd: list[str] = [
             'ffmpeg',
             '-ss', str(position_seconds),
             '-i', str(self._video._filepath),
-            '-vf', 'cropdetect=24:16:0',
-            '-frames:v', '10',
+            '-vf', f'{hdr_cropdetect_filter}cropdetect=24:16:0',
+            '-frames:v', '30',
             '-f', 'null',
             '-'
         ]
 
         try:
-            result = subprocess.run(
+            result: subprocess.CompletedProcess[str] = subprocess.run(
                 cmd,
                 capture_output=True,
                 text=True,
@@ -403,14 +408,14 @@ class Encoder:
 
     def _detect_crop_auto(
         self,
-        num_threads: int = 10,
+        check_samples: int = 10,
         callback: Optional[Callable[[CropHandler], None]] = None,
     ) -> Optional[Tuple[int, int, int, int]]:
         if callback:
             callback(CropHandler(
                 finish_progress=False,
                 completed_samples=0,
-                total_samples=num_threads,
+                total_samples=check_samples,
             ))
 
         # Get video duration
@@ -420,13 +425,13 @@ class Encoder:
             return
 
         # Calculate positions to sample (evenly distributed)
-        interval = duration / (num_threads + 1)
-        positions = [int(interval * (i + 1)) for i in range(num_threads)]
+        interval: float = duration / (check_samples + 1)
+        positions: list[int] = [int(interval * (i + 1)) for i in range(check_samples)]
 
         # Run crop detection in parallel
-        crop_results = []
+        crop_results: list = []
         completed = 0
-        with ThreadPoolExecutor(max_workers=num_threads) as executor:
+        with ThreadPoolExecutor(max_workers=check_samples) as executor:
             futures = {
                 executor.submit(self._detect_crop_at_position, pos): pos
                 for pos in positions
@@ -442,7 +447,7 @@ class Encoder:
                     callback(CropHandler(
                         finish_progress=False,
                         completed_samples=completed,
-                        total_samples=num_threads,
+                        total_samples=check_samples,
                     ))
 
         # Send final crop handler
@@ -450,7 +455,7 @@ class Encoder:
             callback(CropHandler(
                 finish_progress=True,
                 completed_samples=completed,
-                total_samples=num_threads,
+                total_samples=check_samples,
             ))
 
         if not crop_results:
@@ -485,7 +490,7 @@ class Encoder:
 
         if crop_settings.mode == CropMode.AUTO:
             c: Tuple[int, int, int, int] | None = self._detect_crop_auto(
-                num_threads=10,
+                check_samples=100,
                 callback=callback,
             )
             if c is None:
