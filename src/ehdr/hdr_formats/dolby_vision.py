@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Optional
 
 from ehdr.cli.cli_output import monitor_process_progress
-from ehdr.typing.dolby_vision_typing import DolbyVisionProfile, DolbyVisionProfileEncodingMode, DolbyVisionRpuInfo
+from ehdr.typedefs.dolby_vision_typing import DolbyVisionProfile, DolbyVisionProfileEncodingMode, DolbyVisionRpuInfo
 
 
 def get_dovi_tool_path() -> str:

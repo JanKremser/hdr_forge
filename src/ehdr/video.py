@@ -8,10 +8,10 @@ from typing import Dict, LiteralString, Optional, Tuple
 
 from ehdr.container import mkv
 from ehdr.hdr_formats import dolby_vision
-from ehdr.typing.encoder_typing import HdrSdrFormat
-from ehdr.typing.dolby_vision_typing import DolbyVisionEnhancementLayer, DolbyVisionInfo, DolbyVisionProfile, DolbyVisionSiteDataInfo, DolbyVisionRpuInfo
-from ehdr.typing.video_typing import ContentLightLevelMetadata, HdrMetadata, MasterDisplayMetadata
-from ehdr.typing.mkv_typing import MkvInfo, MkvTrack, MkvTrackType
+from ehdr.typedefs.encoder_typing import HdrSdrFormat
+from ehdr.typedefs.dolby_vision_typing import DolbyVisionEnhancementLayer, DolbyVisionInfo, DolbyVisionProfile, DolbyVisionSiteDataInfo, DolbyVisionRpuInfo
+from ehdr.typedefs.video_typing import ContentLightLevelMetadata, HdrMetadata, MasterDisplayMetadata
+from ehdr.typedefs.mkv_typing import MkvInfo, MkvTrack, MkvTrackType
 
 
 DEFAULT_MASTER_DISPLAY: LiteralString = (

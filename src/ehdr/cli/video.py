@@ -3,8 +3,8 @@
 
 
 from ehdr.cli.cli_output import BLUE, color_str, create_aspect_ratio_str
-from ehdr.typing.dolby_vision_typing import DolbyVisionInfo
-from ehdr.typing.mkv_typing import MkvTrack
+from ehdr.typedefs.dolby_vision_typing import DolbyVisionInfo
+from ehdr.typedefs.mkv_typing import MkvTrack
 from ehdr.video import Video
 
 def print_video_infos(video: Video) -> None:

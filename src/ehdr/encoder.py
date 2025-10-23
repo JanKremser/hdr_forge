@@ -10,8 +10,8 @@ from typing import Callable, Dict, Optional, Tuple
 from ffmpeg import FFmpeg
 
 from ehdr.container import mkv
-from ehdr.typing.encoder_typing import HdrSdrFormat, CropHandler, EncoderSettings, ScaleMode, VideoCodec, VideoEncoderLibrary
-from ehdr.typing.dolby_vision_typing import DolbyVisionEnhancementLayer, DolbyVisionProfile, DolbyVisionProfileEncodingMode
+from ehdr.typedefs.encoder_typing import HdrSdrFormat, CropHandler, EncoderSettings, ScaleMode, VideoCodec, VideoEncoderLibrary
+from ehdr.typedefs.dolby_vision_typing import DolbyVisionEnhancementLayer, DolbyVisionProfile, DolbyVisionProfileEncodingMode
 from ehdr.hdr_formats import dolby_vision
 from ehdr.video import Video
 

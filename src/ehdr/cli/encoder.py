@@ -3,8 +3,8 @@
 
 
 from ehdr.cli.cli_output import BLUE, color_str, create_aspect_ratio_str, create_progress_bar
-from ehdr.typing.dolby_vision_typing import DolbyVisionEnhancementLayer, DolbyVisionProfile
-from ehdr.typing.encoder_typing import CropHandler, VideoCodec
+from ehdr.typedefs.dolby_vision_typing import DolbyVisionEnhancementLayer, DolbyVisionProfile
+from ehdr.typedefs.encoder_typing import CropHandler, VideoCodec
 from ehdr.encoder import Encoder
 
 

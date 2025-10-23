@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Optional
 
-from ehdr.typing.dolby_vision_typing import DolbyVisionProfileEncodingMode
+from ehdr.typedefs.dolby_vision_typing import DolbyVisionProfileEncodingMode
 
 
 @dataclass

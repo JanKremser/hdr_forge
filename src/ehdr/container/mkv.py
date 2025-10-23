@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Optional
 
 from ehdr.cli.cli_output import monitor_process_progress
-from ehdr.typing.mkv_typing import MkvInfo, parse_mkv_info
+from ehdr.typedefs.mkv_typing import MkvInfo, parse_mkv_info
 
 def get_mkvmerge_path() -> str:
     """Get path to mkvmerge executable.

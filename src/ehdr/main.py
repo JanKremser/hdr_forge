@@ -7,7 +7,7 @@ from ehdr.cli import argument_parser
 from ehdr.cli.cli_output import create_progress_handler, finish_progress, print_conversion_summary
 from ehdr.cli.encoder import callback_handler_crop_video, print_encoding_params
 from ehdr.cli.video import print_video_infos
-from ehdr.typing.encoder_typing import EncoderSettings
+from ehdr.typedefs.encoder_typing import EncoderSettings
 from ehdr.encoder import Encoder
 from ehdr.video import Video
 from ehdr.hdr_formats.hdr10 import calc_maxcll

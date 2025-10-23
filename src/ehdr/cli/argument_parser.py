@@ -3,8 +3,8 @@
 import argparse
 
 from ehdr import __version__
-from ehdr.typing.encoder_typing import HdrSdrFormat, EncoderSettings, ScaleMode, VideoCodec
-from ehdr.typing.dolby_vision_typing import DolbyVisionProfileEncodingMode
+from ehdr.typedefs.encoder_typing import HdrSdrFormat, EncoderSettings, ScaleMode, VideoCodec
+from ehdr.typedefs.dolby_vision_typing import DolbyVisionProfileEncodingMode
 
 
 # Resolution constants
