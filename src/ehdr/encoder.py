@@ -6,7 +6,7 @@ import time
 from typing import Dict, Optional, Tuple
 
 from ehdr.cli.cli_output import create_progress_handler, finish_progress, print_err
-from ehdr.ffmpeg_wrapper import run_ffmpeg
+from ehdr.ffmpeg.ffmpeg_wrapper import run_ffmpeg
 from ehdr.container import mkv
 from ehdr.ffmpeg.video_codec.video_codec_base import VideoCodecBase
 from ehdr.ffmpeg.video_codec.libx264 import Libx264Codec
