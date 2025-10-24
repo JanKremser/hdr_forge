@@ -27,8 +27,9 @@ def print_encoding_params(encoder: Encoder) -> None:
     if video_codec_lib:
         v_param: dict = video_codec_lib.get_custom_lib_parameters()
         print(f"  Video Encoder Library: {color_str(video_codec_lib.name, color)}")
-        print(f"  CRF: {color_str(v_param.get('crf', '-'), color)}")
-        print(f"  Preset: {color_str(v_param.get('preset', '-'), color)}")
+        print(f"    CRF: {color_str(v_param.get('crf', '-'), color)}")
+        print(f"    Preset: {color_str(v_param.get('preset', '-'), color)}")
+        print(f"    Tune: {color_str(v_param.get('tune', '-'), color)}")
 
         crop: Tuple[int, int, int, int] | None = video_codec_lib.get_crop()
         if crop:

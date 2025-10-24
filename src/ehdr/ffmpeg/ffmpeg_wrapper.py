@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Callable, Dict, Optional
 
 from ehdr.cli.cli_output import print_err
-from ehdr.typedefs.ffmpeg_wrapper import ProgressInfo
+from ehdr.typedefs.ffmpeg_typing import ProgressInfo
 
 
 def _parse_progress_line(line: str, progress_data: Dict[str, str]) -> None:

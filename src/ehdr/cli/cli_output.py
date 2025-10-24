@@ -4,7 +4,7 @@ import time
 import subprocess
 from typing import Callable, Optional
 
-from ehdr.typedefs.ffmpeg_wrapper import ProgressInfo
+from ehdr.typedefs.ffmpeg_typing import ProgressInfo
 
 
 # Constants

@@ -1,6 +1,6 @@
 from typing import Tuple
 from ehdr.ffmpeg.video_codec.video_codec_base import VideoCodecBase
-from ehdr.typedefs.encoder_typing import EncoderSettings, HdrSdrFormat
+from ehdr.typedefs.encoder_typing import EncoderSettings, HdrSdrFormat, X264Params, X264Tune, x265_x264_Preset
 from ehdr.video import Video
 
 class Libx264Codec(VideoCodecBase):
@@ -26,17 +26,20 @@ class Libx264Codec(VideoCodecBase):
             scale=scale,
             supported_hdr_sdr_formats=self.HDR_SDR_SUPPORT,
         )
-        self._crf: int = encoder_settings.crf if encoder_settings.crf is not None else self._get_auto_crf()
-        self._preset: str = encoder_settings.preset if encoder_settings.preset is not None else self._get_auto_preset()
+        self._crf: int = self._get_auto_crf()
+        self._preset: x265_x264_Preset = self._get_auto_preset()
+        self._tune: X264Tune | None = encoder_settings.x264_prams.tune
 
     def get_ffmpeg_params(self) -> dict:
         output_options: dict = super().get_ffmpeg_params()
         output_options.update({
-            "preset": self._preset,
-            "preset": self._preset,
+            "preset": self._preset.value,
             "crf": str(self._crf),
             "pix_fmt": self.SDR_PIXEL_FORMAT,
         })
+
+        if self._tune is not None:
+            output_options['tune'] = self._tune.value
 
         x264_params: list[str] = self.SDR_X264_PARAMS
         output_options['x264-params'] = ':'.join(x264_params)
@@ -46,10 +49,11 @@ class Libx264Codec(VideoCodecBase):
     def get_custom_lib_parameters(self) -> dict:
         return {
             "crf": self._crf,
-            "preset": self._preset,
+            "preset": self._preset.value,
+            "tune": self._tune.value if self._tune else None,
         }
 
-    def _get_auto_preset(self) -> str:
+    def _get_auto_preset(self) -> x265_x264_Preset:
         """Select optimal encoding preset based on resolution.
 
         Returns:
@@ -58,22 +62,26 @@ class Libx264Codec(VideoCodecBase):
         TODO:
         slow bringt spürbare Vorteile, slower oder veryslow nur noch marginal — dafür viel mehr Zeit.
         """
+        x264_params: X264Params = self._encoder_settings.x264_prams
+        if x264_params.preset is not None:
+            return x264_params.preset
+
         pixels = self._get_pixel_count()
 
         # 4K+ (4096x2160 = 8,847,360 pixels)
         if pixels >= 8_847_361:
-            return 'superfast'
+            return x265_x264_Preset.SUPERFAST
 
         # 2K to 4K range
         if pixels >= 2_073_601:
-            return 'faster'
+            return x265_x264_Preset.FASTER
 
         # Full HD
         if pixels >= 2_073_600:
-            return 'fast'
+            return x265_x264_Preset.FAST
 
         # Lower resolutions
-        return 'medium'
+        return x265_x264_Preset.MEDIUM
 
     def _get_auto_crf(self) -> int:
         """Calculate optimal CRF value based on resolution.
@@ -83,6 +91,10 @@ class Libx264Codec(VideoCodecBase):
 
         2-5 points lower than libx265 for similar quality.
         """
+        x264_params: X264Params = self._encoder_settings.x264_prams
+        if x264_params.crf is not None:
+            return x264_params.crf
+
         pixels = self._get_pixel_count()
 
         # UHD 4K (3840x2160 = 8,294,400 pixels)

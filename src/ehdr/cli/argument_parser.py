@@ -5,7 +5,7 @@ import sys
 
 from ehdr import __version__
 from ehdr.cli.cli_output import print_err
-from ehdr.typedefs.encoder_typing import CropMode, CropSettings, HdrSdrFormat, EncoderSettings, SampleSettings, ScaleMode, VideoCodec
+from ehdr.typedefs.encoder_typing import CropMode, CropSettings, HdrSdrFormat, EncoderSettings, SampleSettings, ScaleMode, VideoCodec, X264Params, X264Tune, X265Params, X265Tune, x265_x264_Preset
 from ehdr.typedefs.dolby_vision_typing import DolbyVisionProfileEncodingMode
 from ehdr.typedefs.video_typing import ContentLightLevelMetadata, HdrMetadata, MasterDisplayMetadata
 
@@ -103,27 +103,71 @@ Examples:
     )
 
     convert_parser.add_argument(
-        '--crf',
-        type=int,
-        help='Constant Rate Factor for quality (lower = higher quality). Auto-calculated if not specified.'
+        '--x265-params',
+        help="""Custom x265 parameters for advanced users. Format:
+Example:
+    preset=medium,crf=20
+Parameters:
+    preset= : x265 encoding preset (ultrafast, superfast, veryfast, faster, fast, medium, slow, slower, veryslow)
+              [ultrafast] : Lowest compression, fastest encoding
+              [superfast] : Very low compression, very fast encoding
+              [veryfast]  : Low compression, fast encoding
+              [faster]    : Below average compression and speed
+              [fast]      : Slightly below average compression and speed
+              [medium]    : Balanced compression and speed
+              [slow]      : Above average compression, slower encoding
+              [slower]    : High compression, slow encoding
+              [veryslow]  : Maximum compression, very slow encoding
+    crf=    : Constant Rate Factor for quality control (lower = better quality).
+              The range of the CRF scale is 0–51
+    tune=   : x265 tuning for specific content types (animation, grain)
+"""
     )
 
     convert_parser.add_argument(
-        '-p', '--preset',
-        choices=['ultrafast', 'superfast', 'veryfast', 'faster',
-                 'fast', 'medium', 'slow', 'slower', 'veryslow'],
-        help="""Preset for encoder speed vs. compression ratio.
-[ultrafast] : Lowest compression, fastest encoding
-[superfast]  : Very low compression, very fast encoding
-[veryfast]   : Low compression, fast encoding
-[faster]     : Below average compression and speed
-[fast]       : Slightly below average compression and speed
-[medium]     : Balanced compression and speed
-[slow]       : Above average compression, slower encoding
-[slower]     : High compression, slow encoding
-[veryslow]   : Maximum compression, very slow encoding\n
+        '--x264-params',
+        help="""Custom x264 parameters for advanced users. Format:
+Example:
+    preset=medium,crf=20,tune=film
+Parameters:
+    preset= : x264 encoding preset (ultrafast, superfast, veryfast, faster, fast, medium, slow, slower, veryslow)
+              [ultrafast] : Lowest compression, fastest encoding
+              [superfast] : Very low compression, very fast encoding
+              [veryfast]  : Low compression, fast encoding
+              [faster]    : Below average compression and speed
+              [fast]      : Slightly below average compression and speed
+              [medium]    : Balanced compression and speed
+              [slow]      : Above average compression, slower encoding
+              [slower]    : High compression, slow encoding
+              [veryslow]  : Maximum compression, very slow encoding
+    crf=    : Constant Rate Factor for quality control (lower = better quality).
+              The range of the CRF scale is 0–51
+    tune=   : x264 tuning for specific content types (film, animation, grain)
 """
     )
+
+    # convert_parser.add_argument(
+    #     '--crf',
+    #     type=int,
+    #     help='Constant Rate Factor for quality (lower = higher quality). Auto-calculated if not specified.'
+    # )
+
+#     convert_parser.add_argument(
+#         '-p', '--preset',
+#         choices=['ultrafast', 'superfast', 'veryfast', 'faster',
+#                  'fast', 'medium', 'slow', 'slower', 'veryslow'],
+#         help="""Preset for encoder speed vs. compression ratio.
+# [ultrafast] : Lowest compression, fastest encoding
+# [superfast]  : Very low compression, very fast encoding
+# [veryfast]   : Low compression, fast encoding
+# [faster]     : Below average compression and speed
+# [fast]       : Slightly below average compression and speed
+# [medium]     : Balanced compression and speed
+# [slow]       : Above average compression, slower encoding
+# [slower]     : High compression, slow encoding
+# [veryslow]   : Maximum compression, very slow encoding\n
+# """
+#     )
 
     convert_parser.add_argument(
         '--crop',
@@ -389,7 +433,7 @@ def get_master_display_from_string(md_str: str | None) -> MasterDisplayMetadata 
             max_lum=max_lum
         )
     except (IndexError, ValueError):
-        print_err(f"Invalid master display value '{md_str}', using input video metadata")
+        print_err(f"Invalid master display value '{md_str}'")
         sys.exit(1)
 
 
@@ -411,8 +455,68 @@ def get_content_lightLevel_metadata_from_string(cll_str: str | None) -> ContentL
         maxfall = int(maxfall_str)
         return ContentLightLevelMetadata(maxcll=maxcll, maxfall=maxfall)
     except (ValueError, IndexError):
-        print_err(f"Invalid content light level value '{cll_str}', using input video metadata")
+        print_err(f"Invalid content light level value '{cll_str}'")
         sys.exit(1)
+
+def get_x265_params_from_string(params_str: str | None) -> X265Params:
+    """Convert x265 parameters argument string to X265Params object.
+
+    Args:
+        params_str: x265 parameters argument string
+
+    Returns:
+        X265Params object
+    """
+    params = X265Params()
+    if params_str is None:
+        return params
+
+    parts: list[str] = params_str.split(',')
+    try:
+        for part in parts:
+            if part.startswith('crf='):
+                params.crf = int(part.split('=')[1])
+                if not (0 <= params.crf <= 51):
+                    raise ValueError("CRF out of range")
+            elif part.startswith('preset='):
+                params.preset = x265_x264_Preset(part.split('=')[1])
+            elif part.startswith('tune='):
+                params.tune = X265Tune(part.split('=')[1])
+    except ValueError as err:
+        print_err(msg=f"Invalid x265 parameters value '{params_str}'. Err: {err}")
+        sys.exit(1)
+
+    return params
+
+def get_x264_params_from_string(params_str: str | None) -> X264Params:
+    """Convert x264 parameters argument string to X264Params object.
+
+    Args:
+        params_str: x264 parameters argument string
+
+    Returns:
+        X264Params object
+    """
+    params = X264Params()
+    if params_str is None:
+        return params
+
+    parts: list[str] = params_str.split(',')
+    try:
+        for part in parts:
+            if part.startswith('crf='):
+                params.crf = int(part.split('=')[1])
+                if not (0 <= params.crf <= 51):
+                    raise ValueError("CRF out of range")
+            elif part.startswith('preset='):
+                params.preset = x265_x264_Preset(part.split('=')[1])
+            elif part.startswith('tune='):
+                params.tune = X264Tune(part.split('=')[1])
+    except ValueError as err:
+        print_err(msg=f"Invalid x264 parameters value '{params_str}'. Err: {err}")
+        sys.exit(1)
+
+    return params
 
 def create_encoder_settings_from_args(args) -> EncoderSettings:
     """Create EncoderSettings object from parsed command-line arguments.
@@ -431,8 +535,8 @@ def create_encoder_settings_from_args(args) -> EncoderSettings:
         video_codec=get_video_codec_from_string(args.video_codec),
         hdr_sdr_format=get_hdr_sdr_format_from_string(args.hdr_sdr_format),
         target_dv_profile=get_dolby_vision_profile_from_string(args.dv_profile),
-        crf=args.crf,
-        preset=args.preset,
+        x265_prams=get_x265_params_from_string(getattr(args, 'x265_params', None)),
+        x264_prams=get_x264_params_from_string(getattr(args, 'x264_params', None)),
         scale_height=get_scale_height(args.scale),
         scale_mode=ScaleMode(args.scale_mode),
         crop=get_crop_settings_from_string(args.crop),

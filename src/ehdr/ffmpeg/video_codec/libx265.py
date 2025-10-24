@@ -1,6 +1,6 @@
 from typing import Optional, Tuple
 from ehdr.ffmpeg.video_codec.video_codec_base import VideoCodecBase
-from ehdr.typedefs.encoder_typing import EncoderSettings, HdrSdrFormat
+from ehdr.typedefs.encoder_typing import EncoderSettings, HdrSdrFormat, X265Params, X265Tune, x265_x264_Preset
 from ehdr.typedefs.video_typing import ContentLightLevelMetadata, MasterDisplayMetadata, build_master_display_string, build_max_cll_string
 from ehdr.video import Video
 
@@ -40,15 +40,19 @@ class Libx265Codec(VideoCodecBase):
             scale=scale,
             supported_hdr_sdr_formats=self.HDR_SDR_SUPPORT,
         )
-        self._crf: int = encoder_settings.crf if encoder_settings.crf is not None else self._get_auto_crf()
-        self._preset: str = encoder_settings.preset if encoder_settings.preset is not None else self._get_auto_preset()
+        self._crf: int = self._get_auto_crf()
+        self._preset: x265_x264_Preset = self._get_auto_preset()
+        self._tune: X265Tune | None = encoder_settings.x265_prams.tune
 
     def get_ffmpeg_params(self) -> dict:
         output_options: dict = super().get_ffmpeg_params()
         output_options.update({
-            "preset": self._preset,
+            "preset": self._preset.value,
             "crf": str(self._crf)
         })
+
+        if self._tune is not None:
+            output_options['tune'] = self._tune.value
 
         encoding_hdr_sdr_format: HdrSdrFormat = self.get_encoding_hdr_sdr_format()
 
@@ -69,7 +73,8 @@ class Libx265Codec(VideoCodecBase):
 
         return {
             "crf": self._crf,
-            "preset": self._preset,
+            "preset": self._preset.value,
+            "tune": self._tune.value if self._tune else None,
             "master-display": build_master_display_string(masterdisplay) if masterdisplay else None,
             "max-cll": build_max_cll_string(max_cll_max_fll) if max_cll_max_fll else None,
         }
@@ -119,28 +124,32 @@ class Libx265Codec(VideoCodecBase):
             params.append('max-cll=0,0')
         return params
 
-    def _get_auto_preset(self) -> str:
+    def _get_auto_preset(self) -> x265_x264_Preset:
         """Select optimal encoding preset based on resolution.
 
         Returns:
             Preset string (faster preset = quicker encoding, lower compression)
         """
+        x265_params: X265Params = self._encoder_settings.x265_prams
+        if x265_params.preset is not None:
+            return x265_params.preset
+
         pixels = self._get_pixel_count()
 
         # 4K+ (4096x2160 = 8,847,360 pixels)
         if pixels >= 8_847_361:
-            return 'superfast' # faster -> veryslow besser
+            return x265_x264_Preset.SUPERFAST # faster -> veryslow besser
 
         # 2K to 4K range
         if pixels >= 2_073_601:
-            return 'faster' # fast -> slow besser
+            return x265_x264_Preset.FASTER # fast -> slow besser
 
         # Full HD
         if pixels >= 2_073_600:
-            return 'fast' # medium
+            return x265_x264_Preset.FAST # medium
 
         # Lower resolutions
-        return 'medium' # fast -> medium ist aber auch ok, abhänig von CPU-Leistung
+        return x265_x264_Preset.MEDIUM # fast -> medium ist aber auch ok, abhänig von CPU-Leistung
 
     def _get_auto_crf(self) -> int:
         """Calculate optimal CRF value based on resolution.
@@ -153,6 +162,10 @@ class Libx265Codec(VideoCodecBase):
         TODO:
         Bei 10-Bit-Encoding kannst du den CRF-Wert um etwa +1 (manchmal sogar +2) erhöhen, ohne sichtbaren Qualitätsverlust.
         """
+        x265_params: X265Params = self._encoder_settings.x265_prams
+        if x265_params.crf is not None:
+            return x265_params.crf
+
         pixels: int = self._get_pixel_count()
 
         # UHD 4K (3840x2160 = 8,294,400 pixels)

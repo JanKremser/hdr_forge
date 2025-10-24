@@ -63,6 +63,38 @@ class SampleSettings:
     start_time: Optional[float] = None  # in seconds
     end_time: Optional[float] = None    # in seconds
 
+class x265_x264_Preset(Enum):
+    ULTRAFAST = "ultrafast"
+    SUPERFAST = "superfast"
+    VERYFAST = "veryfast"
+    FASTER = "faster"
+    FAST = "fast"
+    MEDIUM = "medium"
+    SLOW = "slow"
+    SLOWER = "slower"
+    VERYSLOW = "veryslow"
+
+class X265Tune(Enum):
+    ANIMATION = "animation"
+    GRAIN = "grain"
+
+@dataclass
+class X265Params:
+    preset: Optional[x265_x264_Preset] = None
+    crf: Optional[int] = None
+    tune: Optional[X265Tune] = None
+
+class X264Tune(Enum):
+    FILM = "film"
+    ANIMATION = "animation"
+    GRAIN = "grain"
+
+@dataclass
+class X264Params:
+    preset: Optional[x265_x264_Preset] = None
+    crf: Optional[int] = None
+    tune: Optional[X264Tune] = None
+
 
 @dataclass
 class EncoderSettings:
@@ -85,8 +117,10 @@ class EncoderSettings:
     hdr_metadata: HdrMetadata = field(default_factory=HdrMetadata)
     target_dv_profile: DolbyVisionProfileEncodingMode = DolbyVisionProfileEncodingMode.AUTO
 
-    crf: Optional[int] = None
-    preset: Optional[str] = None
+    # crf: Optional[int] = None
+    # preset: Optional[str] = None
+    x265_prams: X265Params = field(default_factory=X265Params)
+    x264_prams: X264Params = field(default_factory=X264Params)
     crop: CropSettings = field(default_factory=lambda: CropSettings(mode=CropMode.AUTO))
 
     scale_height: Optional[int] = None
