@@ -4,6 +4,7 @@ import time
 import subprocess
 from typing import Callable, Optional
 
+from ehdr.core import config
 from ehdr.typedefs.ffmpeg_typing import ProgressInfo
 
 
@@ -23,6 +24,7 @@ RED = '\033[91m'
 GREEN = '\033[92m'
 YELLOW = '\033[93m'
 BLUE = '\033[94m'
+PURPLE = '\033[95m'
 BLACK = '\033[30m'
 
 GREEN_BG = '\033[102m'
@@ -57,6 +59,7 @@ def color_str(value: str | int | float | None, color: str) -> str:
     """
     return f"{color}{str(value)}{RESET}"
 
+
 def print_warn(msg: str) -> None:
     """Print a warning message in yellow color.
 
@@ -65,6 +68,7 @@ def print_warn(msg: str) -> None:
     """
     print(f"{color_str('Warning:', YELLOW)} {msg}")
 
+
 def print_err(msg: str) -> None:
     """Print an error message in red color.
 
@@ -72,6 +76,18 @@ def print_err(msg: str) -> None:
         message: The error message to print
     """
     print(f"{color_str('Error:', RED)} {msg}")
+
+
+def print_debug(msg: str) -> None:
+    """Print an Debug message in blue color.
+
+    Args:
+        message: The Debug message to print
+    """
+    if config.debug_mode == False:
+        return
+    print(f"{color_str(f'Debug: {msg}', PURPLE)}")
+
 
 def create_progress_bar(percent: float, text: Optional[str] = None, width: int = PROGRESS_BAR_WIDTH) -> str:
     """Create a visual progress bar.
@@ -189,7 +205,6 @@ def print_progress_info(first_update: bool, current_frame: int, total_frames: in
     # Create progress bar
     progress_bar: str = create_progress_bar_with_percent(percent=percent)
 
-
     if time_seconds is None or (time_seconds == 0 and current_frame > 0):
         time_seconds = calculate_time_seconds_backup(
             current_frame=current_frame,
@@ -207,72 +222,43 @@ def print_progress_info(first_update: bool, current_frame: int, total_frames: in
             process_time_seconds=process_time_seconds,
             fps=fps,
         )
-    speed_str: str = f"{speed:.2f}x" if speed is not None else "--.-x"
+    speed_str: str = f"{speed:.2f}" if speed is not None else "--.-"
 
-    bitrate_str: str = f"{bitrate_kbs:.2f} kb/s" if bitrate_kbs is not None else "--.- kb/s"
+    bitrate_str: str = f"{bitrate_kbs:.2f}" if bitrate_kbs is not None else "--.-"
 
-    size_str: str = "--.- KB"
+    size_kb_str: str = "--.- KB"
+    size_gb_str: str = "--.- GB"
     if size_bytes is not None:
-        size_kb: float = size_bytes / 1024
-        size_gb: float = size_kb / 1024 / 1024
-        size_str: str = f"{size_bytes / 1024:.2f} KB ~> {size_gb:.2f} GB"
+        size_kb_str: str = f"{size_bytes / 1024:.2f}"
+        size_gb_str: str = f"{size_bytes / 1024 / 1024 / 1204:.2f}"
 
     # Estimate final file size
     estimated_size_bytes = estimate_final_size(size_bytes, current_frame, total_frames)
-    estimated_size_str = "--.- KB"
+    estimated_size_kb_str = "--.- KB"
+    estimated_size_gb_str = "--.- GB"
     if estimated_size_bytes is not None:
-        estimated_size_kb = estimated_size_bytes / 1024
-        estimated_size_gb = estimated_size_kb / 1024 / 1024
-        estimated_size_str = f"{estimated_size_bytes / 1024:.2f} KB ~> {estimated_size_gb:.2f} GB"
+        estimated_size_kb_str: str = f"{estimated_size_bytes / 1024:.2f}"
+        estimated_size_gb_str: str = f"{estimated_size_bytes / 1024 / 1024 / 1024:.2f}"
 
     # Format for multi-line output
     info_line: str = f"""
 {color_str("-" * 70, GREEN)}
 Frame         : {color_str(current_frame, GREEN)}/{total_frames}
-Speed         : {speed_str} | {fps} FPS
+Speed         : {color_str(speed_str, GREEN)}x | {color_str(fps, GREEN)} FPS
 
-ETA           : {eta}
+ETA           : {color_str(eta, GREEN)}
 Time          : {color_str(time_str, GREEN)}/{duration_str}
 Process Time  : {color_str(process_time_str, GREEN)}
 
-Bitrate       : {bitrate_str}
-Size          : {size_str}
-Final size    : {estimated_size_str}
+Bitrate       : {color_str(bitrate_str, GREEN)} kb/s
+Size          : {color_str(size_kb_str, GREEN)} KB ~> {color_str(size_gb_str, GREEN)} GB
+Final size    : {color_str(estimated_size_kb_str, GREEN)} KB ~> {color_str(estimated_size_gb_str, GREEN)} GB
 {progress_bar}
 {color_str("-" * 70, GREEN)}"""
 
     # For the first output, we only need to print both lines
     print(clear_lines(13) if first_update is False else "", end="")
     print(info_line, end="", flush=True)
-
-
-def finish_progress(duration: float, total_frames: int, process_start_time: float) -> None:
-    """Finalize the progress display by setting it to 100%.
-
-    Args:
-        total_frames: Total number of frames in the video
-        duration: Total video duration in seconds
-    """
-
-    process_time_seconds: float = _calc_process_time_seconds(
-        process_start_time=process_start_time
-    )
-
-    print_progress_info(
-        first_update=False,
-        current_frame=total_frames,
-        total_frames=total_frames,
-        duration_seconds=duration,
-        process_time_seconds=process_time_seconds,
-        fps=0.0,
-        speed=0.0,
-        time_seconds=duration,
-        bitrate_kbs=0.0,
-        size_bytes=None,
-    )
-
-    # Add an empty line after finishing progress
-    print()
 
 
 def create_progress_handler(duration: float, total_frames: int, process_start_time: float) -> Callable[[ProgressInfo], None]:

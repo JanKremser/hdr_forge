@@ -7,6 +7,7 @@ from ehdr.cli import argument_parser
 from ehdr.cli.cli_output import print_conversion_summary
 from ehdr.cli.encoder import print_encoding_params
 from ehdr.cli.video import print_video_infos
+from ehdr.core import config
 from ehdr.typedefs.encoder_typing import EncoderSettings
 from ehdr.encoder import Encoder
 from ehdr.video import Video
@@ -207,6 +208,7 @@ def process_info_command(args) -> None:
 def main() -> None:
     """Main entry point for CLI."""
     args = argument_parser.parse_args()
+    config.debug_mode = args.debug
 
     # Execute the corresponding subcommand
     if args.command == 'info':

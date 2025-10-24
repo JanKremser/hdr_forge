@@ -107,8 +107,6 @@ class EncoderSettings:
         video_encoder: VideoEncoder enum specifying the encoder to use
         target_format: Target color format (AUTO, SDR, HDR10, DOLBY_VISION)
         target_dv_profile: Dolby Vision profile for encoding (AUTO or 8)
-        crf: Constant Rate Factor for quality control (lower = better quality)
-        preset: x265 encoding preset (slower = better compression)
         scale_height: Target height for video scaling (downscaling only)
         crop: CropSettings object defining cropping behavior
     """
@@ -117,8 +115,6 @@ class EncoderSettings:
     hdr_metadata: HdrMetadata = field(default_factory=HdrMetadata)
     target_dv_profile: DolbyVisionProfileEncodingMode = DolbyVisionProfileEncodingMode.AUTO
 
-    # crf: Optional[int] = None
-    # preset: Optional[str] = None
     x265_prams: X265Params = field(default_factory=X265Params)
     x264_prams: X264Params = field(default_factory=X264Params)
     crop: CropSettings = field(default_factory=lambda: CropSettings(mode=CropMode.AUTO))

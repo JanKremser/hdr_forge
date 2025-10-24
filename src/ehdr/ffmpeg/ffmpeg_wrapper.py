@@ -120,7 +120,7 @@ def _progress_reader_thread(pipe, progress_callback: Callable[[ProgressInfo], No
             # When we get "progress=continue" or "progress=end", we have a complete update
             if line.startswith('progress='):
                 if progress_data:
-                    progress_info = _create_progress_info(progress_data)
+                    progress_info: ProgressInfo = _create_progress_info(progress_data=progress_data)
                     if progress_callback:
                         progress_callback(progress_info)
 

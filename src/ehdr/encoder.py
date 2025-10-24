@@ -5,13 +5,13 @@ import sys
 import time
 from typing import Dict, Optional, Tuple
 
-from ehdr.cli.cli_output import create_progress_handler, finish_progress, print_err
+from ehdr.cli.cli_output import create_progress_handler, print_err, print_debug
 from ehdr.ffmpeg.ffmpeg_wrapper import run_ffmpeg
 from ehdr.container import mkv
 from ehdr.ffmpeg.video_codec.video_codec_base import VideoCodecBase
 from ehdr.ffmpeg.video_codec.libx264 import Libx264Codec
 from ehdr.ffmpeg.video_codec.libx265 import Libx265Codec
-from ehdr.typedefs.encoder_typing import HdrSdrFormat, EncoderSettings, SampleSettings, VideoCodec, VideoEncoderLibrary
+from ehdr.typedefs.encoder_typing import HdrSdrFormat, EncoderSettings, SampleSettings, VideoCodec
 from ehdr.typedefs.dolby_vision_typing import DolbyVisionEnhancementLayer, DolbyVisionProfile, DolbyVisionProfileEncodingMode
 from ehdr.hdr_formats import dolby_vision
 from ehdr.video import Video
@@ -283,17 +283,11 @@ class Encoder:
         duration = self._video.get_duration_seconds()
 
         progress_callback = None
-        finish_callback = None
 
-        process_start_time = time.time()
+        process_start_time: float = time.time()
 
         if duration > 0:
             progress_callback = create_progress_handler(
-                duration=duration,
-                total_frames=total_frames,
-                process_start_time=process_start_time,
-            )
-            finish_callback = lambda: finish_progress(
                 duration=duration,
                 total_frames=total_frames,
                 process_start_time=process_start_time,
@@ -305,7 +299,7 @@ class Encoder:
 
             # Debug output
             debug_ffmpeg = ' '.join(f"-{k} {v}" for k, v in output_options.items())
-            print(f"ffmpeg command: ffmpeg -y -i {input_file} {debug_ffmpeg} {target_file}")
+            print_debug(f"ffmpeg command: ffmpeg -y -i {input_file} {debug_ffmpeg} {target_file}")
 
             # Execute FFmpeg with progress tracking
             success = run_ffmpeg(
@@ -314,15 +308,12 @@ class Encoder:
                 output_options=output_options,
                 progress_callback=progress_callback
             )
-
-            # Call finish callback if provided and successful
-            if success and finish_callback:
-                finish_callback()
+            print()
 
             return success
 
         except Exception as e:
-            print(f"Error during encoding: {e}")
+            print_err(f"Error during encoding: {e}")
             return False
 
     def convert_sdr_hdr10(

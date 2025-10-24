@@ -244,6 +244,12 @@ Input Video MaxCLL and MaxFALL values will be used if not specified.
 """
     )
 
+    convert_parser.add_argument(
+        '-d', '--debug',
+        action='store_true',
+        help='Enable debug output'
+    )
+
     return parser.parse_args()
 
 
