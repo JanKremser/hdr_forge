@@ -1,9 +1,9 @@
 from dataclasses import dataclass, field
 from enum import Enum
-from random import sample
 from typing import Optional
 
 from ehdr.typedefs.dolby_vision_typing import DolbyVisionProfileEncodingMode
+from ehdr.typedefs.video_typing import HdrMetadata
 
 
 @dataclass
@@ -82,10 +82,13 @@ class EncoderSettings:
     """
     video_codec: VideoCodec = VideoCodec.X265
     hdr_sdr_format: HdrSdrFormat = HdrSdrFormat.AUTO
+    hdr_metadata: HdrMetadata = field(default_factory=HdrMetadata)
     target_dv_profile: DolbyVisionProfileEncodingMode = DolbyVisionProfileEncodingMode.AUTO
+
     crf: Optional[int] = None
     preset: Optional[str] = None
+    crop: CropSettings = field(default_factory=lambda: CropSettings(mode=CropMode.AUTO))
+
     scale_height: Optional[int] = None
     scale_mode: ScaleMode = ScaleMode.HEIGHT
-    crop: CropSettings = field(default_factory=lambda: CropSettings(mode=CropMode.AUTO))
     sample: SampleSettings = field(default_factory=lambda: SampleSettings(enabled=False))

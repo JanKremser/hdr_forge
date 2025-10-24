@@ -5,6 +5,7 @@
 from ehdr.cli.cli_output import BLUE, color_str, create_aspect_ratio_str
 from ehdr.typedefs.dolby_vision_typing import DolbyVisionInfo
 from ehdr.typedefs.mkv_typing import MkvTrack
+from ehdr.typedefs.video_typing import MasterDisplayMetadata, build_master_display_string
 from ehdr.video import Video
 
 def print_video_infos(video: Video) -> None:
@@ -46,7 +47,8 @@ def print_video_infos(video: Video) -> None:
     print(f"  HDR/SDR: {color_str(video.get_hdr_sdr_format().value.upper(), color)}")
     if video.is_hdr_video():
         print("  HDR10 Metadata:")
-        print(f"    MasterDisplay: {color_str(video.get_master_display() or '-', color)}")
+        master_display: MasterDisplayMetadata | None = video.get_master_display()
+        print(f"    MasterDisplay: {color_str(build_master_display_string(master_display) if master_display else '-', color)}")
 
         max_cll_max_fall = video.get_max_cll_max_fall()
         if max_cll_max_fall:

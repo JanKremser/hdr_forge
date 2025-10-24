@@ -344,7 +344,7 @@ class Video:
         except ValueError:
             return None
 
-    def get_master_display(self) -> Optional[str]:
+    def get_master_display(self) -> Optional[MasterDisplayMetadata]:
         """Extract HDR master display metadata.
 
         Returns:
@@ -352,11 +352,7 @@ class Video:
         """
         if self._hdr_metadata.mastering_display_metadata:
             md: MasterDisplayMetadata = self._hdr_metadata.mastering_display_metadata
-            return (f"G({int(md.g_x*50000)},{int(md.g_y*50000)})"
-                    f"B({int(md.b_x*50000)},{int(md.b_y*50000)})"
-                    f"R({int(md.r_x*50000)},{int(md.r_y*50000)})"
-                    f"WP({int(md.wp_x*50000)},{int(md.wp_y*50000)})"
-                    f"L({int(md.max_lum*10000)},{int(md.min_lum*10000)})")
+            return md
 
         video_stream = self._get_video_stream()
         side_data = video_stream.get('side_data_list', [])
@@ -377,13 +373,23 @@ class Video:
 
                 if all([red_x, red_y, green_x, green_y, blue_x, blue_y,
                        white_x, white_y, max_lum, min_lum]):
-                    return (f"G({green_x},{green_y})"
-                           f"B({blue_x},{blue_y})"
-                           f"R({red_x},{red_y})"
-                           f"WP({white_x},{white_y})"
-                           f"L({max_lum},{min_lum})")
+                    return MasterDisplayMetadata(
+                        r_x=red_x,
+                        r_y=red_y,
+                        g_x=green_x,
+                        g_y=green_y,
+                        b_x=blue_x,
+                        b_y=blue_y,
+                        wp_x=white_x,
+                        wp_y=white_y,
+                        min_lum=min_lum,
+                        max_lum=max_lum,
+                    )
 
-        return DEFAULT_MASTER_DISPLAY
+        return None
+
+    def get_content_light_level_metadata(self) -> Optional[ContentLightLevelMetadata]:
+        return self._hdr_metadata.content_light_level_metadata
 
     def get_max_cll_max_fall(self, return_fallback: bool | None = False) -> Tuple[int, int] | None:
         """Extract HDR MaxCLL and MaxFALL metadata.

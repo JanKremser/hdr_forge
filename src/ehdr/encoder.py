@@ -247,22 +247,6 @@ class Encoder:
             except Exception as e:
                 print(f"Warning: Failed to clean up temporary directory {temp_dir}: {e}")
 
-    def get_encoding_video_library(self) -> VideoEncoderLibrary:
-        """Get the FFmpeg video codec library string.
-
-        Returns:
-            FFmpeg video codec library name
-        """
-        if self._target_video_codec == VideoCodec.X265:
-            return VideoEncoderLibrary.LIBX265
-        elif self._target_video_codec == VideoCodec.X264:
-            return VideoEncoderLibrary.LIBX264
-        elif self._target_video_codec == VideoCodec.COPY:
-            return VideoEncoderLibrary.COPY
-        else:
-            print_err(f"Unsupported video codec: {self._target_video_codec}")
-            sys.exit(1)
-
     def _build_ffmpeg_output_options(self) -> Dict[str, str]:
         """Build FFmpeg output options dictionary for encoding.
 

@@ -43,6 +43,11 @@ def print_encoding_params(encoder: Encoder) -> None:
         print(f"  Resolution: {color_str(f"{resolution_w}x{resolution_h}", color)}")
         print(f"  Aspect Ratio: {color_str(aspect_ratio, color)}")
         print(f"  HDR/SDR: {color_str(encoder.get_encoding_hdr_sdr_format().value.upper(), color)}")
+        if video_codec_lib.is_hdr_encoding():
+            masterdisplay: str | None = v_param.get("master-display", None)
+            print(f"    MasterDisplay: {color_str(masterdisplay or '-', color)}")
+            maxcll: str | None = v_param.get("max-cll", None)
+            print(f"    MaxCLL/MaxFALL: {color_str(maxcll or '-', color)}")
     if encoder.is_dolby_vision_encoding():
         dv_profile: DolbyVisionProfile | None = encoder.get_encoding_dolby_vision_profile()
         assert dv_profile is not None

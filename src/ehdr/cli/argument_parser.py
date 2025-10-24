@@ -7,6 +7,7 @@ from ehdr import __version__
 from ehdr.cli.cli_output import print_err
 from ehdr.typedefs.encoder_typing import CropMode, CropSettings, HdrSdrFormat, EncoderSettings, SampleSettings, ScaleMode, VideoCodec
 from ehdr.typedefs.dolby_vision_typing import DolbyVisionProfileEncodingMode
+from ehdr.typedefs.video_typing import ContentLightLevelMetadata, HdrMetadata, MasterDisplayMetadata
 
 
 # Resolution constants
@@ -161,6 +162,26 @@ Examples:
 [auto]   : Automatically determine target color format based on input video
 [hdr10]  : Convert to HDR10 format
 [sdr]    : Convert to SDR format\n
+"""
+    )
+
+    convert_parser.add_argument(
+        '--master-display',
+        help="""Set custom Master Display metadata for HDR10 videos. Format:
+G(x,y)B(x,y)R(x,y)WP(x,y)L(max,min)
+Example:
+--master-display "G(13250,34500)B(7500,30000)R(34000,16000)WP(15635,16450)L(1000,0.05)"
+Input Video Master Display metadata will be used if not specified.
+"""
+    )
+
+    convert_parser.add_argument(
+        '--max-cll',
+        help="""Set custom MaxCLL and MaxFALL values for HDR10 videos. Format:
+MaxCLL,MaxFALL
+Example:
+--max-cll "1000,400"
+Input Video MaxCLL and MaxFALL values will be used if not specified.
 """
     )
 
@@ -332,6 +353,67 @@ def get_sample_settings_from_string(sample_str: str | None) -> SampleSettings:
     return SampleSettings(enabled=False)
 
 
+def get_master_display_from_string(md_str: str | None) -> MasterDisplayMetadata | None:
+    """Convert master display argument string.
+
+    Args:
+        md_str: Master display argument string
+
+    Returns:
+        Master display MasterDisplayMetadata
+    """
+    if md_str is None:
+        return None
+
+    try:
+        parts = md_str.split('L(')
+        lum_part = parts[1].rstrip(')')
+        max_lum, min_lum = map(float, lum_part.split(','))
+
+        md_values = parts[0]
+        r_x = float(md_values.split('R(')[1].split(',')[0])
+        r_y = float(md_values.split('R(')[1].split(')')[0].split(',')[1])
+        g_x = float(md_values.split('G(')[1].split(',')[0])
+        g_y = float(md_values.split('G(')[1].split(')')[0].split(',')[1])
+        b_x = float(md_values.split('B(')[1].split(',')[0])
+        b_y = float(md_values.split('B(')[1].split(')')[0].split(',')[1])
+        wp_x = float(md_values.split('WP(')[1].split(',')[0])
+        wp_y = float(md_values.split('WP(')[1].split(')')[0].split(',')[1])
+
+        return MasterDisplayMetadata(
+            r_x=r_x, r_y=r_y,
+            g_x=g_x, g_y=g_y,
+            b_x=b_x, b_y=b_y,
+            wp_x=wp_x, wp_y=wp_y,
+            min_lum=min_lum,
+            max_lum=max_lum
+        )
+    except (IndexError, ValueError):
+        print_err(f"Invalid master display value '{md_str}', using input video metadata")
+        sys.exit(1)
+
+
+def get_content_lightLevel_metadata_from_string(cll_str: str | None) -> ContentLightLevelMetadata | None:
+    """Convert content light level argument string.
+
+    Args:
+        cll_str: Content light level argument string
+
+    Returns:
+        ContentLightLevelMetadata object
+    """
+    if cll_str is None:
+        return None
+
+    try:
+        maxcll_str, maxfall_str = cll_str.split(',')
+        maxcll = int(maxcll_str)
+        maxfall = int(maxfall_str)
+        return ContentLightLevelMetadata(maxcll=maxcll, maxfall=maxfall)
+    except (ValueError, IndexError):
+        print_err(f"Invalid content light level value '{cll_str}', using input video metadata")
+        sys.exit(1)
+
 def create_encoder_settings_from_args(args) -> EncoderSettings:
     """Create EncoderSettings object from parsed command-line arguments.
 
@@ -341,6 +423,10 @@ def create_encoder_settings_from_args(args) -> EncoderSettings:
     Returns:
         EncoderSettings object with all encoding parameters
     """
+    hdr_metadata = HdrMetadata(
+        mastering_display_metadata=get_master_display_from_string(getattr(args, 'master_display', None)),
+        content_light_level_metadata=get_content_lightLevel_metadata_from_string(getattr(args, 'max_cll', None))
+    )
     return EncoderSettings(
         video_codec=get_video_codec_from_string(args.video_codec),
         hdr_sdr_format=get_hdr_sdr_format_from_string(args.hdr_sdr_format),
@@ -351,4 +437,5 @@ def create_encoder_settings_from_args(args) -> EncoderSettings:
         scale_mode=ScaleMode(args.scale_mode),
         crop=get_crop_settings_from_string(args.crop),
         sample=get_sample_settings_from_string(args.sample),
+        hdr_metadata=hdr_metadata,
     )

@@ -1,6 +1,7 @@
 from typing import Optional, Tuple
 from ehdr.ffmpeg.video_codec.video_codec_base import VideoCodecBase
 from ehdr.typedefs.encoder_typing import EncoderSettings, HdrSdrFormat
+from ehdr.typedefs.video_typing import ContentLightLevelMetadata, MasterDisplayMetadata, build_master_display_string, build_max_cll_string
 from ehdr.video import Video
 
 class Libx265Codec(VideoCodecBase):
@@ -63,10 +64,29 @@ class Libx265Codec(VideoCodecBase):
         return output_options
 
     def get_custom_lib_parameters(self) -> dict:
+        masterdisplay: MasterDisplayMetadata | None = self._get_master_display_for_encoding()
+        max_cll_max_fll: ContentLightLevelMetadata | None = self._get_max_cll_for_encoding()
+
         return {
             "crf": self._crf,
             "preset": self._preset,
+            "master-display": build_master_display_string(masterdisplay) if masterdisplay else None,
+            "max-cll": build_max_cll_string(max_cll_max_fll) if max_cll_max_fll else None,
         }
+
+    def _get_master_display_for_encoding(self) -> Optional[MasterDisplayMetadata]:
+        master_display: MasterDisplayMetadata | None = self._encoder_settings.hdr_metadata.mastering_display_metadata
+        if master_display is None:
+            master_display: MasterDisplayMetadata | None = self._video.get_master_display()
+
+        return master_display
+
+    def _get_max_cll_for_encoding(self) -> Optional[ContentLightLevelMetadata]:
+        encoder_max_cll: ContentLightLevelMetadata | None = self._encoder_settings.hdr_metadata.content_light_level_metadata
+        if encoder_max_cll is None:
+            encoder_max_cll = self._video.get_content_light_level_metadata()
+
+        return encoder_max_cll
 
     def _build_hdr_x265_params(self) -> list[str]:
         """Build x265 parameters for HDR10 video encoding.
@@ -76,14 +96,13 @@ class Libx265Codec(VideoCodecBase):
         """
         params: list[str] = self.HDR_X265_PARAMS.copy()
 
-        master_display = self._video.get_master_display()
+        master_display: MasterDisplayMetadata | None = self._get_master_display_for_encoding()
         if master_display:
-            params.append(f'master-display={master_display}')
+            params.append(f'master-display={build_master_display_string(master_display)}')
 
-            max_cll_max_fall: Tuple[int, int] | None = self._video.get_max_cll_max_fall()
-            if max_cll_max_fall:
-                max_cll, max_fall = max_cll_max_fall
-                params.append(f'max-cll={max_cll},{max_fall}')
+            max_cll_max_fll: ContentLightLevelMetadata | None = self._get_max_cll_for_encoding()
+            if max_cll_max_fll:
+                params.append(f'max-cll={build_max_cll_string(max_cll_max_fll)}')
 
         return params
 

@@ -23,6 +23,7 @@ class VideoCodecBase(ABC):
         self.name = name
         self._video = video
         self._scale = scale
+        self._encoder_settings: EncoderSettings = encoder_settings
         self._supported_hdr_sdr_formats: list[HdrSdrFormat] = supported_hdr_sdr_formats
 
         self._hdr_sdr_format_for_encoding: HdrSdrFormat = self._get_hdr_sdr_format_for_encoding(
@@ -107,6 +108,14 @@ class VideoCodecBase(ABC):
             HdrSdrFormat used for encoding
         """
         return self._hdr_sdr_format_for_encoding
+
+    def is_hdr_encoding(self) -> bool:
+        """Check if encoding is HDR (HDR10 or Dolby Vision).
+
+        Returns:
+            True if encoding is HDR, False otherwise
+        """
+        return self._hdr_sdr_format_for_encoding in [HdrSdrFormat.HDR10, HdrSdrFormat.DOLBY_VISION]
 
     def is_cropped(self) -> bool:
         """Check if video has cropping applied.
