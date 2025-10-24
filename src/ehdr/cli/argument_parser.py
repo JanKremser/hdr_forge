@@ -174,7 +174,7 @@ Examples:
     convert_parser.add_argument(
         '--sample',
         help="""Process only a short sample of the video for testing purposes. Not supported for Dolby Vision encoding
-[auto]      : Process a 30 seconds sample from the middle of the video
+[auto]      : Process a 30 seconds sample starting at 1 minute into the video
 [start:end] : Specify start and end time in seconds (e.g., 60:90 for a sample from 1:00 to 1:30)\n
 """
     )

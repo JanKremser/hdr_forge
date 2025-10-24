@@ -113,10 +113,11 @@ class Encoder:
             end_time: float = max(start_time, min(sample_settings.end_time, video_duration))
             return (int(start_time), int(end_time))
 
-        # Auto sample: 30 seconds from middle of video
-        mid_point: float = video_duration / 2
-        start_time = max(0, mid_point - 15)
-        end_time = min(video_duration, mid_point + 15)
+        # Auto sample: 30 seconds starting at 1 minute
+        start_time = min(video_duration, 60)
+        end_time = min(video_duration, 60 + 30)
+        if start_time == video_duration:
+            start_time = 0
         return (int(start_time), int(end_time))
 
 
