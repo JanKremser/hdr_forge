@@ -29,7 +29,7 @@ class VideoCodecBase(ABC):
             hdr_sdr_format=encoder_settings.hdr_sdr_format
         )
         if self._hdr_sdr_format_for_encoding not in supported_hdr_sdr_formats:
-            print_err(f"{self.name} does not support the selected {encoder_settings.hdr_sdr_format}-format for encoding.")
+            print_err(f"{self.name} does not support the selected {self._hdr_sdr_format_for_encoding.value}-format for encoding.")
             sys.exit(1)
 
         self._crop_width: int = video.width
@@ -78,11 +78,13 @@ class VideoCodecBase(ABC):
                 ) + 'zscale=t=linear:npl=100,format=gbrpf32le,tonemap=tonemap=hable:desat=0,zscale=t=bt709:m=bt709:p=bt709:r=tv,format=yuv420p'
 
                 # Set correct metadata for SDR output
-                # output_options.update({
-                #     "metadata:s:v": "colour_primaries=bt709",
-                #     "metadata:s:v": "colour_transfer=bt709",
-                #     "metadata:s:v": "colour_space=bt709",
-                # })
+                output_options.update({
+                    "metadata:s:v": [
+                        "colour_primaries=bt709",
+                        "colour_transfer=bt709",
+                        "colour_space=bt709"
+                    ],
+                })
 
                 # Neu: 'zscale=t=linear:npl=100,format=gbrpf32le,tonemap=tonemap=hable:desat=0,zscale=t=bt709:m=bt709:p=bt709:r=tv,format=yuv420p'
                 # alt: 'zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,tonemap=tonemap=hable:desat=0,zscale=t=bt709:m=bt709:r=tv,format=yuv420p'

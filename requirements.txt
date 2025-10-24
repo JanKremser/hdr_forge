@@ -1,5 +1,4 @@
 # Python dependencies
-python-ffmpeg>=2.0.0
 numpy==2.3.4
 
 # EHDR also relies on external tools that must be installed separately:

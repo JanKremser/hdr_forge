@@ -5,9 +5,8 @@ import sys
 import time
 from typing import Dict, Optional, Tuple
 
-from ffmpeg import FFmpeg
-
 from ehdr.cli.cli_output import create_progress_handler, finish_progress, print_err
+from ehdr.ffmpeg_wrapper import run_ffmpeg
 from ehdr.container import mkv
 from ehdr.ffmpeg.video_codec.video_codec_base import VideoCodecBase
 from ehdr.ffmpeg.video_codec.libx264 import Libx264Codec
@@ -316,29 +315,26 @@ class Encoder:
             )
 
         try:
-            # Build ffmpeg command
-            ffmpeg = FFmpeg()
-            ffmpeg.option('y')
-            ffmpeg.input(str(input_file))
-
             # Build output options
             output_options: dict = self._build_ffmpeg_output_options()
-            ffmpeg.output(url=str(target_file), options=output_options)
 
+            # Debug output
             debug_ffmpeg = ' '.join(f"-{k} {v}" for k, v in output_options.items())
-            print(f"ffmpeg command: ffmpeg -i {input_file} {debug_ffmpeg} {target_file}")
+            print(f"ffmpeg command: ffmpeg -y -i {input_file} {debug_ffmpeg} {target_file}")
 
-            # Execute with optional progress tracking
-            if progress_callback:
-                ffmpeg.on('progress', progress_callback)
+            # Execute FFmpeg with progress tracking
+            success = run_ffmpeg(
+                input_file=input_file,
+                output_file=target_file,
+                output_options=output_options,
+                progress_callback=progress_callback
+            )
 
-            ffmpeg.execute()
-
-            # Call finish callback if provided
-            if finish_callback:
+            # Call finish callback if provided and successful
+            if success and finish_callback:
                 finish_callback()
 
-            return True
+            return success
 
         except Exception as e:
             print(f"Error during encoding: {e}")

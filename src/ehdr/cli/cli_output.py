@@ -2,10 +2,9 @@
 
 import time
 import subprocess
-from datetime import timedelta
 from typing import Callable, Optional
 
-from ffmpeg import Progress
+from ehdr.typedefs.ffmpeg_wrapper import ProgressInfo
 
 
 # Constants
@@ -198,7 +197,7 @@ def print_progress_info(first_update: bool, current_frame: int, total_frames: in
             duration_seconds=duration_seconds,
         )
     time_str: str = format_time(seconds=time_seconds) if time_seconds is not None else "--:--:--"
-    
+
     duration_str: str = format_time(seconds=duration_seconds) if duration_seconds is not None else "--:--:--"
     process_time_str: str = format_time(seconds=process_time_seconds)
 
@@ -276,7 +275,7 @@ def finish_progress(duration: float, total_frames: int, process_start_time: floa
     print()
 
 
-def create_progress_handler(duration: float, total_frames: int, process_start_time: float) -> Callable[[Progress], None]:
+def create_progress_handler(duration: float, total_frames: int, process_start_time: float) -> Callable[[ProgressInfo], None]:
     """Create a progress handler for ffmpeg encoding.
 
     Args:
@@ -287,18 +286,13 @@ def create_progress_handler(duration: float, total_frames: int, process_start_ti
     """
     first_update = True
 
-    def on_progress(progress: Progress) -> None:
+    def on_progress(progress: ProgressInfo) -> None:
         """Handle progress updates from ffmpeg."""
         nonlocal first_update
 
         time_seconds: float = 0.0
         if progress.time and duration > 0:
-            # Convert timedelta to seconds if necessary
-            time_seconds = (
-                progress.time.total_seconds()
-                if isinstance(progress.time, timedelta)
-                else float(progress.time)
-            )
+            time_seconds = progress.time
 
         current_frame: int = progress.frame
         fps: float = progress.fps if progress.fps else 0.0
