@@ -144,7 +144,7 @@ def inject_rpu(input_path: Path, input_rpu: Path, output_hevc: Optional[Path] = 
         dovi_cmd: list[str] = [
             dovi_tool_exec,
             'inject-rpu',
-            '-i', str(output_hevc),
+            '-i', str(input_path),
             '--rpu-in', str(input_rpu),
             '-o', str(output_hevc)
         ]

@@ -1,14 +1,22 @@
 from typing import Tuple
-from ehdr.cli.cli_output import print_err
-from ehdr.ffmpeg.base import CodecBase
+from ehdr.ffmpeg.video_codec.video_codec_base import VideoCodecBase
 from ehdr.typedefs.encoder_typing import EncoderSettings, HdrSdrFormat
 from ehdr.video import Video
 
-class Libx264Codec(CodecBase):
+class Libx264Codec(VideoCodecBase):
 
     HDR_SDR_SUPPORT: list[HdrSdrFormat] = [
         HdrSdrFormat.SDR,
     ]
+
+    # SDR x265 parameters
+    SDR_X264_PARAMS: list[str] = [
+        'colorprim=bt709',
+        'transfer=bt709',
+        'colormatrix=bt709',
+    ]
+
+    SDR_PIXEL_FORMAT = 'yuv420p'
 
     def __init__(self, encoder_settings: EncoderSettings, video: Video, scale: Tuple[int, int]):
         super().__init__(
@@ -22,11 +30,18 @@ class Libx264Codec(CodecBase):
         self._preset: str = encoder_settings.preset if encoder_settings.preset is not None else self._get_auto_preset()
 
     def get_ffmpeg_params(self) -> dict:
-        return {
-            "c:v": self.name,
+        output_options: dict = super().get_ffmpeg_params()
+        output_options.update({
             "preset": self._preset,
-            "crf": str(self._crf)
-        }
+            "preset": self._preset,
+            "crf": str(self._crf),
+            "pix_fmt": self.SDR_PIXEL_FORMAT,
+        })
+
+        x264_params: list[str] = self.SDR_X264_PARAMS
+        output_options['x264-params'] = ':'.join(x264_params)
+
+        return output_options
 
     def get_custom_lib_parameters(self) -> dict:
         return {
@@ -39,6 +54,9 @@ class Libx264Codec(CodecBase):
 
         Returns:
             Preset string (faster preset = quicker encoding, lower compression)
+
+        TODO:
+        slow bringt spürbare Vorteile, slower oder veryslow nur noch marginal — dafür viel mehr Zeit.
         """
         pixels = self._get_pixel_count()
 
@@ -63,7 +81,7 @@ class Libx264Codec(CodecBase):
         Returns:
             CRF value (lower = higher quality)
 
-        5 points lower than libx265 for similar quality.
+        2-5 points lower than libx265 for similar quality.
         """
         pixels = self._get_pixel_count()
 

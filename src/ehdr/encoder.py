@@ -1,21 +1,18 @@
 """Video encoder configuration and parameter building."""
 
-import math
-import subprocess
-from collections import Counter
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 import sys
-from typing import Callable, Dict, Optional, Tuple
+import time
+from typing import Dict, Optional, Tuple
 
 from ffmpeg import FFmpeg
 
-from ehdr.cli.cli_output import print_err, print_warn
+from ehdr.cli.cli_output import create_progress_handler, finish_progress, print_err
 from ehdr.container import mkv
-from ehdr.ffmpeg.base import CodecBase
-from ehdr.ffmpeg.libx264 import Libx264Codec
-from ehdr.ffmpeg.libx265 import Libx265Codec
-from ehdr.typedefs.encoder_typing import CropMode, CropSettings, HdrSdrFormat, CropHandler, EncoderSettings, SampleSettings, ScaleMode, VideoCodec, VideoEncoderLibrary
+from ehdr.ffmpeg.video_codec.video_codec_base import VideoCodecBase
+from ehdr.ffmpeg.video_codec.libx264 import Libx264Codec
+from ehdr.ffmpeg.video_codec.libx265 import Libx265Codec
+from ehdr.typedefs.encoder_typing import HdrSdrFormat, EncoderSettings, SampleSettings, VideoCodec, VideoEncoderLibrary
 from ehdr.typedefs.dolby_vision_typing import DolbyVisionEnhancementLayer, DolbyVisionProfile, DolbyVisionProfileEncodingMode
 from ehdr.hdr_formats import dolby_vision
 from ehdr.video import Video
@@ -24,32 +21,11 @@ from ehdr.video import Video
 class Encoder:
     """Handles video encoding configuration for different color formats."""
 
-    # HDR x265 parameters for HDR10 encoding
-    HDR_X265_PARAMS: list[str] = [
-        'hdr-opt=1',
-        'repeat-headers=1',
-        'colorprim=bt2020',
-        'transfer=smpte2084',
-        'colormatrix=bt2020nc',
-    ]
-
-    # SDR x265 parameters
-    SDR_X265_PARAMS: list[str] = [
-        'colorprim=bt709',
-        'transfer=bt709',
-        'colormatrix=bt709',
-        'no-hdr10-opt=1',
-    ]
-
-    HDR_PIXEL_FORMAT = 'yuv420p10le'
-    SDR_PIXEL_FORMAT = 'yuv420p'
-
     def __init__(
         self,
         video: Video,
         target_file: Path,
         settings: EncoderSettings,
-        crop_callback: Optional[Callable[[CropHandler], None]] = None,
     ):
         """Initialize encoder with video and encoder settings.
 
@@ -63,27 +39,7 @@ class Encoder:
         self._target_file: Path = target_file
         self._target_video_codec: VideoCodec = settings.video_codec
 
-        # Crop dimensions (initialized to full frame)
-        self._crop_width: int = video.width
-        self._crop_height: int = video.height
-        self._crop_x = 0
-        self._crop_y = 0
-
-        # crop video
-        self._crop_video(
-            crop_settings=settings.crop,
-            callback=crop_callback,
-        )
-
-        # Scale dimensions
-        self._scale_width: Optional[int]
-        self._scale_height: Optional[int]
-        self._scale_width, self._scale_height = self._determine_scale_width_height(
-            scale_mode=settings.scale_mode,
-            new_height=settings.scale_height,
-        )
-
-        self._video_codec_lib: CodecBase | None = self._get_video_codec_lib_instance(
+        self._video_codec_lib: VideoCodecBase | None = self._get_video_codec_lib_instance(
             video=video,
             encoder_settings=settings,
             scale_tuple=(video.width, video.height),
@@ -102,37 +58,34 @@ class Encoder:
             sample_settings=settings.sample,
         )
 
-    def _get_video_codec_lib_instance(self, encoder_settings: EncoderSettings, video: Video, scale_tuple: Tuple[int, int]) -> CodecBase | None:
+    def _get_video_codec_lib_instance(
+        self,
+        encoder_settings: EncoderSettings,
+        video: Video,
+        scale_tuple: Tuple[int, int],
+    ) -> VideoCodecBase | None:
         """Get the codec library instance based on target video codec.
 
         Args:
             encoder_settings: EncoderSettings object with encoding parameters
 
         Returns:
-            CodecBase instance for the selected video codec
+            VideoCodecBase instance for the selected video codec
         """
-        if self._target_video_codec == VideoCodec.X265:
-            return Libx265Codec( encoder_settings=encoder_settings, video=video, scale=scale_tuple)
-        elif self._target_video_codec == VideoCodec.X264:
+        if encoder_settings.video_codec == VideoCodec.X265:
+            return Libx265Codec(encoder_settings=encoder_settings, video=video, scale=scale_tuple)
+        elif encoder_settings.video_codec == VideoCodec.X264:
             return Libx264Codec(encoder_settings=encoder_settings, video=video, scale=scale_tuple)
 
         return None
 
-    def get_video_codec_lib(self) -> CodecBase | None:
+    def get_video_codec_lib(self) -> VideoCodecBase | None:
         """Get the codec library instance.
 
         Returns:
-            CodecBase instance or None if copying
+            VideoCodecBase instance or None if copying
         """
         return self._video_codec_lib
-
-    def get_encoding_resolution(self) -> Tuple[int, int]:
-        if self._scale_width and self._scale_height:
-            return self._scale_width, self._scale_height
-
-        if self._is_cropped():
-            return self._crop_width, self._crop_height
-        return self._video.width, self._video.height
 
     def _determine_video_sample(
         self,
@@ -167,64 +120,6 @@ class Encoder:
         end_time = min(video_duration, mid_point + 15)
         return (int(start_time), int(end_time))
 
-    def _determine_scale_width_height(
-        self,
-        scale_mode: ScaleMode = ScaleMode.HEIGHT,
-        new_height: Optional[int] = None,
-    ) -> Tuple[Optional[int], Optional[int]]:
-        """Get target scale dimensions if scaling is enabled.
-
-        Returns:
-            Tuple of (width, height) or None if scaling is not applied
-        """
-        if new_height is None or new_height > self._video.height:
-            return None, None
-
-        orginal_aspect_ratio: float = self._video.width / self._video.height
-        new_scale_width = math.ceil(new_height * orginal_aspect_ratio)
-        new_scale_height = new_height
-
-        def __check_rounding(w: int, h: int) -> Tuple[int, int]:
-            new_w: int = w
-            new_h: int = h
-            if w % 2 != 0:
-                new_w -= 1
-            if h % 2 != 0:
-                new_h -= 1
-
-            return new_w, new_h
-
-        if self._is_cropped() is False:
-            return __check_rounding(new_scale_width, new_scale_height)
-
-        new_aspect_ratio: float = self._crop_width / self._crop_height
-
-        if scale_mode == ScaleMode.HEIGHT:
-            # scale-mode height
-
-            height: int
-            if self._crop_height < new_scale_height:
-                height = self._crop_height
-            else:
-                height = new_scale_height
-
-            width: int = math.floor(height * new_aspect_ratio)
-
-            return __check_rounding(width, height)
-
-        if scale_mode == ScaleMode.ADAPTIVE:
-            # scale-mode adaptive
-            if self._crop_width > new_scale_width:
-                new_scale_height = math.floor(new_scale_width / new_aspect_ratio)
-                return (new_scale_width, new_scale_height)
-
-            if self._crop_height > new_scale_height:
-                new_scale_width = math.ceil(new_scale_height * new_aspect_ratio)
-                return (new_scale_width, new_scale_height)
-
-            return __check_rounding(self._crop_width, self._crop_height)
-
-        return None, None
 
     def _determine_dv_enhancement_layer(
         self,
@@ -314,210 +209,6 @@ class Encoder:
         """Check if encoding to SDR format."""
         return self.get_encoding_hdr_sdr_format() == HdrSdrFormat.SDR
 
-    def _is_cropped(self) -> bool:
-        """Check if video has cropping applied.
-
-        Returns:
-            True if cropping is applied, False otherwise
-        """
-        return (self._crop_width != self._video.width or
-                self._crop_height != self._video.height or
-                self._crop_x != 0 or
-                self._crop_y != 0)
-
-    def _detect_crop_at_position(self, position_seconds: int) -> Optional[Tuple[int, int, int, int]]:
-        """Detect crop parameters at a specific video position.
-
-        Args:
-            position_seconds: Time position in seconds to analyze
-
-        Returns:
-            Tuple of (width, height, x, y) or None if detection fails
-        """
-        hdr_cropdetect_filter: str = ""
-        if self._video.is_hdr_video():
-            hdr_cropdetect_filter = "zscale=transfer=bt709,format=yuv420p,hqdn3d=1.5:1.5:6:6,"
-
-        cmd: list[str] = [
-            'ffmpeg',
-            '-ss', str(position_seconds),
-            '-i', str(self._video._filepath),
-            '-vf', f'{hdr_cropdetect_filter}cropdetect=24:16:0',
-            '-frames:v', '30',
-            '-f', 'null',
-            '-'
-        ]
-
-        try:
-            result: subprocess.CompletedProcess[str] = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=30
-            )
-
-            # Parse cropdetect output
-            import re
-            crop_pattern = re.compile(r'crop=(\d+):(\d+):(\d+):(\d+)')
-
-            for line in result.stderr.split('\n'):
-                match = crop_pattern.search(line)
-                if match:
-                    w, h, x, y = map(int, match.groups())
-                    return (w, h, x, y)
-
-        except (subprocess.TimeoutExpired, Exception):
-            pass
-
-        return None
-
-    def _detect_crop_auto(
-        self,
-        check_samples: int = 10,
-        callback: Optional[Callable[[CropHandler], None]] = None,
-    ) -> Optional[Tuple[int, int, int, int]]:
-        if callback:
-            callback(CropHandler(
-                finish_progress=False,
-                completed_samples=0,
-                total_samples=check_samples,
-            ))
-
-        # Get video duration
-        duration = self._video.get_duration_seconds()
-
-        if duration <= 0:
-            return
-
-        # Calculate positions to sample (evenly distributed)
-        interval: float = duration / (check_samples + 1)
-        positions: list[int] = [int(interval * (i + 1)) for i in range(check_samples)]
-
-        # Run crop detection in parallel
-        crop_results: list = []
-        completed = 0
-        with ThreadPoolExecutor(max_workers=check_samples) as executor:
-            futures = {
-                executor.submit(self._detect_crop_at_position, pos): pos
-                for pos in positions
-            }
-
-            for future in as_completed(futures):
-                result = future.result()
-                if result:
-                    crop_results.append(result)
-                completed += 1
-
-                if callback:
-                    callback(CropHandler(
-                        finish_progress=False,
-                        completed_samples=completed,
-                        total_samples=check_samples,
-                    ))
-
-        # Send final crop handler
-        if callback:
-            callback(CropHandler(
-                finish_progress=True,
-                completed_samples=completed,
-                total_samples=check_samples,
-            ))
-
-        if not crop_results:
-            return
-
-        # Find most common crop dimensions
-        crop_counter = Counter(crop_results)
-        most_common_crop: Tuple[int, int, int, int] = crop_counter.most_common(1)[0][0]
-
-        return most_common_crop
-
-    def _crop_video(
-        self,
-        crop_settings: CropSettings,
-        callback: Optional[Callable[[CropHandler], None]] = None,
-    ) -> None:
-        """Detect and apply optimal crop parameters using multi-threaded analysis.
-
-        Args:
-            num_threads: Number of concurrent threads for crop detection
-            callback: Optional callback function for progress updates
-        """
-
-        if (
-            self._target_video_codec == VideoCodec.COPY
-        ):
-            return
-
-        if crop_settings.mode == CropMode.OFF:
-            return
-
-        if (
-            self.is_dolby_vision_encoding()
-        ):
-            print_err(msg="Crop detection is not supported for Dolby Vision encoding.")
-            sys.exit(1)
-
-        if crop_settings.mode == CropMode.AUTO:
-            c: Tuple[int, int, int, int] | None = self._detect_crop_auto(
-                check_samples=10,
-                callback=callback,
-            )
-            if c is None:
-                print_warn("Auto crop detection failed or no crop needed.")
-                return
-            self._crop_width, self._crop_height, self._crop_x, self._crop_y = c
-
-        if crop_settings.mode == CropMode.MANUAL:
-            if crop_settings.manual_crop is not None:
-                self._crop_x, self._crop_y, self._crop_width, self._crop_height = crop_settings.manual_crop
-
-        if crop_settings.mode == CropMode.RATIO:
-            if crop_settings.ratio is not None:
-                ar_w, ar_h = crop_settings.ratio
-                target_aspect_ratio: float = ar_w / ar_h
-                current_aspect_ratio: float = self._video.width / self._video.height
-
-                if current_aspect_ratio > target_aspect_ratio:
-                    # Video is wider than target aspect ratio - crop width
-                    new_width: int = int(self._video.height * target_aspect_ratio)
-                    self._crop_width = new_width
-                    self._crop_height = self._video.height
-                    self._crop_x = (self._video.width - new_width) // 2
-                    self._crop_y = 0
-                elif current_aspect_ratio < target_aspect_ratio:
-                    # Video is taller than target aspect ratio - crop height
-                    new_height: int = int(self._video.width / target_aspect_ratio)
-                    self._crop_width = self._video.width
-                    self._crop_height = new_height
-                    self._crop_x = 0
-                    self._crop_y = (self._video.height - new_height) // 2
-                else:
-                    # Aspect ratios match - no cropping needed
-                    pass
-
-
-
-    def get_crop_filter(self) -> Optional[str]:
-        """Get ffmpeg crop filter string if cropping is needed.
-
-        Returns:
-            Crop filter string or None if no cropping needed
-        """
-        if self._is_cropped():
-            return f"crop={self._crop_width}:{self._crop_height}:{self._crop_x}:{self._crop_y}"
-        return None
-
-    def get_scale_filter(self) -> Optional[str]:
-        """Get ffmpeg scale filter string if scaling is needed.
-
-        Returns:
-            Scale filter string or None if no scaling needed
-        """
-        if self._scale_width and self._scale_height:
-            return f"scale={self._scale_width}:{self._scale_height}"
-        return None
-
     def get_target_file(self) -> Path:
         """Get the target output file path.
 
@@ -597,78 +288,33 @@ class Encoder:
             output_options['ss'] = str(start_time)
             output_options['t'] = str(end_time-start_time)
 
-        if self.get_encoding_video_library() == VideoCodec.COPY:
-            return output_options
-
-        # Add video filters (crop and scale), Only for SDR/HDR10 encoding
-        if self.is_dolby_vision_encoding() is False:
-            crop_filter: str | None = self.get_crop_filter()
-            if crop_filter:
-                output_options['vf'] = crop_filter
-
-            scale_filter: str | None = self.get_scale_filter()
-            if scale_filter:
-                if 'vf' in output_options:
-                    output_options['vf'] += f',{scale_filter}'
-                else:
-                    output_options['vf'] = scale_filter
-
-        # Add format-specific parameters
-        if self.is_hdr10_encoding() or self.is_dolby_vision_encoding():
-            x265_params: list[str] = self._build_hdr_x265_params()
-            output_options['pix_fmt'] = self.HDR_PIXEL_FORMAT
-            output_options['x265-params'] = ':'.join(x265_params)
-        elif self.is_sdr_encoding():
-            x265_params: list[str] = self._build_sdr_x265_params()
-            output_options['pix_fmt'] = self.SDR_PIXEL_FORMAT
-            output_options['x265-params'] = ':'.join(x265_params)
-            if self._video.is_hdr_video():
-                # Tone mapping for HDR to SDR conversion
-                output_options['vf'] = (
-                    (output_options.get('vf', '') + ',') if 'vf' in output_options else ''
-                ) + 'zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,tonemap=tonemap=hable:desat=0,zscale=t=bt709:m=bt709:r=tv,format=yuv420p'
-
         return output_options
-
-    def _build_hdr_x265_params(self) -> list[str]:
-        """Build x265 parameters for HDR10 video encoding.
-
-        Returns:
-            list of x265 parameter strings
-        """
-        params: list[str] = self.HDR_X265_PARAMS.copy()
-
-        master_display = self._video.get_master_display()
-        if master_display:
-            params.append(f'master-display={master_display}')
-
-            max_cll_max_fall: Tuple[int, int] | None = self._video.get_max_cll_max_fall()
-            if max_cll_max_fall:
-                max_cll, max_fall = max_cll_max_fall
-                params.append(f'max-cll={max_cll},{max_fall}')
-
-        return params
-
-    def _build_sdr_x265_params(self) -> list[str]:
-        """Build x265 parameters for SDR video encoding.
-
-        Returns:
-            list of x265 parameter strings
-        """
-        params: list[str] = self.SDR_X265_PARAMS.copy()
-        if self._video.is_hdr_video():
-            # remove HDR metadata if present
-            params.append('master-display=G(0,0)B(0,0)R(0,0)WP(0,0)L(0,0)')
-            params.append('max-cll=0,0')
-        return params
 
     def _run_ffmpeg_encoding_process(
         self,
         input_file: Path,
         target_file: Path,
-        progress_callback: Optional[Callable] = None,
-        finish_callback: Optional[Callable] = None,
     ):
+        total_frames = self._video.get_total_frames()
+        duration = self._video.get_duration_seconds()
+
+        progress_callback = None
+        finish_callback = None
+
+        process_start_time = time.time()
+
+        if duration > 0:
+            progress_callback = create_progress_handler(
+                duration=duration,
+                total_frames=total_frames,
+                process_start_time=process_start_time,
+            )
+            finish_callback = lambda: finish_progress(
+                duration=duration,
+                total_frames=total_frames,
+                process_start_time=process_start_time,
+            )
+
         try:
             # Build ffmpeg command
             ffmpeg = FFmpeg()
@@ -678,6 +324,9 @@ class Encoder:
             # Build output options
             output_options: dict = self._build_ffmpeg_output_options()
             ffmpeg.output(url=str(target_file), options=output_options)
+
+            debug_ffmpeg = ' '.join(f"-{k} {v}" for k, v in output_options.items())
+            print(f"ffmpeg command: ffmpeg -i {input_file} {debug_ffmpeg} {target_file}")
 
             # Execute with optional progress tracking
             if progress_callback:
@@ -697,8 +346,6 @@ class Encoder:
 
     def convert_sdr_hdr10(
         self,
-        progress_callback: Optional[Callable] = None,
-        finish_callback: Optional[Callable] = None,
     ) -> bool:
         """Execute FFmpeg conversion with configured parameters.
 
@@ -715,8 +362,6 @@ class Encoder:
         return self._run_ffmpeg_encoding_process(
             input_file=input_file,
             target_file=self._target_file,
-            progress_callback=progress_callback,
-            finish_callback=finish_callback,
         )
 
     def convert_dolby_vision_to_hdr10_without_re_encoding(
@@ -747,8 +392,6 @@ class Encoder:
 
     def convert_dolby_vision(
         self,
-        progress_callback: Optional[Callable] = None,
-        finish_callback: Optional[Callable] = None,
     ) -> bool:
         """Convert Dolby Vision video by re-encoding base layer and re-injecting RPU.
 
@@ -812,8 +455,6 @@ class Encoder:
         encoding_success: bool = self._run_ffmpeg_encoding_process(
             input_file=Path(base_layer_mkv_path),
             target_file=encoded_base_layer_mkv,
-            progress_callback=progress_callback,
-            finish_callback=finish_callback,
         )
         # Cleanup: Delete base layer MKV (no longer needed after encoding)
         base_layer_mkv_path.unlink(missing_ok=True)
@@ -881,8 +522,6 @@ class Encoder:
 
     def convert(
         self,
-        progress_callback: Optional[Callable] = None,
-        finish_callback: Optional[Callable] = None,
     ) -> bool:
         if self._video.is_dolby_vision_video():
 
@@ -894,12 +533,6 @@ class Encoder:
                 return self.convert_dolby_vision_to_hdr10_without_re_encoding()
 
             # Dolby Vision encoding workflow
-            return self.convert_dolby_vision(
-                progress_callback=progress_callback,
-                finish_callback=finish_callback
-            )
+            return self.convert_dolby_vision()
 
-        return self.convert_sdr_hdr10(
-            progress_callback=progress_callback,
-            finish_callback=finish_callback
-        )
+        return self.convert_sdr_hdr10()

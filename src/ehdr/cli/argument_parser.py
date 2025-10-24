@@ -111,7 +111,17 @@ Examples:
         '-p', '--preset',
         choices=['ultrafast', 'superfast', 'veryfast', 'faster',
                  'fast', 'medium', 'slow', 'slower', 'veryslow'],
-        help='Encoding preset (speed vs compression). Auto-calculated if not specified.'
+        help="""Preset for encoder speed vs. compression ratio.
+[ultrafast] : Lowest compression, fastest encoding
+[superfast]  : Very low compression, very fast encoding
+[veryfast]   : Low compression, fast encoding
+[faster]     : Below average compression and speed
+[fast]       : Slightly below average compression and speed
+[medium]     : Balanced compression and speed
+[slow]       : Above average compression, slower encoding
+[slower]     : High compression, slow encoding
+[veryslow]   : Maximum compression, very slow encoding\n
+"""
     )
 
     convert_parser.add_argument(
@@ -119,7 +129,7 @@ Examples:
         help="""Crop black bars from video. Not supported for Dolby Vision encoding.
 [auto]             : Automatically detect and crop black bars
 [width:height:x:y] : Manually specify crop dimensions. The basis for the calculation is the original video, not the target resolution.
-[ratio]            : 16:9, 21:9 etc. to crop to specific aspect ratio
+[16:9] or [1.77:1] : 16:9, 21:9 etc. to crop to specific aspect ratio
 [cinema]           : CinemaScope Classic 2.35:1 ratio\n
 [cinema-modern]    : CinemaScope Modern 2.39:1 ratio\n
 """
@@ -147,7 +157,11 @@ Examples:
         '--hdr-sdr-format',
         choices=['auto', 'hdr10', 'sdr'],
         default='auto',
-        help='Target color format for output video (auto = keep source format, hdr10 = convert to HDR10, sdr = convert to SDR)'
+        help="""User-specified target color format for the output video.
+[auto]   : Automatically determine target color format based on input video
+[hdr10]  : Convert to HDR10 format
+[sdr]    : Convert to SDR format\n
+"""
     )
 
     convert_parser.add_argument(
@@ -246,6 +260,8 @@ def get_video_codec_from_string(codec_str: str | None) -> VideoCodec:
     codec_str = codec_str.lower()
     if codec_str == 'copy':
         return VideoCodec.COPY
+    elif codec_str == 'x264':
+        return VideoCodec.X264
 
     return VideoCodec.X265
 

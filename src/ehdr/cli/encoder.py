@@ -1,11 +1,9 @@
 """CLI output and progress tracking functionality."""
 
-
-
-from ehdr.cli.cli_output import BLUE, color_str, create_aspect_ratio_str, create_progress_bar
-from ehdr.ffmpeg.base import CodecBase
+from typing import Tuple
+from ehdr.cli.cli_output import BLUE, color_str, create_aspect_ratio_str
+from ehdr.ffmpeg.video_codec.video_codec_base import VideoCodecBase
 from ehdr.typedefs.dolby_vision_typing import DolbyVisionEnhancementLayer, DolbyVisionProfile
-from ehdr.typedefs.encoder_typing import CropHandler
 from ehdr.encoder import Encoder
 
 
@@ -25,19 +23,22 @@ def print_encoding_params(encoder: Encoder) -> None:
 
     video_codec = encoder.get_encoding_video_codec()
     print(f"  Video Codec: {color_str(video_codec.value, color)}")
-    video_codec_lib: CodecBase | None = encoder.get_video_codec_lib()
+    video_codec_lib: VideoCodecBase | None = encoder.get_video_codec_lib()
     if video_codec_lib:
         v_param: dict = video_codec_lib.get_custom_lib_parameters()
         print(f"  Video Encoder Library: {color_str(video_codec_lib.name, color)}")
         print(f"  CRF: {color_str(v_param.get('crf', '-'), color)}")
         print(f"  Preset: {color_str(v_param.get('preset', '-'), color)}")
-        if encoder._is_cropped():
-            crop_filter: str | None = encoder.get_crop_filter()
+
+        crop: Tuple[int, int, int, int] | None = video_codec_lib.get_crop()
+        if crop:
+            width, height, x, y = crop
+            crop_filter: str | None = f"{width}:{height}:{x}:{y}"
             print(f"  Crop: {color_str(crop_filter, color)}")
         else:
             print(f"  Crop: {color_str('-', color)}")
 
-        resolution_w, resolution_h = encoder.get_encoding_resolution()
+        resolution_w, resolution_h = video_codec_lib.get_encoding_resolution()
         aspect_ratio: str = create_aspect_ratio_str(resolution_w, resolution_h)
         print(f"  Resolution: {color_str(f"{resolution_w}x{resolution_h}", color)}")
         print(f"  Aspect Ratio: {color_str(aspect_ratio, color)}")
@@ -57,23 +58,3 @@ def print_encoding_params(encoder: Encoder) -> None:
         print(f"    Enhancement Layer (EL): {color_str(dv_el_str or '-', color)}")
     print(f"{color_str('_', color)}" * 70)
     print()
-
-def callback_handler_crop_video(crop_handler: CropHandler) -> None:
-    """Callback handler for crop video progress.
-
-    Args:
-        crop_handler: CropHandler instance
-        message: Optional message to display
-    """
-
-    if crop_handler.finish_progress:
-        print()  # New line on completion
-        return
-
-    completed_samples = crop_handler.completed_samples
-    total_samples = crop_handler.total_samples
-    percent: float = (completed_samples / total_samples * 100) if total_samples > 0 else 0.0
-    progress_bar: str = create_progress_bar(percent=percent)
-    if completed_samples == 0:
-        print("\nCropping Progress:")
-    print(f"\r{progress_bar} {percent:.1f}% | {completed_samples}/{total_samples}", end="", flush=True)

@@ -4,8 +4,8 @@ import sys
 from pathlib import Path
 
 from ehdr.cli import argument_parser
-from ehdr.cli.cli_output import create_progress_handler, finish_progress, print_conversion_summary
-from ehdr.cli.encoder import callback_handler_crop_video, print_encoding_params
+from ehdr.cli.cli_output import print_conversion_summary
+from ehdr.cli.encoder import print_encoding_params
 from ehdr.cli.video import print_video_infos
 from ehdr.typedefs.encoder_typing import EncoderSettings
 from ehdr.encoder import Encoder
@@ -101,27 +101,12 @@ def convert_video(
         video=video,
         target_file=target_file,
         settings=settings,
-        crop_callback=callback_handler_crop_video,
     )
 
     try:
         print_encoding_params(encoder=encoder)
 
-        # Prepare progress monitoring
-        total_frames = video.get_total_frames()
-        duration = video.get_duration_seconds()
-
-        progress_handler = None
-        finish_callback = None
-
-        if duration > 0:
-            progress_handler = create_progress_handler(duration=duration, total_frames=total_frames)
-            finish_callback = lambda: finish_progress(total_frames=total_frames, duration=duration)
-
-        success: bool = encoder.convert(
-            progress_callback=progress_handler,
-            finish_callback=finish_callback
-        )
+        success: bool = encoder.convert()
 
         if success:
             print()  # New line after progress
