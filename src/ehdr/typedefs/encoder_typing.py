@@ -25,12 +25,14 @@ class HdrSdrFormat(Enum):
 class VideoCodec(Enum):
     """Video encoder mode."""
     X265 = "x265"
+    X264 = "x264"
     COPY = "copy"
 
 
 class VideoEncoderLibrary(Enum):
     """Video encoder library for FFmpeg."""
     LIBX265 = "libx265"
+    LIBX264 = "libx264"
     COPY = "copy"
 
 class ScaleMode(Enum):

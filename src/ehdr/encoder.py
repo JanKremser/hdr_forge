@@ -12,6 +12,9 @@ from ffmpeg import FFmpeg
 
 from ehdr.cli.cli_output import print_err, print_warn
 from ehdr.container import mkv
+from ehdr.ffmpeg.base import CodecBase
+from ehdr.ffmpeg.libx264 import Libx264Codec
+from ehdr.ffmpeg.libx265 import Libx265Codec
 from ehdr.typedefs.encoder_typing import CropMode, CropSettings, HdrSdrFormat, CropHandler, EncoderSettings, SampleSettings, ScaleMode, VideoCodec, VideoEncoderLibrary
 from ehdr.typedefs.dolby_vision_typing import DolbyVisionEnhancementLayer, DolbyVisionProfile, DolbyVisionProfileEncodingMode
 from ehdr.hdr_formats import dolby_vision
@@ -60,19 +63,6 @@ class Encoder:
         self._target_file: Path = target_file
         self._target_video_codec: VideoCodec = settings.video_codec
 
-        # Determine effective color format
-        self._target_hdr_sdr_format: HdrSdrFormat = self._determine_effective_hdr_sdr_format(
-            hdr_sdr_format=settings.hdr_sdr_format
-        )
-
-        # Dolby Vision profile (only relevant if encoding to DV)
-        self._target_dv_profile: Optional[DolbyVisionProfile] = self._determine_dv_profile(
-            dv_profile=settings.target_dv_profile
-        )
-        self._target_dv_el: DolbyVisionEnhancementLayer | None = self._determine_dv_enhancement_layer(
-            target_dv_profile=self._target_dv_profile,
-        )
-
         # Crop dimensions (initialized to full frame)
         self._crop_width: int = video.width
         self._crop_height: int = video.height
@@ -93,14 +83,48 @@ class Encoder:
             new_height=settings.scale_height,
         )
 
-        # Calculate or use provided CRF and preset
-        self._crf: int = settings.crf if settings.crf is not None else self._get_auto_crf()
-        self._preset: str = settings.preset if settings.preset is not None else self._get_auto_preset()
+        self._video_codec_lib: CodecBase | None = self._get_video_codec_lib_instance(
+            video=video,
+            encoder_settings=settings,
+            scale_tuple=(video.width, video.height),
+        )
+
+        # Dolby Vision profile (only relevant if encoding to DV)
+        self._target_dv_profile: Optional[DolbyVisionProfile] = self._determine_dv_profile(
+            dv_profile=settings.target_dv_profile
+        )
+        self._target_dv_el: DolbyVisionEnhancementLayer | None = self._determine_dv_enhancement_layer(
+            target_dv_profile=self._target_dv_profile,
+        )
 
         #samples
         self._video_sample_in_sec: Optional[Tuple[int, int]] = self._determine_video_sample(
             sample_settings=settings.sample,
         )
+
+    def _get_video_codec_lib_instance(self, encoder_settings: EncoderSettings, video: Video, scale_tuple: Tuple[int, int]) -> CodecBase | None:
+        """Get the codec library instance based on target video codec.
+
+        Args:
+            encoder_settings: EncoderSettings object with encoding parameters
+
+        Returns:
+            CodecBase instance for the selected video codec
+        """
+        if self._target_video_codec == VideoCodec.X265:
+            return Libx265Codec( encoder_settings=encoder_settings, video=video, scale=scale_tuple)
+        elif self._target_video_codec == VideoCodec.X264:
+            return Libx264Codec(encoder_settings=encoder_settings, video=video, scale=scale_tuple)
+
+        return None
+
+    def get_video_codec_lib(self) -> CodecBase | None:
+        """Get the codec library instance.
+
+        Returns:
+            CodecBase instance or None if copying
+        """
+        return self._video_codec_lib
 
     def get_encoding_resolution(self) -> Tuple[int, int]:
         if self._scale_width and self._scale_height:
@@ -223,44 +247,6 @@ class Encoder:
 
         return None
 
-    def _determine_effective_hdr_sdr_format(self, hdr_sdr_format: HdrSdrFormat) -> HdrSdrFormat:
-        """Determine the effective color format based on target and source.
-
-        Only downgrades are allowed (DV→HDR10→SDR). Upgrades are not possible.
-
-        Returns:
-            Effective ColorFormat to use for encoding
-        """
-        # Determine source format
-        if self._video.is_dolby_vision_video():
-            source_format = HdrSdrFormat.DOLBY_VISION
-        elif self._video.is_hdr_video():
-            source_format = HdrSdrFormat.HDR10
-        else:
-            source_format = HdrSdrFormat.SDR
-
-        if hdr_sdr_format == HdrSdrFormat.AUTO:
-            # Auto mode: keep source format
-            return source_format
-
-        # Check if conversion is valid (only downgrades allowed)
-        format_hierarchy = {
-            HdrSdrFormat.SDR: 0,
-            HdrSdrFormat.HDR10: 1,
-            HdrSdrFormat.DOLBY_VISION: 2
-        }
-
-        source_level = format_hierarchy[source_format]
-        target_level = format_hierarchy[hdr_sdr_format]
-
-        if target_level > source_level:
-            # Attempting upgrade - not allowed, keep source
-            print(f"Warning: Cannot upgrade from {source_format.value} to {hdr_sdr_format.value}. Keeping source format.")
-            return source_format
-
-        # Valid downgrade
-        return hdr_sdr_format
-
     def _determine_dv_profile(self, dv_profile: DolbyVisionProfileEncodingMode) -> Optional[DolbyVisionProfile]:
         """Determine the Dolby Vision profile for encoding.
 
@@ -312,19 +298,21 @@ class Encoder:
         Returns:
             Effective ColorFormat
         """
-        return self._target_hdr_sdr_format
+        if self._video_codec_lib is None:
+            return self._video.get_hdr_sdr_format()
+        return self._video_codec_lib.get_encoding_hdr_sdr_format()
 
     def is_dolby_vision_encoding(self) -> bool:
         """Check if encoding to Dolby Vision format."""
-        return self._target_hdr_sdr_format == HdrSdrFormat.DOLBY_VISION
+        return self.get_encoding_hdr_sdr_format() == HdrSdrFormat.DOLBY_VISION
 
     def is_hdr10_encoding(self) -> bool:
         """Check if encoding to HDR10 format."""
-        return self._target_hdr_sdr_format == HdrSdrFormat.HDR10
+        return self.get_encoding_hdr_sdr_format() == HdrSdrFormat.HDR10
 
     def is_sdr_encoding(self) -> bool:
         """Check if encoding to SDR format."""
-        return self._target_hdr_sdr_format == HdrSdrFormat.SDR
+        return self.get_encoding_hdr_sdr_format() == HdrSdrFormat.SDR
 
     def _is_cropped(self) -> bool:
         """Check if video has cropping applied.
@@ -336,68 +324,6 @@ class Encoder:
                 self._crop_height != self._video.height or
                 self._crop_x != 0 or
                 self._crop_y != 0)
-
-    def _get_pixel_count(self) -> int:
-        """Get total pixel count considering scale and crop.
-
-        Returns:
-            Total number of pixels for encoding
-        """
-        if self._scale_width and self._scale_height:
-            return self._scale_width * self._scale_height
-
-        return self._video.width * self._video.height
-
-    def _get_auto_crf(self) -> int:
-        """Calculate optimal CRF value based on resolution.
-
-        Returns:
-            CRF value (lower = higher quality)
-        """
-        pixels = self._get_pixel_count()
-
-        # UHD 4K (3840x2160 = 8,294,400 pixels)
-        if pixels >= 6_144_000:
-            return 13
-
-        # 2K to 4K range - scale linearly
-        if pixels >= 2_211_841:
-            # Linear interpolation between 14 (at 6.14M) and 18 (at 2.21M)
-            ratio = (pixels - 2_211_841) / (6_144_000 - 2_211_841)
-            return int(18 - (4 * ratio))
-
-        # Full HD (1920x1080 = 2,073,600 pixels)
-        if pixels >= 2_073_600:
-            return 18
-
-        # Lower resolutions
-        if pixels >= 1_000_000:
-            return 19
-
-        return 20
-
-    def _get_auto_preset(self) -> str:
-        """Select optimal encoding preset based on resolution.
-
-        Returns:
-            Preset string (faster preset = quicker encoding, lower compression)
-        """
-        pixels = self._get_pixel_count()
-
-        # 4K+ (4096x2160 = 8,847,360 pixels)
-        if pixels >= 8_847_361:
-            return 'superfast'
-
-        # 2K to 4K range
-        if pixels >= 2_073_601:
-            return 'faster'
-
-        # Full HD
-        if pixels >= 2_073_600:
-            return 'fast'
-
-        # Lower resolutions
-        return 'medium'
 
     def _detect_crop_at_position(self, position_seconds: int) -> Optional[Tuple[int, int, int, int]]:
         """Detect crop parameters at a specific video position.
@@ -638,10 +564,13 @@ class Encoder:
         """
         if self._target_video_codec == VideoCodec.X265:
             return VideoEncoderLibrary.LIBX265
+        elif self._target_video_codec == VideoCodec.X264:
+            return VideoEncoderLibrary.LIBX264
         elif self._target_video_codec == VideoCodec.COPY:
             return VideoEncoderLibrary.COPY
         else:
-            raise ValueError(f"Unsupported video codec: {self._target_video_codec}")
+            print_err(f"Unsupported video codec: {self._target_video_codec}")
+            sys.exit(1)
 
     def _build_ffmpeg_output_options(self) -> Dict[str, str]:
         """Build FFmpeg output options dictionary for encoding.
@@ -649,15 +578,13 @@ class Encoder:
         Returns:
             Dictionary of FFmpeg output options
         """
-        codec_lib: VideoEncoderLibrary = self.get_encoding_video_library()
-        output_options: dict = {
-            'c:v': codec_lib.value,
-        }
+        output_options: dict = {}
 
-        if codec_lib != VideoCodec.COPY:
+        if self._video_codec_lib:
+            output_options.update(self._video_codec_lib.get_ffmpeg_params())
+        else:
             output_options.update({
-                'preset': self._preset,
-                'crf': str(self._crf),
+                'c:v': 'copy',
             })
 
         output_options.update({
@@ -670,7 +597,7 @@ class Encoder:
             output_options['ss'] = str(start_time)
             output_options['t'] = str(end_time-start_time)
 
-        if codec_lib == VideoCodec.COPY:
+        if self.get_encoding_video_library() == VideoCodec.COPY:
             return output_options
 
         # Add video filters (crop and scale), Only for SDR/HDR10 encoding
@@ -734,19 +661,6 @@ class Encoder:
             params.append('master-display=G(0,0)B(0,0)R(0,0)WP(0,0)L(0,0)')
             params.append('max-cll=0,0')
         return params
-
-    def get_format_name(self) -> str:
-        """Get human-readable format name.
-
-        Returns:
-            Format name string
-        """
-        if self.is_dolby_vision_encoding():
-            return "Dolby Vision"
-        elif self.is_hdr10_encoding():
-            return "HDR10"
-        else:
-            return "SDR"
 
     def _run_ffmpeg_encoding_process(
         self,

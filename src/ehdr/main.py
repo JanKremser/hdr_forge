@@ -178,7 +178,7 @@ def process_convert_command(args) -> None:
         video = Video(filepath=video_file)
         print_video_infos(video=video)
 
-        success = convert_video(
+        success: bool = convert_video(
             video=video,
             target_file=out_file,
             settings=settings,

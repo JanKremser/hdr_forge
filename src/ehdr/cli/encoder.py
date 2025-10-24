@@ -3,8 +3,9 @@
 
 
 from ehdr.cli.cli_output import BLUE, color_str, create_aspect_ratio_str, create_progress_bar
+from ehdr.ffmpeg.base import CodecBase
 from ehdr.typedefs.dolby_vision_typing import DolbyVisionEnhancementLayer, DolbyVisionProfile
-from ehdr.typedefs.encoder_typing import CropHandler, VideoCodec
+from ehdr.typedefs.encoder_typing import CropHandler
 from ehdr.encoder import Encoder
 
 
@@ -24,11 +25,12 @@ def print_encoding_params(encoder: Encoder) -> None:
 
     video_codec = encoder.get_encoding_video_codec()
     print(f"  Video Codec: {color_str(video_codec.value, color)}")
-    if video_codec != VideoCodec.COPY:
-        encoding_video_library = encoder.get_encoding_video_library()
-        print(f"  Video Encoder Library: {color_str(encoding_video_library.value, color)}")
-        print(f"  CRF: {color_str(encoder._crf, color)}")
-        print(f"  Preset: {color_str(encoder._preset, color)}")
+    video_codec_lib: CodecBase | None = encoder.get_video_codec_lib()
+    if video_codec_lib:
+        v_param: dict = video_codec_lib.get_custom_lib_parameters()
+        print(f"  Video Encoder Library: {color_str(video_codec_lib.name, color)}")
+        print(f"  CRF: {color_str(v_param.get('crf', '-'), color)}")
+        print(f"  Preset: {color_str(v_param.get('preset', '-'), color)}")
         if encoder._is_cropped():
             crop_filter: str | None = encoder.get_crop_filter()
             print(f"  Crop: {color_str(crop_filter, color)}")
