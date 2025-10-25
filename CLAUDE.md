@@ -465,8 +465,5 @@ hdr_forge calc_maxcll -i input.mkv
 ## Future Improvements
 
 - GPU-accelerated encoding support (NVENC, QSV)
-- Advanced crop detection with scene change detection
-- JSON output mode for programmatic usage
-- Configuration file support (.hdr_forgerc)
 - Dolby Vision Profile 5 MEL-to-FEL conversion support
 - Audio transcoding options

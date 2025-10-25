@@ -362,36 +362,106 @@ class Encoder:
 
         return True
 
+    def _convert_dolby_profile(
+        self,
+        input_file: Path,
+        hevc_bl: Path,
+        source_dv_profile: DolbyVisionProfile | None,
+        target_dv_profile: DolbyVisionProfile | None,
+    ) -> Path:
+        temp_dir: Path = self._get_temp_directory()
+
+        # Step 1: Extract RPU metadata from original Dolby Vision video
+        rpu_file_path: Path = dolby_vision.extract_rpu(
+            input_path=input_file,
+            output_rpu=temp_dir / f"RPU.rpu",
+            dv_profile_source=source_dv_profile,
+            dv_profile_encoding=target_dv_profile,
+        )
+
+        hevc: Path = hevc_bl
+        # Setup 2: If AUTO profile and source is profile 7, demux EL profile 7 RPU
+        if self._target_dv_el is not None:
+            # start demux EL profile 7 for profile 7 encoding
+            el_path: Path = dolby_vision.extract_enhancement_layer(
+                input_file=input_file,
+                output_el=temp_dir / f"video_EL.hevc",
+            )
+            bl_el_hevc: Path = dolby_vision.inject_dolby_vision_layers(
+                bl_path=hevc_bl,
+                el_path=el_path,
+                output_bl_el=temp_dir / f"video_encoded_BL_EL.hevc",
+            )
+            hevc = bl_el_hevc
+
+        # Step 3: Inject original RPU metadata back into encoded HEVC
+        encoded_hevc_with_rpu_path: Path = dolby_vision.inject_rpu(
+            input_path=hevc,
+            input_rpu=rpu_file_path,
+            output_hevc=temp_dir / f"video_encoded_BL_{'EL_' if self._target_dv_el else ''}RPU.hevc"
+        )
+
+        return encoded_hevc_with_rpu_path
+
+
+    def convert_dolby_vision_to_other_profile_without_re_encoding(
+        self,
+    ) -> bool:
+        input_file: Path = self._video.get_filepath()
+
+        # Create temporary directory for all intermediate files
+        temp_dir: Path = self._get_temp_directory()
+
+        # Step 1: Extract base layer (HEVC without RPU) from original video
+        base_layer_hevc_path: Path = dolby_vision.extract_base_layer(
+            input_path=input_file,
+            output_hevc=temp_dir / f"video_BL.hevc",
+        )
+
+        # Step 2: Convert Dolby Vision profile by injecting RPU into base layer HEVC
+        hevc_with_rpu: Path = self._convert_dolby_profile(
+            input_file=input_file,
+            hevc_bl=base_layer_hevc_path,
+            source_dv_profile=self._video.get_dolby_vision_profile(),
+            target_dv_profile=self._target_dv_profile,
+        )
+
+        # Step 3: Mux final HEVC (with RPU) + audio/subtitles into target file
+        mkv.mux_hevc_to_mkv(
+            input_hevc_path=hevc_with_rpu,
+            input_mkv=input_file,
+            output_mkv=self._target_file,
+        )
+
+        # Step 4: Clean up temporary directory (should be empty now, but removes it anyway)
+        self._cleanup_temp_directory()
+
+        return True
+
     def convert_dolby_vision(
         self,
     ) -> bool:
-        """Convert Dolby Vision video by re-encoding base layer and re-injecting RPU.
+        """Convert Dolby Vision video by re-encoding base layer and optionally re-injecting RPU or EL+RPU.
 
         This workflow:
-        1. Extracts RPU metadata from original video
-        2. Extracts base layer (HEVC without RPU)
-        3. Muxes base layer into MKV with original audio/subtitles
-           -> Deletes base layer HEVC
-        4. Re-encodes the base layer with FFmpeg
-           -> Deletes base layer MKV
-        5. Extracts encoded HEVC from MKV
-        6. Injects original RPU back into encoded HEVC
-           -> Deletes encoded HEVC without RPU
-           -> Deletes RPU file
-        7. Muxes final video with audio/subtitles into target file
-           -> Deletes encoded HEVC with RPU
-           -> Deletes encoded base layer MKV
-        8. Cleans up temporary directory
+        1. Extracts RPU metadata from the original video.
+        2. Extracts the base layer (HEVC without RPU or EL).
+        3. Muxes the base layer into MKV with original audio/subtitles.
+           -> Deletes the base layer HEVC.
+        4. Re-encodes the base layer with FFmpeg.
+           -> Deletes the base layer MKV.
+        5. Optionally extracts the Enhancement Layer (EL) for profile 7 encoding.
+        6. Optionally injects EL into the encoded base layer.
+        7. Injects RPU metadata back into the encoded HEVC.
+           -> Deletes intermediate files like encoded HEVC without RPU or EL.
+        8. Muxes the final HEVC (with RPU or EL+RPU) and audio/subtitles into the target file.
+        9. Cleans up the temporary directory.
 
         All intermediate files are stored in a temporary directory and deleted
         incrementally as soon as they are no longer needed to minimize disk usage.
 
-        Args:
-            progress_callback: Optional progress handler callback
-            finish_callback: Optional finish callback
-
         Returns:
-            True if conversion succeeded, False otherwise
+            True if conversion succeeded, False otherwise.
         """
         only_hdr10_or_sdr_encoding: bool = not self.is_dolby_vision_encoding()
 
@@ -447,47 +517,25 @@ class Encoder:
             output_hevc=temp_dir / f"video_encoded_BL.hevc"
         )
 
-        # Step 5: Extract RPU metadata from original Dolby Vision video
-        rpu_file_path: Path = dolby_vision.extract_rpu(
-            input_path=self._video.get_filepath(),
-            output_rpu=temp_dir / f"RPU.rpu",
-            dv_profile_source=self._video.get_dolby_vision_profile(),
-            dv_profile_encoding=self._target_dv_profile
-        )
-
-        # Setup 5.1: If AUTO profile and source is profile 7, demux EL profile 7 RPU
-        if self._target_dv_el is not None:
-            # start demux EL profile 7 for profile 7 encoding
-            el_path: Path = dolby_vision.extract_enhancement_layer(
-                input_file=input_file,
-                output_el=temp_dir / f"video_EL.hevc",
-            )
-            bl_el_hevc: Path = dolby_vision.inject_dolby_vision_layers(
-                bl_path=encoded_hevc_bl_path,
-                el_path=el_path,
-                output_bl_el=temp_dir / f"video_encoded_BL_EL.hevc",
-            )
-            encoded_hevc_bl_path.unlink(missing_ok=True)
-            encoded_hevc_bl_path = bl_el_hevc
-
-        # Step 6: Inject original RPU metadata back into encoded HEVC
-        encoded_hevc_with_rpu_path: Path = dolby_vision.inject_rpu(
-            input_path=encoded_hevc_bl_path,
-            input_rpu=rpu_file_path,
-            output_hevc=temp_dir / f"video_encoded_BL_{'EL_' if self._target_dv_el else ''}RPU.hevc"
+        # Step 5: Convert Dolby Vision profile by injecting RPU into encoded base layer HEVC
+        hevc_with_rpu: Path = self._convert_dolby_profile(
+            input_file=input_file,
+            hevc_bl=encoded_hevc_bl_path,
+            source_dv_profile=self._video.get_dolby_vision_profile(),
+            target_dv_profile=self._target_dv_profile,
         )
 
         # Cleanup: Delete encoded HEVC without RPU (no longer needed after RPU injection)
         encoded_hevc_bl_path.unlink(missing_ok=True)
 
-        # Step 7: Mux final HEVC (with RPU) + audio/subtitles into target file
+        # Step 6: Mux final HEVC (with RPU) + audio/subtitles into target file
         mkv.mux_hevc_to_mkv(
-            input_hevc_path=encoded_hevc_with_rpu_path,
+            input_hevc_path=hevc_with_rpu,
             input_mkv=encoded_base_layer_mkv,
             output_mkv=self._target_file,
         )
 
-        # Step 8: Clean up temporary directory (should be empty now, but removes it anyway)
+        # Step 7: Clean up temporary directory (should be empty now, but removes it anyway)
         self._cleanup_temp_directory()
 
         return True
@@ -498,11 +546,11 @@ class Encoder:
         if self._video.is_dolby_vision_video():
 
             # Convert Dolby Vision to HDR10, without re-encoding
-            if (
-                self.is_hdr10_encoding() and
-                self.get_encoding_video_codec() == VideoCodec.COPY
-            ):
-                return self.convert_dolby_vision_to_hdr10_without_re_encoding()
+            if (self.get_encoding_video_codec() == VideoCodec.COPY):
+                if (self.is_hdr10_encoding()):
+                    return self.convert_dolby_vision_to_hdr10_without_re_encoding()
+                elif (self.is_dolby_vision_encoding()):
+                    return self.convert_dolby_vision_to_other_profile_without_re_encoding()
 
             # Dolby Vision encoding workflow
             return self.convert_dolby_vision()
