@@ -5,16 +5,16 @@ import sys
 import time
 from typing import Dict, Optional, Tuple
 
-from ehdr.cli.cli_output import create_progress_handler, print_err, print_debug
-from ehdr.ffmpeg.ffmpeg_wrapper import run_ffmpeg
-from ehdr.container import mkv
-from ehdr.ffmpeg.video_codec.video_codec_base import VideoCodecBase
-from ehdr.ffmpeg.video_codec.libx264 import Libx264Codec
-from ehdr.ffmpeg.video_codec.libx265 import Libx265Codec
-from ehdr.typedefs.encoder_typing import HdrSdrFormat, EncoderSettings, SampleSettings, VideoCodec
-from ehdr.typedefs.dolby_vision_typing import DolbyVisionEnhancementLayer, DolbyVisionProfile, DolbyVisionProfileEncodingMode
-from ehdr.hdr_formats import dolby_vision
-from ehdr.video import Video
+from hdr_forge.cli.cli_output import create_progress_handler, print_err, print_debug
+from hdr_forge.ffmpeg.ffmpeg_wrapper import run_ffmpeg
+from hdr_forge.container import mkv
+from hdr_forge.ffmpeg.video_codec.video_codec_base import VideoCodecBase
+from hdr_forge.ffmpeg.video_codec.libx264 import Libx264Codec
+from hdr_forge.ffmpeg.video_codec.libx265 import Libx265Codec
+from hdr_forge.typedefs.encoder_typing import HdrSdrFormat, EncoderSettings, SampleSettings, VideoCodec
+from hdr_forge.typedefs.dolby_vision_typing import DolbyVisionEnhancementLayer, DolbyVisionProfile, DolbyVisionProfileEncodingMode
+from hdr_forge.hdr_formats import dolby_vision
+from hdr_forge.video import Video
 
 
 class Encoder:
@@ -221,12 +221,12 @@ class Encoder:
         """Get or create temporary directory for intermediate files.
 
         Creates a temp directory in the same location as target_file:
-        {target_file_dir}/.ehdr_temp_{target_file_stem}/
+        {target_file_dir}/.hdr_forge_temp_{target_file_stem}/
 
         Returns:
             Path to temporary directory
         """
-        temp_dir = self._target_file.parent / f".ehdr_temp_{self._target_file.stem}"
+        temp_dir = self._target_file.parent / f".hdr_forge_temp_{self._target_file.stem}"
         temp_dir.mkdir(parents=True, exist_ok=True)
         return temp_dir
 
@@ -238,7 +238,7 @@ class Encoder:
         """
         import shutil
 
-        temp_dir = self._target_file.parent / f".ehdr_temp_{self._target_file.stem}"
+        temp_dir = self._target_file.parent / f".hdr_forge_temp_{self._target_file.stem}"
 
         if temp_dir.exists() and temp_dir.is_dir():
             try:

@@ -4,8 +4,8 @@ import time
 import subprocess
 from typing import Callable, Optional
 
-from ehdr.core import config
-from ehdr.typedefs.ffmpeg_typing import ProgressInfo
+from hdr_forge.core import config
+from hdr_forge.typedefs.ffmpeg_typing import ProgressInfo
 
 
 # Constants

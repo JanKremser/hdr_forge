@@ -3,9 +3,9 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "ehdr"
+name = "hdr_forge"
 version = "0.4.0"
-description = "Easy HDR video converter - Convert HDR10, Dolby Vision, and SDR videos to H.265/HEVC"
+description = "HDR Forge video converter - Convert HDR10, Dolby Vision, and SDR videos to H.265/HEVC"
 readme = "README.md"
 requires-python = ">=3.7"
 license = {text = "MIT"}
@@ -30,12 +30,12 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/jankremser/ehdr"
-Repository = "https://github.com/jankremser/ehdr"
-Issues = "https://github.com/jankremser/ehdr/issues"
+Homepage = "https://github.com/jankremser/hdr_forge"
+Repository = "https://github.com/jankremser/hdr_forge"
+Issues = "https://github.com/jankremser/hdr_forge/issues"
 
 [project.scripts]
-ehdr = "ehdr.main:main"
+hdr_forge = "hdr_forge.main:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

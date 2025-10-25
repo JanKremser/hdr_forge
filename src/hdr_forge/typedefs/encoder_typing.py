@@ -2,8 +2,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Optional
 
-from ehdr.typedefs.dolby_vision_typing import DolbyVisionProfileEncodingMode
-from ehdr.typedefs.video_typing import HdrMetadata
+from hdr_forge.typedefs.dolby_vision_typing import DolbyVisionProfileEncodingMode
+from hdr_forge.typedefs.video_typing import HdrMetadata
 
 
 @dataclass

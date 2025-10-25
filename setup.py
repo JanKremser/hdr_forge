@@ -1,4 +1,4 @@
-"""Setup script for EHDR - maintained for compatibility."""
+"""Setup script for HDR Forge - maintained for compatibility."""
 
 from setuptools import setup
 

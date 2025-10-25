@@ -1,8 +1,8 @@
 from typing import Optional, Tuple
-from ehdr.ffmpeg.video_codec.video_codec_base import VideoCodecBase
-from ehdr.typedefs.encoder_typing import EncoderSettings, HdrSdrFormat, X265Params, X265Tune, x265_x264_Preset
-from ehdr.typedefs.video_typing import ContentLightLevelMetadata, MasterDisplayMetadata, build_master_display_string, build_max_cll_string
-from ehdr.video import Video
+from hdr_forge.ffmpeg.video_codec.video_codec_base import VideoCodecBase
+from hdr_forge.typedefs.encoder_typing import EncoderSettings, HdrSdrFormat, X265Params, X265Tune, x265_x264_Preset
+from hdr_forge.typedefs.video_typing import ContentLightLevelMetadata, MasterDisplayMetadata, build_master_display_string, build_max_cll_string
+from hdr_forge.video import Video
 
 class Libx265Codec(VideoCodecBase):
 

@@ -1,8 +1,8 @@
-# EHDR - Codebase Documentation for Claude Code
+# HDR Forge - Codebase Documentation for Claude Code
 
 ## Project Overview
 
-EHDR (Easy HDR Video Converter) is a Python-based command-line tool for converting video files to H.265/HEVC format with intelligent HDR metadata preservation, automatic quality optimization, and black bar detection.
+HDR Forge (Easy HDR Video Converter) is a Python-based command-line tool for converting video files to H.265/HEVC format with intelligent HDR metadata preservation, automatic quality optimization, and black bar detection.
 
 **Current Version:** Python v0.4.0 (Rust code has been removed)
 
@@ -17,8 +17,8 @@ EHDR (Easy HDR Video Converter) is a Python-based command-line tool for converti
 ## Project Structure
 
 ```
-ehdr/
-├── src/ehdr/
+hdr_forge/
+├── src/hdr_forge/
 │   ├── __init__.py              # Package initialization with version info
 │   ├── main.py                  # CLI entry point with argparse
 │   ├── video.py                 # Video metadata extraction and analysis
@@ -297,7 +297,7 @@ dovi_tool remove - -o output_BL.hevc
    - Clean up temporary directory
 
 **Temporary Files Management:**
-- All intermediate files stored in `.ehdr_temp_{filename}/` directory
+- All intermediate files stored in `.hdr_forge_temp_{filename}/` directory
 - Files deleted incrementally as soon as no longer needed
 - Entire temp directory removed at end of workflow
 
@@ -315,40 +315,40 @@ dovi_tool remove - -o output_BL.hevc
 
 ```bash
 # Show video info
-ehdr info -i input.mkv
+hdr_forge info -i input.mkv
 
 # Convert video with auto settings (keeps source format)
-ehdr convert -i input.mkv -o output.mkv
+hdr_forge convert -i input.mkv -o output.mkv
 
 # Convert with custom quality
-ehdr convert -i input.mkv -o output.mkv --crf 16 --preset slow
+hdr_forge convert -i input.mkv -o output.mkv --crf 16 --preset slow
 
 # Batch convert folder
-ehdr convert -i ./input_folder -o ./output_folder
+hdr_forge convert -i ./input_folder -o ./output_folder
 
 # Scale video to 1080p (downscaling only, not compatible with DV)
-ehdr convert -i 4k_video.mkv -o output.mkv --scale FHD
+hdr_forge convert -i 4k_video.mkv -o output.mkv --scale FHD
 
 # Disable automatic cropping
-ehdr convert -i input.mkv -o output.mkv --ncrop
+hdr_forge convert -i input.mkv -o output.mkv --ncrop
 
 # Convert Dolby Vision to HDR10 (auto-detected, extracts base layer)
-ehdr convert -i dolby_vision.mkv -o output.mkv --color-format hdr10
+hdr_forge convert -i dolby_vision.mkv -o output.mkv --color-format hdr10
 
 # Convert Dolby Vision to SDR with tone mapping
-ehdr convert -i dolby_vision.mkv -o output.mkv --color-format sdr
+hdr_forge convert -i dolby_vision.mkv -o output.mkv --color-format sdr
 
 # Convert HDR10 to SDR with tone mapping
-ehdr convert -i hdr10_video.mkv -o output.mkv --color-format sdr
+hdr_forge convert -i hdr10_video.mkv -o output.mkv --color-format sdr
 
 # Preserve Dolby Vision with re-encoding (must disable crop)
-ehdr convert -i dolby_vision.mkv -o output.mkv --ncrop
+hdr_forge convert -i dolby_vision.mkv -o output.mkv --ncrop
 
 # Force Dolby Vision Profile 8.1 output (from Profile 5/7/8)
-ehdr convert -i dolby_vision.mkv -o output.mkv --dv-profile 8 --ncrop
+hdr_forge convert -i dolby_vision.mkv -o output.mkv --dv-profile 8 --ncrop
 
 # Calculate MaxCLL and MaxFALL (BETA feature)
-ehdr calc_maxcll -i input.mkv
+hdr_forge calc_maxcll -i input.mkv
 ```
 
 ## Key Technical Details
@@ -397,7 +397,7 @@ ehdr calc_maxcll -i input.mkv
 - DV → SDR: Extracts base layer, applies tone mapping, removes HDR metadata
 
 **Temporary File Management:**
-- Creates `.ehdr_temp_{filename}/` directory in output location
+- Creates `.hdr_forge_temp_{filename}/` directory in output location
 - Incremental deletion of intermediate files during workflow
 - Final cleanup removes entire temp directory
 
@@ -467,6 +467,6 @@ ehdr calc_maxcll -i input.mkv
 - GPU-accelerated encoding support (NVENC, QSV)
 - Advanced crop detection with scene change detection
 - JSON output mode for programmatic usage
-- Configuration file support (.ehdrrc)
+- Configuration file support (.hdr_forgerc)
 - Dolby Vision Profile 5 MEL-to-FEL conversion support
 - Audio transcoding options

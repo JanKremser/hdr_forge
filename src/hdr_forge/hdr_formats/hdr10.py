@@ -15,7 +15,7 @@ from multiprocessing.managers import SyncManager
 
 import numpy as np
 
-from ehdr.cli.cli_output import create_progress_bar
+from hdr_forge.cli.cli_output import create_progress_bar
 
 # Constants
 SEGMENT_DURATION = 30  # Duration per segment in seconds (adjustable)

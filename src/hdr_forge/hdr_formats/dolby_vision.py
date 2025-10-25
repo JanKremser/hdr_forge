@@ -6,8 +6,8 @@ import threading
 from pathlib import Path
 from typing import Optional
 
-from ehdr.cli.cli_output import monitor_process_progress
-from ehdr.typedefs.dolby_vision_typing import DolbyVisionProfile, DolbyVisionProfileEncodingMode, DolbyVisionRpuInfo
+from hdr_forge.cli.cli_output import monitor_process_progress
+from hdr_forge.typedefs.dolby_vision_typing import DolbyVisionProfile, DolbyVisionProfileEncodingMode, DolbyVisionRpuInfo
 
 
 def get_dovi_tool_path() -> str:

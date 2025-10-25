@@ -4,8 +4,8 @@ import json
 from pathlib import Path
 from typing import Optional
 
-from ehdr.cli.cli_output import monitor_process_progress
-from ehdr.typedefs.mkv_typing import MkvInfo, parse_mkv_info
+from hdr_forge.cli.cli_output import monitor_process_progress
+from hdr_forge.typedefs.mkv_typing import MkvInfo, parse_mkv_info
 
 def get_mkvmerge_path() -> str:
     """Get path to mkvmerge executable.

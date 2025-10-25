@@ -1,7 +1,7 @@
 from typing import Tuple
-from ehdr.ffmpeg.video_codec.video_codec_base import VideoCodecBase
-from ehdr.typedefs.encoder_typing import EncoderSettings, HdrSdrFormat, X264Params, X264Tune, x265_x264_Preset
-from ehdr.video import Video
+from hdr_forge.ffmpeg.video_codec.video_codec_base import VideoCodecBase
+from hdr_forge.typedefs.encoder_typing import EncoderSettings, HdrSdrFormat, X264Params, X264Tune, x265_x264_Preset
+from hdr_forge.video import Video
 
 class Libx264Codec(VideoCodecBase):
 

@@ -6,10 +6,10 @@ import subprocess
 import sys
 from typing import Callable, Counter, Optional, Tuple
 
-from ehdr.cli.cli_output import print_err, print_warn
-from ehdr.cli.video_codec_base import callback_handler_crop_video
-from ehdr.typedefs.encoder_typing import CropHandler, CropMode, CropSettings, EncoderSettings, HdrSdrFormat, ScaleMode
-from ehdr.video import Video
+from hdr_forge.cli.cli_output import print_err, print_warn
+from hdr_forge.cli.video_codec_base import callback_handler_crop_video
+from hdr_forge.typedefs.encoder_typing import CropHandler, CropMode, CropSettings, EncoderSettings, HdrSdrFormat, ScaleMode
+from hdr_forge.video import Video
 
 class VideoCodecBase(ABC):
 

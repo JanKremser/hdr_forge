@@ -1,5 +1,5 @@
-from ehdr.cli.cli_output import create_progress_bar
-from ehdr.typedefs.encoder_typing import CropHandler
+from hdr_forge.cli.cli_output import create_progress_bar
+from hdr_forge.typedefs.encoder_typing import CropHandler
 
 
 def callback_handler_crop_video(crop_handler: CropHandler) -> None:

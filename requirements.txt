@@ -1,7 +1,7 @@
 # Python dependencies
 numpy==2.3.4
 
-# EHDR also relies on external tools that must be installed separately:
+# HDR Forge also relies on external tools that must be installed separately:
 #
 # Required:
 #   - ffmpeg (video encoding)

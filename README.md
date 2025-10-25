@@ -1,4 +1,4 @@
-# EHDR - Easy HDR Video Converter
+# HDR Forge - HDR Video Converter
 
 [![Python 3.7+](https://img.shields.io/badge/python-3.7+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -43,22 +43,22 @@ All videos are converted to H.265 (HEVC) with compression settings dynamically a
     -   **for Arch Linux:** Available in the repositories
     -   **for the others:** Download from releases and place in PATH or project root
 
-### Install EHDR
+### Install HDR Forge
 
 ```bash
 # Install from source
-git clone https://github.com/yourusername/ehdr.git
-cd ehdr
+git clone https://github.com/yourusername/hdr_forge.git
+cd hdr_forge
 pip install -e .
 
 # Or install directly with pip (when published to PyPI)
-pip install ehdr
+pip install hdr_forge
 ```
 
 ### Verify Installation
 
 ```bash
-ehdr --version
+hdr_forge --version
 ffmpeg -version
 ffprobe -version
 x265 --version
@@ -74,7 +74,7 @@ dovi_tool --help
 Display detailed video metadata without conversion:
 
 ```bash
-ehdr info -i video.mkv
+hdr_forge info -i video.mkv
 ```
 
 Shows resolution, frame rate, color information, HDR metadata, and Dolby Vision details if present.
@@ -84,13 +84,13 @@ Shows resolution, frame rate, color information, HDR metadata, and Dolby Vision 
 Convert a single video file. Black bars are automatically detected and cropped by default:
 
 ```bash
-ehdr convert -i input.mkv -o output.mkv
+hdr_forge convert -i input.mkv -o output.mkv
 ```
 
 To disable automatic cropping:
 
 ```bash
-ehdr convert -i input.mkv -o output.mkv --ncrop
+hdr_forge convert -i input.mkv -o output.mkv --ncrop
 ```
 
 ### Dolby Vision
@@ -105,23 +105,23 @@ Dolby Vision videos are automatically detected based on RPU metadata flags.
 **Preserve Dolby Vision (re-encode with DV):**
 ```bash
 # Must disable cropping when preserving DV
-ehdr convert -i dolby_vision.mkv -o output.mkv --ncrop
+hdr_forge convert -i dolby_vision.mkv -o output.mkv --ncrop
 
 # Force conversion to Profile 8.1
-ehdr convert -i dolby_vision.mkv -o output.mkv --dv-profile 8 --ncrop
+hdr_forge convert -i dolby_vision.mkv -o output.mkv --dv-profile 8 --ncrop
 ```
 
 **Convert to HDR10 (extract base layer only):**
 ```bash
 # Cropping and scaling supported when converting to HDR10
-ehdr convert -i dolby_vision.mkv -o output.mkv --color-format hdr10
-ehdr convert -i dolby_vision.mkv -o output.mkv --color-format hdr10 --scale FHD
+hdr_forge convert -i dolby_vision.mkv -o output.mkv --color-format hdr10
+hdr_forge convert -i dolby_vision.mkv -o output.mkv --color-format hdr10 --scale FHD
 ```
 
 **Convert to SDR (with tone mapping):**
 ```bash
 # Converts DV → HDR10 base layer → SDR with tone mapping
-ehdr convert -i dolby_vision.mkv -o output.mkv --color-format sdr
+hdr_forge convert -i dolby_vision.mkv -o output.mkv --color-format sdr
 ```
 
 **Important Notes:**
@@ -135,13 +135,13 @@ Convert between different HDR/SDR formats. Only downgrades are supported (DV →
 
 ```bash
 # Convert HDR10 to SDR with tone mapping
-ehdr convert -i hdr10_video.mkv -o output.mkv --color-format sdr
+hdr_forge convert -i hdr10_video.mkv -o output.mkv --color-format sdr
 
 # Convert Dolby Vision to HDR10 (extracts base layer)
-ehdr convert -i dolby_vision.mkv -o output.mkv --color-format hdr10
+hdr_forge convert -i dolby_vision.mkv -o output.mkv --color-format hdr10
 
 # Keep source format (default behavior)
-ehdr convert -i input.mkv -o output.mkv --color-format auto
+hdr_forge convert -i input.mkv -o output.mkv --color-format auto
 ```
 
 **Tone Mapping:**
@@ -154,7 +154,7 @@ ehdr convert -i input.mkv -o output.mkv --color-format auto
 Convert all supported video files in a folder:
 
 ```bash
-ehdr convert -i ./input_folder -o ./output_folder
+hdr_forge convert -i ./input_folder -o ./output_folder
 ```
 
 Output files maintain original names with `.mkv` extension.
@@ -165,13 +165,13 @@ Override automatic quality settings:
 
 ```bash
 # Higher quality (lower CRF = better quality, larger file size)
-ehdr convert -i input.mkv -o output.mkv --crf 12 --preset slow
+hdr_forge convert -i input.mkv -o output.mkv --crf 12 --preset slow
 
 # Faster encoding (faster preset = quicker encoding)
-ehdr convert -i input.mkv -o output.mkv --preset faster
+hdr_forge convert -i input.mkv -o output.mkv --preset faster
 
 # Combine both
-ehdr convert -i input.mkv -o output.mkv --crf 14 --preset medium
+hdr_forge convert -i input.mkv -o output.mkv --crf 14 --preset medium
 ```
 
 ### Resolution Scaling
@@ -180,12 +180,12 @@ Scale videos to specific resolutions:
 
 ```bash
 # Using named resolutions
-ehdr convert -i 4k_video.mkv -o output.mkv --scale FHD    # 1920x1080
-ehdr convert -i 2k_video.mkv -o output.mkv --scale HD     # 1280x720
+hdr_forge convert -i 4k_video.mkv -o output.mkv --scale FHD    # 1920x1080
+hdr_forge convert -i 2k_video.mkv -o output.mkv --scale HD     # 1280x720
 
 # Using numeric height (width calculated automatically)
-ehdr convert -i 4k_video.mkv -o output.mkv --scale 1080
-ehdr convert -i input.mkv -o output.mkv --scale 720
+hdr_forge convert -i 4k_video.mkv -o output.mkv --scale 1080
+hdr_forge convert -i input.mkv -o output.mkv --scale 720
 ```
 
 **Available Named Resolutions:**
@@ -212,14 +212,14 @@ ehdr convert -i input.mkv -o output.mkv --scale 720
 ### Global Options
 
 ```
-ehdr --version              Show program version
-ehdr --help                 Show help message
+hdr_forge --version              Show program version
+hdr_forge --help                 Show help message
 ```
 
 ### Info Subcommand
 
 ```
-ehdr info -i INPUT          Display video metadata
+hdr_forge info -i INPUT          Display video metadata
 
 Options:
   -i, --input INPUT         Input video file
@@ -228,7 +228,7 @@ Options:
 ### Convert Subcommand
 
 ```
-ehdr convert -i INPUT -o OUTPUT [OPTIONS]
+hdr_forge convert -i INPUT -o OUTPUT [OPTIONS]
 
 Required Arguments:
   -i, --input INPUT         Input video file or folder
@@ -254,7 +254,7 @@ Optional Arguments:
 
 ## Automatic Quality Optimization
 
-EHDR automatically adjusts encoding parameters based on video resolution for optimal quality and encoding speed:
+HDR Forge automatically adjusts encoding parameters based on video resolution for optimal quality and encoding speed:
 
 ### CRF (Quality) - Lower = Better Quality
 
@@ -281,25 +281,25 @@ These defaults can be overridden with `--crf` and `--preset` parameters.
 
 ```bash
 # Convert 4K video to 1080p with high quality
-ehdr convert -i 4k_movie.mkv -o 1080p_movie.mkv --scale FHD --crf 14
+hdr_forge convert -i 4k_movie.mkv -o 1080p_movie.mkv --scale FHD --crf 14
 
 # Batch convert folder without cropping
-ehdr convert -i ./videos -o ./encoded --ncrop
+hdr_forge convert -i ./videos -o ./encoded --ncrop
 
 # Fast conversion with lower quality for previews
-ehdr convert -i input.mkv -o preview.mkv --crf 22 --preset ultrafast
+hdr_forge convert -i input.mkv -o preview.mkv --crf 22 --preset ultrafast
 
 # High-quality conversion for archiving
-ehdr convert -i input.mkv -o archive.mkv --crf 12 --preset veryslow
+hdr_forge convert -i input.mkv -o archive.mkv --crf 12 --preset veryslow
 
 # Convert Dolby Vision library to HDR10 with scaling
-ehdr convert -i ./dv_movies -o ./hdr10_movies --color-format hdr10 --scale FHD
+hdr_forge convert -i ./dv_movies -o ./hdr10_movies --color-format hdr10 --scale FHD
 
 # Create SDR copies from HDR10 content
-ehdr convert -i ./hdr10_videos -o ./sdr_videos --color-format sdr
+hdr_forge convert -i ./hdr10_videos -o ./sdr_videos --color-format sdr
 
 # Re-encode Dolby Vision with custom quality
-ehdr convert -i dolby_vision.mkv -o output.mkv --ncrop --crf 14 --preset slow
+hdr_forge convert -i dolby_vision.mkv -o output.mkv --ncrop --crf 14 --preset slow
 ```
 
 ## Technical Details
@@ -337,7 +337,7 @@ ehdr convert -i dolby_vision.mkv -o output.mkv --ncrop --crf 14 --preset slow
 - DV → SDR: Base layer with tone mapping applied
 
 **Temporary Files:**
-- Stored in `.ehdr_temp_{filename}/` directory
+- Stored in `.hdr_forge_temp_{filename}/` directory
 - Incrementally deleted during workflow
 - Final cleanup removes entire temp directory
 

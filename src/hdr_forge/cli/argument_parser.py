@@ -1,13 +1,13 @@
-"""Command-line argument parsing for EHDR."""
+"""Command-line argument parsing for HDR Forge."""
 
 import argparse
 import sys
 
-from ehdr import __version__
-from ehdr.cli.cli_output import print_err
-from ehdr.typedefs.encoder_typing import CropMode, CropSettings, HdrSdrFormat, EncoderSettings, SampleSettings, ScaleMode, VideoCodec, X264Params, X264Tune, X265Params, X265Tune, x265_x264_Preset
-from ehdr.typedefs.dolby_vision_typing import DolbyVisionProfileEncodingMode
-from ehdr.typedefs.video_typing import ContentLightLevelMetadata, HdrMetadata, MasterDisplayMetadata
+from hdr_forge import __version__
+from hdr_forge.cli.cli_output import print_err
+from hdr_forge.typedefs.encoder_typing import CropMode, CropSettings, HdrSdrFormat, EncoderSettings, SampleSettings, ScaleMode, VideoCodec, X264Params, X264Tune, X265Params, X265Tune, x265_x264_Preset
+from hdr_forge.typedefs.dolby_vision_typing import DolbyVisionProfileEncodingMode
+from hdr_forge.typedefs.video_typing import ContentLightLevelMetadata, HdrMetadata, MasterDisplayMetadata
 
 
 # Resolution constants
@@ -27,14 +27,14 @@ def parse_args():
         Parsed arguments namespace
     """
     parser = argparse.ArgumentParser(
-        description='EHDR - Easy HDR Video Converter',
+        description='HDR Forge - HDR Video Converter',
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
 
     parser.add_argument(
         '--version',
         action='version',
-        version=f'EHDR {__version__}'
+        version=f'HDR Forge {__version__}'
     )
 
     # Create subcommands
@@ -54,7 +54,7 @@ def parse_args():
     )
 
     # "maccll" subcommand
-    maxcll_parser = subparsers.add_parser('calc_maxcll',
+    maxcll_parser: argparse.ArgumentParser = subparsers.add_parser('calc_maxcll',
         description='BETA function. Calculate MaxCLL and MaxFALL values for HDR videos',
         help='Calculate MaxCLL and MaxFALL'
     )
@@ -66,16 +66,14 @@ def parse_args():
     )
 
     # "convert" subcommand
-    convert_parser = subparsers.add_parser('convert',
+    convert_parser: argparse.ArgumentParser = subparsers.add_parser('convert',
         description='Convert videos',
         formatter_class=argparse.RawTextHelpFormatter,
         help='Convert videos',
         epilog="""
 Examples:
-  ehdr convert -i input.mkv -o output.mkv
-  ehdr convert -i input.mkv -o output.mkv --crf 16 --preset slow
-  ehdr convert -i input.mkv -o output.mkv --dv --ncrop
-  ehdr convert -i ./input_folder -o ./output_folder
+  hdr_forge convert -i input.mkv -o output.mkv
+  hdr_forge convert -i ./input_folder -o ./output_folder
         """
     )
 

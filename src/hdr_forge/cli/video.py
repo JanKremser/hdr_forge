@@ -2,11 +2,11 @@
 
 
 
-from ehdr.cli.cli_output import BLUE, color_str, create_aspect_ratio_str
-from ehdr.typedefs.dolby_vision_typing import DolbyVisionInfo
-from ehdr.typedefs.mkv_typing import MkvTrack
-from ehdr.typedefs.video_typing import MasterDisplayMetadata, build_master_display_string
-from ehdr.video import Video
+from hdr_forge.cli.cli_output import BLUE, color_str, create_aspect_ratio_str
+from hdr_forge.typedefs.dolby_vision_typing import DolbyVisionInfo
+from hdr_forge.typedefs.mkv_typing import MkvTrack
+from hdr_forge.typedefs.video_typing import MasterDisplayMetadata, build_master_display_string
+from hdr_forge.video import Video
 
 def print_video_infos(video: Video) -> None:
     """Print extracted video information.

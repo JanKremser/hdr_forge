@@ -1,10 +1,10 @@
 """CLI output and progress tracking functionality."""
 
 from typing import Tuple
-from ehdr.cli.cli_output import BLUE, color_str, create_aspect_ratio_str
-from ehdr.ffmpeg.video_codec.video_codec_base import VideoCodecBase
-from ehdr.typedefs.dolby_vision_typing import DolbyVisionEnhancementLayer, DolbyVisionProfile
-from ehdr.encoder import Encoder
+from hdr_forge.cli.cli_output import BLUE, color_str, create_aspect_ratio_str
+from hdr_forge.ffmpeg.video_codec.video_codec_base import VideoCodecBase
+from hdr_forge.typedefs.dolby_vision_typing import DolbyVisionEnhancementLayer, DolbyVisionProfile
+from hdr_forge.encoder import Encoder
 
 
 

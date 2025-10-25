@@ -1,17 +1,17 @@
-"""Main CLI entry point for EHDR video converter."""
+"""Main CLI entry point for HDR Forge video converter."""
 
 import sys
 from pathlib import Path
 
-from ehdr.cli import argument_parser
-from ehdr.cli.cli_output import print_conversion_summary, print_debug, print_err, print_warn
-from ehdr.cli.encoder import print_encoding_params
-from ehdr.cli.video import print_video_infos
-from ehdr.core import config
-from ehdr.typedefs.encoder_typing import EncoderSettings
-from ehdr.encoder import Encoder
-from ehdr.video import Video
-from ehdr.hdr_formats.hdr10 import calc_maxcll
+from hdr_forge.cli import argument_parser
+from hdr_forge.cli.cli_output import print_conversion_summary, print_debug, print_err, print_warn
+from hdr_forge.cli.encoder import print_encoding_params
+from hdr_forge.cli.video import print_video_infos
+from hdr_forge.core import config
+from hdr_forge.typedefs.encoder_typing import EncoderSettings
+from hdr_forge.encoder import Encoder
+from hdr_forge.video import Video
+from hdr_forge.hdr_formats.hdr10 import calc_maxcll
 
 # Supported input video formats
 SUPPORTED_FORMATS: list[str] = ['.mkv', '.m2ts', '.ts', '.mp4']

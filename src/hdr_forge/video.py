@@ -6,12 +6,12 @@ import subprocess
 from pathlib import Path
 from typing import Dict, LiteralString, Optional, Tuple
 
-from ehdr.container import mkv
-from ehdr.hdr_formats import dolby_vision
-from ehdr.typedefs.encoder_typing import HdrSdrFormat
-from ehdr.typedefs.dolby_vision_typing import DolbyVisionEnhancementLayer, DolbyVisionInfo, DolbyVisionProfile, DolbyVisionSiteDataInfo, DolbyVisionRpuInfo
-from ehdr.typedefs.video_typing import ContentLightLevelMetadata, HdrMetadata, MasterDisplayMetadata
-from ehdr.typedefs.mkv_typing import MkvInfo, MkvTrack, MkvTrackType
+from hdr_forge.container import mkv
+from hdr_forge.hdr_formats import dolby_vision
+from hdr_forge.typedefs.encoder_typing import HdrSdrFormat
+from hdr_forge.typedefs.dolby_vision_typing import DolbyVisionEnhancementLayer, DolbyVisionInfo, DolbyVisionProfile, DolbyVisionSiteDataInfo, DolbyVisionRpuInfo
+from hdr_forge.typedefs.video_typing import ContentLightLevelMetadata, HdrMetadata, MasterDisplayMetadata
+from hdr_forge.typedefs.mkv_typing import MkvInfo, MkvTrack, MkvTrackType
 
 
 DEFAULT_MASTER_DISPLAY: LiteralString = (
