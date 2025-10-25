@@ -5,7 +5,7 @@ import sys
 
 from hdr_forge import __version__
 from hdr_forge.cli.cli_output import print_err
-from hdr_forge.typedefs.encoder_typing import CropMode, CropSettings, HdrSdrFormat, EncoderSettings, SampleSettings, ScaleMode, VideoCodec, X264Params, X264Tune, X265Params, X265Tune, x265_x264_Preset
+from hdr_forge.typedefs.encoder_typing import CropMode, CropSettings, HdrForgeEncodingHardwarePresets, HdrForgeEncodingPresetSettings, HdrForgeEncodingPresets, HdrSdrFormat, EncoderSettings, SampleSettings, ScaleMode, VideoCodec, X264Params, X264Tune, X265Params, X265Tune, x265_x264_Preset
 from hdr_forge.typedefs.dolby_vision_typing import DolbyVisionProfileEncodingMode
 from hdr_forge.typedefs.video_typing import ContentLightLevelMetadata, HdrMetadata, MasterDisplayMetadata
 
@@ -126,7 +126,7 @@ Parameters:
         '--x264-params',
         help="""Custom x264 parameters for advanced users. Format:
 Example:
-    preset=medium,crf=20,tune=film
+    preset=medium:crf=20:tune=film
 Parameters:
     preset= : x264 encoding preset (ultrafast, superfast, veryfast, faster, fast, medium, slow, slower, veryslow)
               [ultrafast] : Lowest compression, fastest encoding
@@ -144,28 +144,44 @@ Parameters:
 """
     )
 
-    # convert_parser.add_argument(
-    #     '--crf',
-    #     type=int,
-    #     help='Constant Rate Factor for quality (lower = higher quality). Auto-calculated if not specified.'
-    # )
+    convert_parser.add_argument(
+        '-p', '--preset',
+        choices=["auto", "film", "grain", "action", "animation", "web"],
+        default="auto",
+        help="""HDR Forge encoding preset for simplified settings. Default is the automation mode. Not x265/x264 presets.
+You can combine Presets with HW-Presets.
+Examples:
+    hdr_forge convert -i input.mkv -o output.mkv --preset auto
+    hdr_forge convert -i input.mkv -o output.mkv --preset film
+Presets:
+    [auto]        : Automatic preset selection based on input video characteristics. This is the default.
 
-#     convert_parser.add_argument(
-#         '-p', '--preset',
-#         choices=['ultrafast', 'superfast', 'veryfast', 'faster',
-#                  'fast', 'medium', 'slow', 'slower', 'veryslow'],
-#         help="""Preset for encoder speed vs. compression ratio.
-# [ultrafast] : Lowest compression, fastest encoding
-# [superfast]  : Very low compression, very fast encoding
-# [veryfast]   : Low compression, fast encoding
-# [faster]     : Below average compression and speed
-# [fast]       : Slightly below average compression and speed
-# [medium]     : Balanced compression and speed
-# [slow]       : Above average compression, slower encoding
-# [slower]     : High compression, slow encoding
-# [veryslow]   : Maximum compression, very slow encoding\n
-# """
-#     )
+    [film]        : Optimized for film content with moderate motion
+    [grain]       : Optimized for content with film grain preservation
+    [action]      : Optimized for action-packed content with fast motion
+    [animation]   : Optimized for animated content with vibrant colors\n
+"""
+    )
+
+    convert_parser.add_argument(
+        '--hw-preset',
+        choices=["cpu:balanced", "cpu:opt", "cpu:quality", "cpu:best"],
+        default="cpu:balanced",
+        help="""HDR Forge hardware preset for encoding optimization. Not x265/x264 presets.
+Examples:
+    hdr_forge convert -i input.mkv -o output.mkv --hw-preset cpu:opt
+Presets:
+  CPU based encoding:
+    [cpu:balanced] : Balanced speed and quality, this is the default for CPU encoding
+
+    [cpu:opt]      : Optimized settings for your system with balanced speed and quality
+    [cpu:quality]  : Focus on quality. You need a high-performance system for this preset.\n
+"""
+    # [gpu-balanced]
+    # [gpu-opt]
+    # [gpu-quality]
+    # [gpu-best]
+    )
 
     convert_parser.add_argument(
         '--crop',
@@ -505,7 +521,7 @@ def get_x264_params_from_string(params_str: str | None) -> X264Params:
     if params_str is None:
         return params
 
-    parts: list[str] = params_str.split(',')
+    parts: list[str] = params_str.split(':')
     try:
         for part in parts:
             if part.startswith('crf='):
@@ -522,6 +538,40 @@ def get_x264_params_from_string(params_str: str | None) -> X264Params:
 
     return params
 
+def get_hdr_forge_encoder_presets_from_args(args) -> HdrForgeEncodingPresetSettings:
+    """Create HdrForgeEncodingPresetSettings object from parsed command-line arguments.
+
+    Args:
+        args: Parsed arguments from parse_args()
+
+    Returns:
+        HdrForgeEncodingPresetSettings object with preset and hardware preset
+    """
+    preset: HdrForgeEncodingPresets
+    hw_preset: HdrForgeEncodingHardwarePresets
+    if args.preset is None:
+        preset = HdrForgeEncodingPresets.AUTO
+    else:
+        try:
+            preset = HdrForgeEncodingPresets(args.preset)
+        except ValueError:
+            print_err(msg=f"Invalid preset value '{args.preset}'")
+            sys.exit(1)
+
+    if args.hw_preset is None:
+        hw_preset = HdrForgeEncodingHardwarePresets.CPU_BALANCED
+    else:
+        try:
+            hw_preset = HdrForgeEncodingHardwarePresets(args.hw_preset)
+        except ValueError:
+            print_err(msg=f"Invalid hardware preset value '{args.hw_preset}'")
+            sys.exit(1)
+
+    return HdrForgeEncodingPresetSettings(
+        preset=preset,
+        hardware_preset=hw_preset,
+    )
+
 def create_encoder_settings_from_args(args) -> EncoderSettings:
     """Create EncoderSettings object from parsed command-line arguments.
 
@@ -537,6 +587,7 @@ def create_encoder_settings_from_args(args) -> EncoderSettings:
     )
     return EncoderSettings(
         video_codec=get_video_codec_from_string(args.video_codec),
+        hdr_forge_encoding_preset=get_hdr_forge_encoder_presets_from_args(args),
         hdr_sdr_format=get_hdr_sdr_format_from_string(args.hdr_sdr_format),
         target_dv_profile=get_dolby_vision_profile_from_string(args.dv_profile),
         x265_prams=get_x265_params_from_string(getattr(args, 'x265_params', None)),

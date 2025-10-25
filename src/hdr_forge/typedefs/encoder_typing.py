@@ -2,8 +2,29 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Optional
 
+
 from hdr_forge.typedefs.dolby_vision_typing import DolbyVisionProfileEncodingMode
 from hdr_forge.typedefs.video_typing import HdrMetadata
+
+
+class RESOLUTION_PRESETS(Enum):
+    """Vordefinierte Auflösungen für die Skalierung."""
+    K8 = "8K"
+    UHD = "UHD"
+    QHD = "QHD"
+    FHD = "FHD"
+    HD = "HD"
+    SD = "SD"
+
+
+RESOLUTION_PRESETS_VALUES: dict[RESOLUTION_PRESETS, tuple[int, int]] = {
+    RESOLUTION_PRESETS.K8: (7680, 4320),
+    RESOLUTION_PRESETS.UHD: (3840, 2160),
+    RESOLUTION_PRESETS.QHD: (2560, 1440),
+    RESOLUTION_PRESETS.FHD: (1920, 1080),
+    RESOLUTION_PRESETS.HD: (1280, 720),
+    RESOLUTION_PRESETS.SD: (854, 480),
+}
 
 
 @dataclass
@@ -96,6 +117,24 @@ class X264Params:
     crf: Optional[int] = None
     tune: Optional[X264Tune] = None
 
+class HdrForgeEncodingPresets(Enum):
+    AUTO = "auto"
+    FILM = "film"
+    GRAIN = "grain"
+    ACTION = "action"
+    ANIMATION = "animation"
+    WEB = "web"
+
+class HdrForgeEncodingHardwarePresets(Enum):
+    CPU_BALANCED = "cpu:balanced"
+    CPU_OPTIMIZED = "cpu:opt"
+    CPU_QUALITY = "cpu:quality"
+    CPU_BEST = "cpu:best"
+
+@dataclass
+class HdrForgeEncodingPresetSettings:
+    preset: HdrForgeEncodingPresets = HdrForgeEncodingPresets.AUTO
+    hardware_preset: HdrForgeEncodingHardwarePresets = HdrForgeEncodingHardwarePresets.CPU_BALANCED
 
 @dataclass
 class EncoderSettings:
@@ -112,6 +151,9 @@ class EncoderSettings:
         crop: CropSettings object defining cropping behavior
     """
     video_codec: VideoCodec = VideoCodec.X265
+    hdr_forge_encoding_preset: HdrForgeEncodingPresetSettings = field(
+        default_factory=lambda: HdrForgeEncodingPresetSettings()
+    )
     hdr_sdr_format: HdrSdrFormat = HdrSdrFormat.AUTO
     hdr_metadata: HdrMetadata = field(default_factory=HdrMetadata)
     target_dv_profile: DolbyVisionProfileEncodingMode = DolbyVisionProfileEncodingMode.AUTO

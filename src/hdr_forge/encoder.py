@@ -5,15 +5,15 @@ import sys
 import time
 from typing import Dict, Optional, Tuple
 
-from hdr_forge.cli.cli_output import create_progress_handler, print_err, print_debug
-from hdr_forge.ffmpeg.ffmpeg_wrapper import run_ffmpeg
+from hdr_forge.cli.cli_output import create_progress_handler, print_debug, print_err
 from hdr_forge.container import mkv
+from hdr_forge.ffmpeg.ffmpeg_wrapper import run_ffmpeg
 from hdr_forge.ffmpeg.video_codec.video_codec_base import VideoCodecBase
 from hdr_forge.ffmpeg.video_codec.libx264 import Libx264Codec
 from hdr_forge.ffmpeg.video_codec.libx265 import Libx265Codec
+from hdr_forge.hdr_formats import dolby_vision
 from hdr_forge.typedefs.encoder_typing import HdrSdrFormat, EncoderSettings, SampleSettings, VideoCodec
 from hdr_forge.typedefs.dolby_vision_typing import DolbyVisionEnhancementLayer, DolbyVisionProfile, DolbyVisionProfileEncodingMode
-from hdr_forge.hdr_formats import dolby_vision
 from hdr_forge.video import Video
 
 
@@ -253,7 +253,9 @@ class Encoder:
         Returns:
             Dictionary of FFmpeg output options
         """
-        output_options: dict = {}
+        output_options: dict = {
+            "map": "0",
+        }
 
         if self._video_codec_lib:
             output_options.update(self._video_codec_lib.get_ffmpeg_params())

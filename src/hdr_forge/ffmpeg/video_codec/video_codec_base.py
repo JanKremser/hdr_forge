@@ -4,24 +4,35 @@ import math
 import os
 import subprocess
 import sys
-from typing import Callable, Counter, Optional, Tuple
+from typing import Callable, Counter, Optional, Tuple, Type, TypeVar
 
 from hdr_forge.cli.cli_output import print_err, print_warn
 from hdr_forge.cli.video_codec_base import callback_handler_crop_video
-from hdr_forge.typedefs.encoder_typing import CropHandler, CropMode, CropSettings, EncoderSettings, HdrSdrFormat, ScaleMode
+from hdr_forge.ffmpeg.video_codec.service.presets import calc_hw_prest_params
+from hdr_forge.typedefs.encoder_typing import CropHandler, CropMode, CropSettings, EncoderSettings, HdrSdrFormat, ScaleMode, VideoEncoderLibrary
 from hdr_forge.video import Video
+
+T = TypeVar("T")
 
 class VideoCodecBase(ABC):
 
+    PIXEL_RESOLUTIONS: dict[str, int] = {
+        'UHD': 3840*2160,
+        'QHD': 2560*1440,
+        'FHD': 1920*1080,
+        'HD': 1280*720,
+        'SD': 854*480
+    }
+
     def __init__(
         self,
-        name: str,
+        lib: VideoEncoderLibrary,
         encoder_settings: EncoderSettings,
         video: Video,
         scale: Tuple[int, int],
         supported_hdr_sdr_formats: list[HdrSdrFormat] = [],
     ):
-        self.name = name
+        self.lib: VideoEncoderLibrary = lib
         self._video = video
         self._scale = scale
         self._encoder_settings: EncoderSettings = encoder_settings
@@ -31,7 +42,7 @@ class VideoCodecBase(ABC):
             hdr_sdr_format=encoder_settings.hdr_sdr_format
         )
         if self._hdr_sdr_format_for_encoding not in supported_hdr_sdr_formats:
-            print_err(f"{self.name} does not support the selected {self._hdr_sdr_format_for_encoding.value}-format for encoding.")
+            print_err(f"{self.lib.value} does not support the selected {self._hdr_sdr_format_for_encoding.value}-format for encoding.")
             sys.exit(1)
 
         self._crop_width: int = video.width
@@ -55,7 +66,7 @@ class VideoCodecBase(ABC):
     def get_ffmpeg_params(self) -> dict:
         """Get FFmpeg parameters for this codec."""
         output_options: dict = {
-            "c:v": self.name
+            "c:v": self.lib.value
         }
         encoding_hdr_sdr_format: HdrSdrFormat = self.get_encoding_hdr_sdr_format()
 
@@ -100,7 +111,7 @@ class VideoCodecBase(ABC):
         pass
 
     def get_name(self) -> str:
-        return self.name
+        return self.lib.value
 
     def get_encoding_hdr_sdr_format(self) -> HdrSdrFormat:
         """Get the effective color format used for encoding.
@@ -147,8 +158,17 @@ class VideoCodecBase(ABC):
             return self._crop_width, self._crop_height
         return self._video.width, self._video.height
 
+    def calc_hw_preset_settings(self, cls: Type[T]) -> T:
+        pixel: int = self._get_pixel_count()
+
+        return cls(**calc_hw_prest_params(
+            pixels=pixel,
+            hw_preset=self._encoder_settings.hdr_forge_encoding_preset.hardware_preset,
+            lib=self.lib
+        ))
+
     def __str__(self):
-        return f"{self.__class__.__name__}({self.name})"
+        return f"{self.__class__.__name__}({self.lib.value})"
 
     def _get_scale_filter(self) -> Optional[str]:
         """Get ffmpeg scale filter string if scaling is needed.

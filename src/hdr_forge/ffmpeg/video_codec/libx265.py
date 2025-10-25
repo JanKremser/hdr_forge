@@ -1,6 +1,7 @@
 from typing import Optional, Tuple
+from hdr_forge.ffmpeg.video_codec.service.presets import Hdr_Forge_X265_X264_Preset
 from hdr_forge.ffmpeg.video_codec.video_codec_base import VideoCodecBase
-from hdr_forge.typedefs.encoder_typing import EncoderSettings, HdrSdrFormat, X265Params, X265Tune, x265_x264_Preset
+from hdr_forge.typedefs.encoder_typing import EncoderSettings, HdrForgeEncodingPresets, HdrSdrFormat, VideoEncoderLibrary, X265Params, X265Tune, x265_x264_Preset
 from hdr_forge.typedefs.video_typing import ContentLightLevelMetadata, MasterDisplayMetadata, build_master_display_string, build_max_cll_string
 from hdr_forge.video import Video
 
@@ -34,15 +35,16 @@ class Libx265Codec(VideoCodecBase):
 
     def __init__(self, encoder_settings: EncoderSettings, video: Video, scale: Tuple[int, int]):
         super().__init__(
-            name="libx265",
+            lib=VideoEncoderLibrary.LIBX265,
             encoder_settings=encoder_settings,
             video=video,
             scale=scale,
             supported_hdr_sdr_formats=self.HDR_SDR_SUPPORT,
         )
-        self._crf: int = self._get_auto_crf()
-        self._preset: x265_x264_Preset = self._get_auto_preset()
-        self._tune: X265Tune | None = encoder_settings.x265_prams.tune
+        hw_preset: Hdr_Forge_X265_X264_Preset = self.calc_hw_preset_settings(Hdr_Forge_X265_X264_Preset)
+        self._crf: int = self._get_auto_crf(hw_preset)
+        self._preset: x265_x264_Preset = self._get_auto_preset(hw_preset)
+        self._tune: X265Tune | None = self._get_auto_tune()
 
     def get_ffmpeg_params(self) -> dict:
         output_options: dict = super().get_ffmpeg_params()
@@ -124,7 +126,25 @@ class Libx265Codec(VideoCodecBase):
             params.append('max-cll=0,0')
         return params
 
-    def _get_auto_preset(self) -> x265_x264_Preset:
+    def _get_auto_tune(self) -> Optional[X265Tune]:
+        """Select optimal encoding tune based on content.
+
+        Returns:
+            X265Tune enum or None if no tune is set
+        """
+        x265_params: X265Params = self._encoder_settings.x265_prams
+        if x265_params.tune is not None:
+            return x265_params.tune
+
+        hdr_forge_preset: HdrForgeEncodingPresets = self._encoder_settings.hdr_forge_encoding_preset.preset
+        if hdr_forge_preset == HdrForgeEncodingPresets.ANIMATION:
+            return X265Tune.ANIMATION
+        elif hdr_forge_preset == HdrForgeEncodingPresets.GRAIN:
+            return X265Tune.GRAIN
+
+        return None
+
+    def _get_auto_preset(self, hw_preset: Hdr_Forge_X265_X264_Preset) -> x265_x264_Preset:
         """Select optimal encoding preset based on resolution.
 
         Returns:
@@ -134,24 +154,10 @@ class Libx265Codec(VideoCodecBase):
         if x265_params.preset is not None:
             return x265_params.preset
 
-        pixels = self._get_pixel_count()
+        preset = hw_preset.preset
+        return x265_x264_Preset(preset)
 
-        # 4K+ (4096x2160 = 8,847,360 pixels)
-        if pixels >= 8_847_361:
-            return x265_x264_Preset.SUPERFAST # faster -> veryslow besser
-
-        # 2K to 4K range
-        if pixels >= 2_073_601:
-            return x265_x264_Preset.FASTER # fast -> slow besser
-
-        # Full HD
-        if pixels >= 2_073_600:
-            return x265_x264_Preset.FAST # medium
-
-        # Lower resolutions
-        return x265_x264_Preset.MEDIUM # fast -> medium ist aber auch ok, abhänig von CPU-Leistung
-
-    def _get_auto_crf(self) -> int:
+    def _get_auto_crf(self, hw_preset: Hdr_Forge_X265_X264_Preset) -> int:
         """Calculate optimal CRF value based on resolution.
 
         Returns:
@@ -166,24 +172,18 @@ class Libx265Codec(VideoCodecBase):
         if x265_params.crf is not None:
             return x265_params.crf
 
-        pixels: int = self._get_pixel_count()
+        crf: float = hw_preset.crf
+        if self.is_hdr_encoding():
+            crf += 1.0  # HDR encoding allows slightly higher CRF (more compression) for similar quality
 
-        # UHD 4K (3840x2160 = 8,294,400 pixels)
-        if pixels >= 6_144_000:
-            return 13 # 15 bei slow-preset, 14 bei medium, 13 bei fast o. faster
+        hdr_forge_preset: HdrForgeEncodingPresets = self._encoder_settings.hdr_forge_encoding_preset.preset
+        if hdr_forge_preset == HdrForgeEncodingPresets.ACTION:
+            crf -= 2.0  # Action preset lowers CRF for better handling of fast motion
+        elif hdr_forge_preset == HdrForgeEncodingPresets.GRAIN:
+            pass
+            # grain_score = 0 → normal, keine Anpassung
+            # grain_score = 1 (leicht) → CRF -0.5
+            # grain_score = 2 (mittel) → CRF -1
+            # grain_score = 3 (viel) → CRF -1.5 bis -2
 
-        # 2K to 4K range - scale linearly
-        if pixels >= 2_211_841:
-            # Linear interpolation between 14 (at 6.14M) and 18 (at 2.21M)
-            ratio = (pixels - 2_211_841) / (6_144_000 - 2_211_841)
-            return int(18 - (4 * ratio)) # 14-18
-
-        # Full HD (1920x1080 = 2,073,600 pixels)
-        if pixels >= 2_073_600:
-            return 18 # 18-20
-
-        # Lower resolutions
-        if pixels >= 1_000_000:
-            return 19
-
-        return 20 # 20-22
+        return int(hw_preset.crf)
