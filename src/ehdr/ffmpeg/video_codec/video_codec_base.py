@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import math
+import os
 import subprocess
 import sys
 from typing import Callable, Counter, Optional, Tuple
@@ -266,6 +267,7 @@ class VideoCodecBase(ABC):
     def _detect_crop_auto(
         self,
         check_samples: int = 10,
+        max_workers: int = 16,
         callback: Optional[Callable[[CropHandler], None]] = None,
     ) -> Optional[Tuple[int, int, int, int]]:
         if callback:
@@ -288,7 +290,7 @@ class VideoCodecBase(ABC):
         # Run crop detection in parallel
         crop_results: list = []
         completed = 0
-        with ThreadPoolExecutor(max_workers=check_samples) as executor:
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
             futures = {
                 executor.submit(self._detect_crop_at_position, pos): pos
                 for pos in positions
@@ -345,8 +347,10 @@ class VideoCodecBase(ABC):
             sys.exit(1)
 
         if crop_settings.mode == CropMode.AUTO:
+            cpu_kerne: int = min(crop_settings.check_samples, os.cpu_count() or 4)
             c: Tuple[int, int, int, int] | None = self._detect_crop_auto(
-                check_samples=10,
+                check_samples=crop_settings.check_samples,
+                max_workers=cpu_kerne,
                 callback=callback_handler_crop_video,
             )
             if c is None:

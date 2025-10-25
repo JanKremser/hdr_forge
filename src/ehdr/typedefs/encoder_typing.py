@@ -54,6 +54,7 @@ class CropSettings:
     mode: CropMode = CropMode.AUTO
     manual_crop: Optional[tuple[int, int, int, int]] = None  # x, y, width, height
     ratio: Optional[tuple[float, float]] = None # Aspect ratio for RATIO mode
+    check_samples: int = 10  # Number of samples to analyze for auto crop detection
 
 
 @dataclass
