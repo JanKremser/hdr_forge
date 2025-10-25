@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 
 from ehdr.cli import argument_parser
-from ehdr.cli.cli_output import print_conversion_summary
+from ehdr.cli.cli_output import print_conversion_summary, print_debug, print_err, print_warn
 from ehdr.cli.encoder import print_encoding_params
 from ehdr.cli.video import print_video_infos
 from ehdr.core import config
@@ -114,13 +114,16 @@ def convert_video(
             print(f"Success: {target_file.name}")
 
         return success
-
+    except KeyboardInterrupt:
+        print("\n" * 3)
+        print_warn("Encoding cancelled by user.")
+        return False
     except Exception as e:
         print(f"Error processing {input_file.name}: {e}")
         return False
 
 
-def process_convert_command(args) -> None:
+def process_convert_command(args) -> int:
     """Process the convert subcommand."""
     input_path = Path(args.input)
     output_path = Path(args.output)
@@ -176,17 +179,18 @@ def process_convert_command(args) -> None:
             fail_count += 1
 
     print_conversion_summary(success_count, fail_count)
-    sys.exit(0 if fail_count == 0 else 1)
+
+    return 0 if fail_count == 0 else 1
 
 
-def process_info_command(args) -> None:
+def process_info_command(args) -> int:
     """Process the info subcommand."""
     input_path = Path(args.input)
 
     # Validate input
     if not input_path.exists():
         print(f"Error: Input path does not exist: {input_path}")
-        sys.exit(1)
+        return 1
 
     # Determine if it's a file or directory
     if input_path.is_file():
@@ -198,32 +202,41 @@ def process_info_command(args) -> None:
         if not video_files:
             print(f"Error: No supported video files found in: {input_path}")
             print(f"Supported formats: {', '.join(SUPPORTED_FORMATS)}")
-            sys.exit(1)
+            return 1
 
         # Show info for each video file
         for video_file in video_files:
             show_video_info(video_file)
+    return 0
 
 
 def main() -> None:
     """Main entry point for CLI."""
     args = argument_parser.parse_args()
     config.debug_mode = args.debug
+    if config.debug_mode:
+        print_debug("Debug mode enabled")
 
+    code: int = 0
     # Execute the corresponding subcommand
     if args.command == 'info':
-        process_info_command(args)
+        code = process_info_command(args)
     elif args.command == 'convert':
-        process_convert_command(args)
+        code = process_convert_command(args)
     elif args.command == 'calc_maxcll':
         input_path = Path(args.input)
         if not input_path.exists():
-            print(f"Error: Input path does not exist: {input_path}")
+            print_err(f"Input path does not exist: {input_path}")
             sys.exit(1)
         calc_maxcll(video_path=str(input_path))
     else:
-        print(f"Unknown command: {args.command}")
-        sys.exit(1)
+        print_err(f"Unknown command: {args.command}")
+        code = 1
+
+    if config.debug_mode and code != 0:
+        print_debug("skipping sys.exit()")
+        return
+    sys.exit(code)
 
 
 if __name__ == '__main__':
