@@ -1,25 +1,21 @@
-from typing import Optional, Tuple
+from typing import Tuple
 from hdr_forge.cli.cli_output import print_warn
 from hdr_forge.ffmpeg.video_codec.service.presets import Hdr_Forge_HEVC_H264_NVENC_Preset
 from hdr_forge.ffmpeg.video_codec.video_codec_base import VideoCodecBase
 from hdr_forge.typedefs.encoder_typing import EncoderSettings, HEVC_NVENC_Preset, HdrForgeEncodingPresets, HdrSdrFormat, VideoEncoderLibrary
-from hdr_forge.typedefs.video_typing import ContentLightLevelMetadata, MasterDisplayMetadata, build_master_display_string, build_max_cll_string
 from hdr_forge.video import Video
 
-class HevcNvencCodec(VideoCodecBase):
+class H264NvencCodec(VideoCodecBase):
 
     HDR_SDR_SUPPORT: list[HdrSdrFormat] = [
-        HdrSdrFormat.HDR10,
         HdrSdrFormat.SDR,
-        HdrSdrFormat.DOLBY_VISION,
     ]
 
-    HDR_PIXEL_FORMAT = 'yuv420p10le'
     SDR_PIXEL_FORMAT = 'yuv420p'
 
     def __init__(self, encoder_settings: EncoderSettings, video: Video, scale: Tuple[int, int]):
         super().__init__(
-            lib=VideoEncoderLibrary.HEVC_NVENC,
+            lib=VideoEncoderLibrary.H264_NVENC,
             encoder_settings=encoder_settings,
             video=video,
             scale=scale,
@@ -37,53 +33,17 @@ class HevcNvencCodec(VideoCodecBase):
             "cq": str(self._cq)
         })
 
-        encoding_hdr_sdr_format: HdrSdrFormat = self.get_encoding_hdr_sdr_format()
-
-        if encoding_hdr_sdr_format in [HdrSdrFormat.HDR10, HdrSdrFormat.DOLBY_VISION]:
-            output_options['pix_fmt'] = self.HDR_PIXEL_FORMAT
-
-            master_display: MasterDisplayMetadata | None = self._get_master_display_for_encoding()
-            if master_display:
-                metadata: list = output_options.get('metadata:s:v', []) or []
-                metadata.append(f'master-display={build_master_display_string(master_display)}')
-                max_cll_max_fll: ContentLightLevelMetadata | None = self._get_max_cll_for_encoding()
-                if max_cll_max_fll:
-                    metadata.append(f'max-cll={build_max_cll_string(max_cll_max_fll)}')
-                output_options['metadata:s:v'] = metadata
-
-            if encoding_hdr_sdr_format in [HdrSdrFormat.DOLBY_VISION]:
-                print_warn("HEVC_NVENC HDR Metadata for Dolby Vision encoding is not yet supported;")
-        elif encoding_hdr_sdr_format == HdrSdrFormat.SDR:
-            output_options['pix_fmt'] = self.SDR_PIXEL_FORMAT
-            if self._video.is_hdr_video():
-                print_warn("HEVC_NVENC-SDR encoding does not support HDR metadata removal;")
+        output_options['pix_fmt'] = self.SDR_PIXEL_FORMAT
+        if self._video.is_hdr_video():
+            print_warn("H264_NVENC-SDR encoding does not support HDR metadata removal;")
 
         return output_options
 
     def get_custom_lib_parameters(self) -> dict:
-        masterdisplay: MasterDisplayMetadata | None = self._get_master_display_for_encoding()
-        max_cll_max_fll: ContentLightLevelMetadata | None = self._get_max_cll_for_encoding()
-
         return {
             "cq": self._cq,
             "preset": self._preset.value,
-            "master-display": build_master_display_string(masterdisplay) if masterdisplay else None,
-            "max-cll": build_max_cll_string(max_cll_max_fll) if max_cll_max_fll else None,
         }
-
-    def _get_master_display_for_encoding(self) -> Optional[MasterDisplayMetadata]:
-        master_display: MasterDisplayMetadata | None = self._encoder_settings.hdr_metadata.mastering_display_metadata
-        if master_display is None:
-            master_display: MasterDisplayMetadata | None = self._video.get_master_display()
-
-        return master_display
-
-    def _get_max_cll_for_encoding(self) -> Optional[ContentLightLevelMetadata]:
-        encoder_max_cll: ContentLightLevelMetadata | None = self._encoder_settings.hdr_metadata.content_light_level_metadata
-        if encoder_max_cll is None:
-            encoder_max_cll = self._video.get_content_light_level_metadata()
-
-        return encoder_max_cll
 
     def _get_auto_preset(self, hw_preset: Hdr_Forge_HEVC_H264_NVENC_Preset) -> HEVC_NVENC_Preset:
         """Select optimal encoding preset based on resolution.

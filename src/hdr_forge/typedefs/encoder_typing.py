@@ -55,6 +55,7 @@ class VideoEncoderLibrary(Enum):
     LIBX265 = "libx265"
     LIBX264 = "libx264"
     HEVC_NVENC = "hevc_nvenc"
+    H264_NVENC = "h264_nvenc"
     COPY = "copy"
 
 class ScaleMode(Enum):

@@ -6,9 +6,10 @@ import sys
 import time
 from typing import Dict, Optional, Tuple
 
-from hdr_forge.cli.cli_output import create_progress_handler, print_debug, print_err, print_warn
+from hdr_forge.cli.cli_output import create_progress_handler, print_debug, print_err
 from hdr_forge.container import mkv
 from hdr_forge.ffmpeg.ffmpeg_wrapper import run_ffmpeg
+from hdr_forge.ffmpeg.video_codec.h264_nvenc import H264NvencCodec
 from hdr_forge.ffmpeg.video_codec.hevc_nvenc import HevcNvencCodec
 from hdr_forge.ffmpeg.video_codec.video_codec_base import VideoCodecBase
 from hdr_forge.ffmpeg.video_codec.libx264 import Libx264Codec
@@ -125,7 +126,15 @@ class Encoder:
             else:
                 return Libx265Codec(encoder_settings=encoder_settings, video=video, scale=scale_tuple)
         elif encoder_settings.video_codec == VideoCodec.X264:
-            return Libx264Codec(encoder_settings=encoder_settings, video=video, scale=scale_tuple)
+            if encoder_settings.enable_gpu_acceleration:
+                test: list[VideoEncoderLibrary] = self.get_available_hw_encoders()
+                if VideoEncoderLibrary.H264_NVENC in test:
+                    return H264NvencCodec(encoder_settings=encoder_settings, video=video, scale=scale_tuple)
+                else:
+                    print_err("Only NVENC hardware acceleration is supported currently.")
+                    sys.exit(1)
+            else:
+                return Libx264Codec(encoder_settings=encoder_settings, video=video, scale=scale_tuple)
 
         return None
 

@@ -2,7 +2,6 @@ from dataclasses import dataclass
 from enum import Enum
 
 from hdr_forge.typedefs.encoder_typing import HdrForgeEncodingHardwarePresets, VideoEncoderLibrary
-from hdr_forge.video import Video
 
 
 @dataclass
@@ -11,7 +10,7 @@ class Hdr_Forge_X265_X264_Preset:
     preset: str
 
 @dataclass
-class Hdr_Forge_HEVC_NVENC_Preset:
+class Hdr_Forge_HEVC_H264_NVENC_Preset:
     cq: float
     preset: str
 
@@ -92,21 +91,25 @@ HW_PRESET: dict = {
             "from_pixel": RESOLUTION_PRESETS.NONE.value,
             "to_pixel": RESOLUTION_PRESETS.HD.value,
             VideoEncoderLibrary.HEVC_NVENC: {"from_CQ": 22, "to_CQ": 20, "preset": "slow"},
+            VideoEncoderLibrary.H264_NVENC: {"from_CQ": 22, "to_CQ": 20, "preset": "slow"},
         },
         {
             "from_pixel": RESOLUTION_PRESETS.HD.value + 1,
             "to_pixel": RESOLUTION_PRESETS.FHD.value,
             VideoEncoderLibrary.HEVC_NVENC: {"from_CQ": 20, "to_CQ": 19, "preset": "slow"},
+            VideoEncoderLibrary.H264_NVENC: {"from_CQ": 20, "to_CQ": 19, "preset": "slow"},
         },
         {
             "from_pixel": RESOLUTION_PRESETS.FHD.value + 1,
             "to_pixel": RESOLUTION_PRESETS.UHD.value,
             VideoEncoderLibrary.HEVC_NVENC: {"from_CQ": 19, "to_CQ": 15, "preset": "slow"},
+            VideoEncoderLibrary.H264_NVENC: {"from_CQ": 19, "to_CQ": 15, "preset": "slow"},
         },
         {
             "from_pixel": RESOLUTION_PRESETS.UHD.value + 1,
             "to_pixel": RESOLUTION_PRESETS._8K.value,
             VideoEncoderLibrary.HEVC_NVENC: {"from_CQ": 15, "to_CQ": 13, "preset": "slow"},
+            VideoEncoderLibrary.H264_NVENC: {"from_CQ": 15, "to_CQ": 13, "preset": "slow"},
         },
     ],
 }
