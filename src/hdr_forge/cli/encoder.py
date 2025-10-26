@@ -28,7 +28,12 @@ def print_encoding_params(encoder: Encoder) -> None:
     if video_codec_lib:
         v_param: dict = video_codec_lib.get_custom_lib_parameters()
         print(f"  Video Encoder Library: {color_str(video_codec_lib.lib.value, color)}")
-        print(f"    CRF: {color_str(v_param.get('crf') or '-', color)}")
+        crf: int | None = v_param.get("crf", None) or None
+        if crf is not None:
+            print(f"    CRF: {color_str(crf, color)}")
+        cq: int | None = v_param.get("cq", None) or None
+        if cq is not None:
+            print(f"    CQ: {color_str(cq, color)}")
         print(f"    Preset: {color_str(v_param.get('preset') or '-', color)}")
         print(f"    Tune: {color_str(v_param.get('tune') or '-', color)}")
 

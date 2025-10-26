@@ -1,18 +1,20 @@
 """Video encoder configuration and parameter building."""
 
 from pathlib import Path
+import subprocess
 import sys
 import time
 from typing import Dict, Optional, Tuple
 
-from hdr_forge.cli.cli_output import create_progress_handler, print_debug, print_err
+from hdr_forge.cli.cli_output import create_progress_handler, print_debug, print_err, print_warn
 from hdr_forge.container import mkv
 from hdr_forge.ffmpeg.ffmpeg_wrapper import run_ffmpeg
+from hdr_forge.ffmpeg.video_codec.hevc_nvenc import HevcNvencCodec
 from hdr_forge.ffmpeg.video_codec.video_codec_base import VideoCodecBase
 from hdr_forge.ffmpeg.video_codec.libx264 import Libx264Codec
 from hdr_forge.ffmpeg.video_codec.libx265 import Libx265Codec
 from hdr_forge.hdr_formats import dolby_vision
-from hdr_forge.typedefs.encoder_typing import HdrSdrFormat, EncoderSettings, SampleSettings, VideoCodec
+from hdr_forge.typedefs.encoder_typing import HdrSdrFormat, EncoderSettings, SampleSettings, VideoCodec, VideoEncoderLibrary
 from hdr_forge.typedefs.dolby_vision_typing import DolbyVisionEnhancementLayer, DolbyVisionProfile, DolbyVisionProfileEncodingMode
 from hdr_forge.video import Video
 
@@ -57,6 +59,47 @@ class Encoder:
             sample_settings=settings.sample,
         )
 
+    def get_available_hw_encoders(self) -> list[VideoEncoderLibrary]:
+        """
+        Gibt eine Liste von Enum-Mitgliedern zurück, deren Encoder
+        auf dem System über FFmpeg verfügbar sind UND Hardware-beschleunigt sind.
+
+        :param enum_class: Enum-Klasse, z. B. VideoEncoderLibrary
+        :return: Liste der Enum-Mitglieder, die verfügbar und HW-Encoder sind
+        """
+        try:
+            result = subprocess.run(
+                ["ffmpeg", "-hide_banner", "-encoders"],
+                capture_output=True,
+                text=True,
+                check=True
+            )
+
+            lines = result.stdout.splitlines()
+            available_hw_encoders = set()
+
+            for line in lines:
+                if line.startswith(" V"):
+                    parts = line.split()
+                    if len(parts) > 1:
+                        encoder_name = parts[1]
+                        # typische HW-Kennzeichen
+                        if any(hw in encoder_name for hw in ["nvenc", "qsv", "vaapi", "amf", "v4l2"]):
+                            available_hw_encoders.add(encoder_name)
+
+            result_members: list[VideoEncoderLibrary] = [
+                member
+                for member in VideoEncoderLibrary
+                if member.value in available_hw_encoders
+            ]
+
+            return result_members
+
+        except subprocess.CalledProcessError as e:
+            print("Fehler beim Abfragen der Encoder:", e)
+            return []
+
+
     def _get_video_codec_lib_instance(
         self,
         encoder_settings: EncoderSettings,
@@ -72,7 +115,15 @@ class Encoder:
             VideoCodecBase instance for the selected video codec
         """
         if encoder_settings.video_codec == VideoCodec.X265:
-            return Libx265Codec(encoder_settings=encoder_settings, video=video, scale=scale_tuple)
+            if encoder_settings.enable_gpu_acceleration:
+                test: list[VideoEncoderLibrary] = self.get_available_hw_encoders()
+                if VideoEncoderLibrary.HEVC_NVENC in test:
+                    return HevcNvencCodec(encoder_settings=encoder_settings, video=video, scale=scale_tuple)
+                else:
+                    print_err("Only NVENC hardware acceleration is supported currently.")
+                    sys.exit(1)
+            else:
+                return Libx265Codec(encoder_settings=encoder_settings, video=video, scale=scale_tuple)
         elif encoder_settings.video_codec == VideoCodec.X264:
             return Libx264Codec(encoder_settings=encoder_settings, video=video, scale=scale_tuple)
 

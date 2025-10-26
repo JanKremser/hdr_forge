@@ -166,7 +166,7 @@ Presets:
 
     convert_parser.add_argument(
         '--hw-preset',
-        choices=["cpu:balanced", "cpu:opt", "cpu:quality", "cpu:best"],
+        choices=["cpu:balanced", "cpu:quality", "gpu:balanced"],
         default="cpu:balanced",
         help="""HDR Forge hardware preset for encoding optimization. Not x265/x264 presets.
 Examples:
@@ -174,13 +174,13 @@ Examples:
 Presets:
   CPU based encoding:
     [cpu:balanced] : Balanced speed and quality, this is the default for CPU encoding
-    [cpu:quality]  : Focus on quality. You need a high-performance system for this preset.\n
+    [cpu:quality]  : Focus on quality. You need a high-performance system for this preset.
+
+    [gpu:balanced] : Balanced quality and size\n
 """
     # [cpu:opt]      : Optimized settings for your system with balanced speed and quality
     # [gpu-balanced]
-    # [gpu-opt]
     # [gpu-quality]
-    # [gpu-best]
     )
 
     convert_parser.add_argument(
@@ -589,6 +589,7 @@ def create_encoder_settings_from_args(args) -> EncoderSettings:
         video_codec=get_video_codec_from_string(args.video_codec),
         hdr_forge_encoding_preset=get_hdr_forge_encoder_presets_from_args(args),
         hdr_sdr_format=get_hdr_sdr_format_from_string(args.hdr_sdr_format),
+        enable_gpu_acceleration=args.hw_preset.startswith('gpu:'),
         target_dv_profile=get_dolby_vision_profile_from_string(args.dv_profile),
         x265_prams=get_x265_params_from_string(getattr(args, 'x265_params', None)),
         x264_prams=get_x264_params_from_string(getattr(args, 'x264_params', None)),

@@ -54,6 +54,7 @@ class VideoEncoderLibrary(Enum):
     """Video encoder library for FFmpeg."""
     LIBX265 = "libx265"
     LIBX264 = "libx264"
+    HEVC_NVENC = "hevc_nvenc"
     COPY = "copy"
 
 class ScaleMode(Enum):
@@ -84,6 +85,13 @@ class SampleSettings:
     enabled: bool = False
     start_time: Optional[float] = None  # in seconds
     end_time: Optional[float] = None    # in seconds
+
+class HEVC_NVENC_Preset(Enum):
+    DEFAULT = "default"
+    SLOW = "slow"
+    HQ = "hq"
+    LLHQ = "llhq"
+    LLHP = "llhp"
 
 class x265_x264_Preset(Enum):
     ULTRAFAST = "ultrafast"
@@ -125,9 +133,8 @@ class HdrForgeEncodingPresets(Enum):
 
 class HdrForgeEncodingHardwarePresets(Enum):
     CPU_BALANCED = "cpu:balanced"
-    CPU_OPTIMIZED = "cpu:opt"
     CPU_QUALITY = "cpu:quality"
-    CPU_BEST = "cpu:best"
+    GPU_BALANCED = "gpu:balanced"
 
 @dataclass
 class HdrForgeEncodingPresetSettings:
@@ -152,6 +159,7 @@ class EncoderSettings:
     hdr_forge_encoding_preset: HdrForgeEncodingPresetSettings = field(
         default_factory=lambda: HdrForgeEncodingPresetSettings()
     )
+    enable_gpu_acceleration: bool = False
     hdr_sdr_format: HdrSdrFormat = HdrSdrFormat.AUTO
     hdr_metadata: HdrMetadata = field(default_factory=HdrMetadata)
     target_dv_profile: DolbyVisionProfileEncodingMode = DolbyVisionProfileEncodingMode.AUTO
