@@ -161,7 +161,6 @@ Presets:
     [action]      : Optimized for action-packed content with fast motion
     [animation]   : Optimized for animated content with vibrant colors\n
 """
-# [grain]       : Optimized for content with film grain preservation
     )
 
     convert_parser.add_argument(
@@ -176,11 +175,10 @@ Presets:
     [cpu:balanced] : Balanced speed and quality, this is the default for CPU encoding
     [cpu:quality]  : Focus on quality. You need a high-performance system for this preset.
 
-    [gpu:balanced] : Balanced quality and size\n
+    [gpu:balanced] : Balanced quality and size
+    [gpu:quality] : Focus on quality\n
 """
     # [cpu:opt]      : Optimized settings for your system with balanced speed and quality
-    # [gpu-balanced]
-    # [gpu-quality]
     )
 
     convert_parser.add_argument(

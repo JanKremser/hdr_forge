@@ -112,6 +112,32 @@ HW_PRESET: dict = {
             VideoEncoderLibrary.H264_NVENC: {"from_CQ": 14, "to_CQ": 12, "preset": "slow"},
         },
     ],
+    HdrForgeEncodingHardwarePresets.GPU_QUALITY: [
+        {
+            "from_pixel": RESOLUTION_PRESETS.NONE.value,
+            "to_pixel": RESOLUTION_PRESETS.HD.value,
+            VideoEncoderLibrary.HEVC_NVENC: {"from_CQ": 22, "to_CQ": 20, "preset": "hq"},
+            VideoEncoderLibrary.H264_NVENC: {"from_CQ": 20, "to_CQ": 18, "preset": "hq"},
+        },
+        {
+            "from_pixel": RESOLUTION_PRESETS.HD.value + 1,
+            "to_pixel": RESOLUTION_PRESETS.FHD.value,
+            VideoEncoderLibrary.HEVC_NVENC: {"from_CQ": 20, "to_CQ": 19, "preset": "hq"},
+            VideoEncoderLibrary.H264_NVENC: {"from_CQ": 18, "to_CQ": 17, "preset": "hq"},
+        },
+        {
+            "from_pixel": RESOLUTION_PRESETS.FHD.value + 1,
+            "to_pixel": RESOLUTION_PRESETS.UHD.value,
+            VideoEncoderLibrary.HEVC_NVENC: {"from_CQ": 19, "to_CQ": 15, "preset": "hq"},
+            VideoEncoderLibrary.H264_NVENC: {"from_CQ": 17, "to_CQ": 14, "preset": "hq"},
+        },
+        {
+            "from_pixel": RESOLUTION_PRESETS.UHD.value + 1,
+            "to_pixel": RESOLUTION_PRESETS._8K.value,
+            VideoEncoderLibrary.HEVC_NVENC: {"from_CQ": 15, "to_CQ": 13, "preset": "hq"},
+            VideoEncoderLibrary.H264_NVENC: {"from_CQ": 14, "to_CQ": 12, "preset": "hq"},
+        },
+    ],
 }
 
 def interpolate(value, x1, x2, y1, y2):

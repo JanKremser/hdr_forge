@@ -136,6 +136,7 @@ class HdrForgeEncodingHardwarePresets(Enum):
     CPU_BALANCED = "cpu:balanced"
     CPU_QUALITY = "cpu:quality"
     GPU_BALANCED = "gpu:balanced"
+    GPU_QUALITY = "gpu:quality"
 
 @dataclass
 class HdrForgeEncodingPresetSettings:
