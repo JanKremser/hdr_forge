@@ -120,10 +120,8 @@ class X264Params:
 class HdrForgeEncodingPresets(Enum):
     AUTO = "auto"
     FILM = "film"
-    GRAIN = "grain"
     ACTION = "action"
     ANIMATION = "animation"
-    WEB = "web"
 
 class HdrForgeEncodingHardwarePresets(Enum):
     CPU_BALANCED = "cpu:balanced"

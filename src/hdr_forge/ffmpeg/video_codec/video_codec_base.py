@@ -286,3 +286,40 @@ class VideoCodecBase(ABC):
             return __check_rounding(crop_result.width, crop_result.height)
 
         return None, None
+
+    def _calculate_crf_adjustment_weight(
+        self,
+        current_crf: float,
+        crf_delta: float,
+        min_weight: float = 0.1,
+        max_weight: float = 1.0,
+        min_crf: float = 10.0,
+        max_crf: float = 30.0
+    ) -> float:
+        """
+        Berechnet einen Gewichtungsfaktor für die CRF-Anpassung nach unten.
+
+        Args:
+            current_crf: Basis-CRF des Videos
+            crf_delta: gewünschte Anpassung nach unten (z.B. 2 für -2 CRF)
+            min_weight: minimale Gewichtung
+            max_weight: maximale Gewichtung
+            min_crf: kleinster Basis-CRF für Skalierung
+            max_crf: größter Basis-CRF für Skalierung
+
+        Rückgabe:
+            float zwischen min_weight und max_weight
+        """
+        if crf_delta == 0.0:
+            return 0.0
+        
+        # Skaliere Basis-CRF auf 0..1
+        crf_norm = (current_crf - min_crf) / (max_crf - min_crf)
+        crf_norm = max(0.0, min(crf_norm, 1.0))
+
+        # Gewicht proportional zum CRF-Delta und Basis-CRF
+        weight = crf_norm * (crf_delta / crf_delta)  # hier nur skalierende Logik
+        # Clamp auf min/max
+        weight = max(min_weight, min(weight, max_weight))
+
+        return weight

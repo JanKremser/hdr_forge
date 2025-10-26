@@ -155,12 +155,13 @@ Examples:
     hdr_forge convert -i input.mkv -o output.mkv --preset film
 Presets:
     [auto]        : Automatic preset selection based on input video characteristics. This is the default.
+    [minimal]     : Minimal. Without any preset and crf optimizations. Only by Resolution.
 
     [film]        : Optimized for film content with moderate motion
-    [grain]       : Optimized for content with film grain preservation
     [action]      : Optimized for action-packed content with fast motion
     [animation]   : Optimized for animated content with vibrant colors\n
 """
+# [grain]       : Optimized for content with film grain preservation
     )
 
     convert_parser.add_argument(

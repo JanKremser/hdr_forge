@@ -68,10 +68,11 @@ class Libx264Codec(VideoCodecBase):
         hdr_forge_preset: HdrForgeEncodingPresets = self._encoder_settings.hdr_forge_encoding_preset.preset
         if hdr_forge_preset == HdrForgeEncodingPresets.ANIMATION:
             return X264Tune.ANIMATION
-        elif hdr_forge_preset == HdrForgeEncodingPresets.GRAIN:
-            return X264Tune.GRAIN
         elif hdr_forge_preset == HdrForgeEncodingPresets.FILM:
             return X264Tune.FILM
+
+        if self._grain.get_category() >= 2:
+            return X264Tune.GRAIN
 
         return None
 
@@ -101,10 +102,22 @@ class Libx264Codec(VideoCodecBase):
         if x264_params.crf is not None:
             return x264_params.crf
 
-        crf = hw_preset.crf
+        crf: float = hw_preset.crf
 
         hdr_forge_preset: HdrForgeEncodingPresets = self._encoder_settings.hdr_forge_encoding_preset.preset
-        if hdr_forge_preset == HdrForgeEncodingPresets.ACTION:
-            crf -= 2.0  # Action preset lowers CRF for better handling of fast motion
+        action_crf: float = 2.0 if hdr_forge_preset == HdrForgeEncodingPresets.ACTION else 0.0 # Action preset lowers CRF for better handling of fast motion
 
-        return int(crf)
+        action_w: float = self._calculate_crf_adjustment_weight(
+            current_crf=crf,
+            crf_delta=action_crf,
+        )
+        crf -= action_crf * action_w
+
+        grain_crf: float = self._grain.get_crf_x265_x264_adjustment()
+        grain_w: float = self._calculate_crf_adjustment_weight(
+            current_crf=crf,
+            crf_delta=grain_crf,
+        )
+        crf -= grain_crf * grain_w
+
+        return round(crf)

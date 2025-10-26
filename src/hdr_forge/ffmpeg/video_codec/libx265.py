@@ -139,7 +139,8 @@ class Libx265Codec(VideoCodecBase):
         hdr_forge_preset: HdrForgeEncodingPresets = self._encoder_settings.hdr_forge_encoding_preset.preset
         if hdr_forge_preset == HdrForgeEncodingPresets.ANIMATION:
             return X265Tune.ANIMATION
-        elif hdr_forge_preset == HdrForgeEncodingPresets.GRAIN:
+
+        if self._grain.get_category() >= 2:
             return X265Tune.GRAIN
 
         return None
@@ -164,9 +165,6 @@ class Libx265Codec(VideoCodecBase):
             CRF value (lower = higher quality)
 
         libx265 generally uses higher CRF values than libx264 for similar quality. 2-5 points higher.
-
-        TODO:
-        Bei 10-Bit-Encoding kannst du den CRF-Wert um etwa +1 (manchmal sogar +2) erhöhen, ohne sichtbaren Qualitätsverlust.
         """
         x265_params: X265Params = self._encoder_settings.x265_prams
         if x265_params.crf is not None:
@@ -174,16 +172,21 @@ class Libx265Codec(VideoCodecBase):
 
         crf: float = hw_preset.crf
         if self.is_hdr_encoding():
-            crf += 1.0  # HDR encoding allows slightly higher CRF (more compression) for similar quality
+            crf += 1.0  # 10-Bit HDR allows slightly higher CRF without quality loss
 
         hdr_forge_preset: HdrForgeEncodingPresets = self._encoder_settings.hdr_forge_encoding_preset.preset
-        if hdr_forge_preset == HdrForgeEncodingPresets.ACTION:
-            crf -= 2.0  # Action preset lowers CRF for better handling of fast motion
-        elif hdr_forge_preset == HdrForgeEncodingPresets.GRAIN:
-            pass
-            # grain_score = 0 → normal, keine Anpassung
-            # grain_score = 1 (leicht) → CRF -0.5
-            # grain_score = 2 (mittel) → CRF -1
-            # grain_score = 3 (viel) → CRF -1.5 bis -2
+        action_crf: float = 2.0 if hdr_forge_preset == HdrForgeEncodingPresets.ACTION else 0.0 # Action preset lowers CRF for better handling of fast motion
+        action_w = self._calculate_crf_adjustment_weight(
+            current_crf=crf,
+            crf_delta=action_crf,
+        )
+        crf -= action_crf * action_w
 
-        return int(hw_preset.crf)
+        grain_crf: float = self._grain.get_crf_x265_x264_adjustment()
+        grain_w = self._calculate_crf_adjustment_weight(
+            current_crf=crf,
+            crf_delta=grain_crf,
+        )
+        crf -= grain_crf * grain_w
+
+        return round(crf)

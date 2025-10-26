@@ -1,4 +1,3 @@
-from contextlib import contextmanager
 import os
 os.environ["OPENCV_FFMPEG_LOGLEVEL"] = "quiet"
 import cv2
@@ -35,23 +34,97 @@ class GrainAnalyzer:
 
         self._result: GrainResult = GrainResult()
 
-    def _analyze_frame(self, frame: np.ndarray) -> float:
+    def _analyze_frame_legacy(self, frame: np.ndarray) -> float:
         h, w = frame.shape[:2]
         scale = self._resize_width / w
         frame_small = cv2.resize(frame, (self._resize_width, int(h*scale)))
 
-        gray = cv2.cvtColor(frame_small, cv2.COLOR_BGR2GRAY)
+        gray: np.ndarray = cv2.cvtColor(frame_small, cv2.COLOR_BGR2GRAY)
+        mean_val: float = float(np.mean(gray))
+        contrast = np.std(gray)
+        # Early exit for nearly black/white
+        if mean_val < 5 or mean_val > 250:
+            return 0.0
+        if mean_val < 16:
+            return 0.0005 * mean_val
+        if contrast < 5:
+            return 0.0
+
         blur = cv2.GaussianBlur(gray, (5, 5), 0)
         highpass = gray.astype(np.float32) - blur.astype(np.float32)
 
-        return float(np.std(highpass) / 255.0)
+        highpass_std = float(np.std(highpass) / 255.0) # the old score
+        return float(highpass_std)
+
+
+    def _analyze_frame(self, frame: np.ndarray) -> float:
+        """
+        Analyzes a frame for film grain.
+        Text/credits edges are devalued.
+        Returns: Score between 0.0 and 3.0
+        """
+        # Resize for performance
+        h, w = frame.shape[:2]
+        scale = self._resize_width / float(w)
+        frame_small = cv2.resize(frame, (self._resize_width, int(h*scale)))
+
+        # Grayscale
+        gray: np.ndarray = cv2.cvtColor(frame_small, cv2.COLOR_BGR2GRAY)
+        mean_val = float(np.mean(gray))
+        if mean_val < 5.0 or mean_val > 250.0:
+            return 0.0
+        if mean_val < 10.0:
+            return 0.00001 * mean_val
+        if mean_val < 16.0:
+            return 0.0005 * mean_val
+
+        # Block size
+        block_size = 32
+        h_blocks = gray.shape[0] // block_size
+        w_blocks = gray.shape[1] // block_size
+
+        scores = []
+
+        for by in range(h_blocks):
+            for bx in range(w_blocks):
+                y0 = by * block_size
+                x0 = bx * block_size
+                block = gray[y0:y0+block_size, x0:x0+block_size]
+
+                # Mask very bright or dark pixels (text/credits)
+                mask = (block > 10) & (block < 245)
+                if np.count_nonzero(mask) < (block_size*block_size*0.2):
+                    continue  # too few valid pixels in block
+
+                valid_pixels = block[mask]
+
+                # High-Pass Filter
+                blur = cv2.GaussianBlur(valid_pixels.astype(np.float32), (3, 3), 0)
+                highpass = valid_pixels.astype(np.float32) - blur.astype(np.float32)
+
+                # Standard deviation
+                std_score = float(np.std(highpass) / 255.0)
+
+                # More robust Laplacian metric: Median instead of variance
+                laplacian = cv2.Laplacian(valid_pixels, cv2.CV_64F)
+                laplacian_score = float(np.median(np.abs(laplacian)) / 255.0)
+
+                # Combine scores
+                block_score = 0.5 * std_score + 0.5 * laplacian_score
+                scores.append(block_score)
+
+        if not scores:
+            return 0.0
+
+        avg_score = float(np.mean(scores))
+        return avg_score
 
     def _calculate_category(self, avg_score: float) -> int:
-        if avg_score < 0.01:
+        if avg_score < 0.035:
             return 0
-        elif avg_score < 0.02:
+        elif avg_score < 0.05:
             return 1
-        elif avg_score < 0.03:
+        elif avg_score < 0.1:
             return 2
         return 3
 
@@ -59,9 +132,6 @@ class GrainAnalyzer:
         cap = cv2.VideoCapture(str(self._video._filepath))
         if not cap.isOpened():
             raise RuntimeError("Video cannot be opened")
-
-        #fps = cap.get(cv2.CAP_PROP_FPS)
-        #total_frames = int(min(self._duration_sec * fps, cap.get(cv2.CAP_PROP_FRAME_COUNT)))
 
         fps = self._video.get_fps()
         start_frame = int(self._start_sec * fps)
@@ -119,3 +189,13 @@ class GrainAnalyzer:
 
     def get_category_and_score(self) -> Tuple[int, float]:
         return self._result.category, self._result.score
+
+    def get_category(self) -> int:
+        return self._result.category
+
+    def get_crf_x265_x264_adjustment(self) -> float:
+        cat, score = self.get_category_and_score()
+        if cat == 0:
+            return 0.0
+        multi: float = min(1.0, score * 10.0)
+        return 3.0 * multi
