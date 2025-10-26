@@ -320,6 +320,36 @@ def print_conversion_summary(success_count: int, fail_count: int) -> None:
     print(f"{color_str('_', color)}" * 70)
 
 
+class ProgressBarSpinner:
+    """Simple spinner progress indicator for indeterminate tasks."""
+
+    def __init__(self, description: str):
+        self.description = description
+        self.spinner = ['|', '/', '-', '\\']
+        self.index = 0
+        self.running = False
+
+    def start(self) -> None:
+        """Start the spinner."""
+        self.running = True
+        print(f"{self.description}", flush=True)
+
+    def update(self) -> None:
+        """Update the spinner state."""
+        if not self.running:
+            return
+        bar: str = create_progress_bar(percent=(self.index % 20) * 5, text=f"Processing {self.spinner[self.index % 4]}")  # Indeterminate progress
+        status: str = f"{CLEAR_LINE}{MOVE_TO_START}{bar}"
+        print(status, end='', flush=True)
+        self.index += 1
+
+    def stop(self, text: str | None) -> None:
+        """Stop the spinner."""
+        self.running = False
+        bar: str = create_progress_bar(percent=100, text=text or "Processing Done")
+        status: str = f"{CLEAR_LINE}{MOVE_TO_START}{bar}\n"
+        print(status, end='', flush=True)
+
 def monitor_process_progress(process: subprocess.Popen, description: str) -> None:
     """Monitor a running process and display a progress bar.
 
@@ -330,20 +360,14 @@ def monitor_process_progress(process: subprocess.Popen, description: str) -> Non
     if not process:
         return
 
-    print(f"{description}", flush=True)
-
-    spinner = ['|', '/', '-', '\\']
-    i = 0
+    spinner = ProgressBarSpinner(description=description)
+    spinner.start()
 
     while process.poll() is None:
-        bar = create_progress_bar(percent=(i % 20) * 5, text=f"Processing {spinner[i % 4]}")  # Indeterminate progress
-        status = f"{CLEAR_LINE}{MOVE_TO_START}{bar}"
-        print(status, end='', flush=True)
+        spinner.update()
         time.sleep(0.1)
-        i += 1
 
-    # Clear the progress line after completion
-    print(f"{CLEAR_LINE}{MOVE_TO_START}", end='', flush=True)
+    spinner.stop(None)
 
 def create_aspect_ratio_str(width: int, height: int, tolerance: float = 0.02) -> str:
     """

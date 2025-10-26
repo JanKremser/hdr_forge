@@ -169,14 +169,13 @@ Presets:
         default="cpu:balanced",
         help="""HDR Forge hardware preset for encoding optimization. Not x265/x264 presets.
 Examples:
-    hdr_forge convert -i input.mkv -o output.mkv --hw-preset cpu:opt
+    hdr_forge convert -i input.mkv -o output.mkv --hw-preset cpu:quality
 Presets:
   CPU based encoding:
     [cpu:balanced] : Balanced speed and quality, this is the default for CPU encoding
-
-    [cpu:opt]      : Optimized settings for your system with balanced speed and quality
     [cpu:quality]  : Focus on quality. You need a high-performance system for this preset.\n
 """
+    # [cpu:opt]      : Optimized settings for your system with balanced speed and quality
     # [gpu-balanced]
     # [gpu-opt]
     # [gpu-quality]

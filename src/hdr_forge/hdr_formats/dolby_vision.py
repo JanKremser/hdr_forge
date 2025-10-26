@@ -6,7 +6,7 @@ import threading
 from pathlib import Path
 from typing import Optional
 
-from hdr_forge.cli.cli_output import monitor_process_progress
+from hdr_forge.cli.cli_output import monitor_process_progress, print_debug
 from hdr_forge.typedefs.dolby_vision_typing import DolbyVisionProfile, DolbyVisionProfileEncodingMode, DolbyVisionRpuInfo
 
 
@@ -93,7 +93,7 @@ def extract_base_layer(input_path: Path, output_hevc: Optional[Path] = None) -> 
         monitor_thread.start()
 
         # Wait for dovi_tool to complete
-        stdout, stderr = dovi_process.communicate()
+        _stdout, stderr = dovi_process.communicate()
 
         # Wait for the monitor thread to finish
         monitor_thread.join(timeout=1.0)
@@ -108,7 +108,7 @@ def extract_base_layer(input_path: Path, output_hevc: Optional[Path] = None) -> 
         if not output_hevc.exists():
             raise RuntimeError("HADR10 Base Layer file was not created")
 
-        print(f"- HDR10 Base Layer extracted successfully: {str(output_hevc)}")
+        print_debug(f"- HDR10 Base Layer extracted successfully: {str(output_hevc)}")
         return output_hevc
 
     except FileNotFoundError as e:
@@ -172,7 +172,7 @@ def inject_rpu(input_path: Path, input_rpu: Path, output_hevc: Optional[Path] = 
         if not output_hevc.exists():
             raise RuntimeError("HEVC file with RPU was not created")
 
-        print(f"- RPU injected successfully: {str(output_hevc)}")
+        print_debug(f"- RPU injected successfully: {str(output_hevc)}")
         return output_hevc
 
     except FileNotFoundError as e:
@@ -262,7 +262,7 @@ def extract_rpu(input_path: Path, output_rpu: Optional[Path] = None, dv_profile_
         monitor_thread.start()
 
         # Wait for dovi_tool to complete
-        stdout, stderr = dovi_process.communicate()
+        _stdout, stderr = dovi_process.communicate()
 
         # Wait for the monitor thread to finish
         monitor_thread.join(timeout=1.0)
@@ -277,7 +277,7 @@ def extract_rpu(input_path: Path, output_rpu: Optional[Path] = None, dv_profile_
         if not output_rpu.exists():
             raise RuntimeError("RPU file was not created")
 
-        print(f"- RPU extracted successfully: {str(output_rpu)}")
+        print_debug(f"- RPU extracted successfully: {str(output_rpu)}")
         return output_rpu
 
     except FileNotFoundError as e:
@@ -333,7 +333,7 @@ def inject_dolby_vision_layers(bl_path: Path, el_path: Path, output_bl_el: Optio
         monitor_thread.start()
 
         # Wait for dovi_tool to complete
-        stdout, stderr = dovi_process.communicate()
+        _stdout, stderr = dovi_process.communicate()
 
         # Wait for the monitor thread to finish
         monitor_thread.join(timeout=1.0)
@@ -345,7 +345,7 @@ def inject_dolby_vision_layers(bl_path: Path, el_path: Path, output_bl_el: Optio
         if not output_bl_el.exists():
             raise RuntimeError("Multiplexed file was not created")
 
-        print(f"- Dolby Vision layers multiplexed successfully: {str(output_bl_el)}")
+        print_debug(f"- Dolby Vision layers multiplexed successfully: {str(output_bl_el)}")
         return output_bl_el
 
     except FileNotFoundError as e:
@@ -422,7 +422,7 @@ def extract_enhancement_layer(input_file: Path, output_el: Optional[Path] = None
         monitor_thread.start()
 
         # Wait for dovi_tool to complete
-        stdout, stderr = dovi_process.communicate()
+        _stdout, stderr = dovi_process.communicate()
 
         # Wait for the monitor thread to finish
         monitor_thread.join(timeout=1.0)
@@ -437,7 +437,7 @@ def extract_enhancement_layer(input_file: Path, output_el: Optional[Path] = None
         if not output_el.exists():
             raise RuntimeError("Enhancement Layer file was not created")
 
-        print(f"- Enhancement Layer extracted successfully: {str(output_el)}")
+        print_debug(f"- Enhancement Layer extracted successfully: {str(output_el)}")
         return output_el
 
     except FileNotFoundError as e:

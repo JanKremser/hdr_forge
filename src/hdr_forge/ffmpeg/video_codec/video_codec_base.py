@@ -1,15 +1,13 @@
 from abc import ABC, abstractmethod
-from concurrent.futures import ThreadPoolExecutor, as_completed
 import math
-import os
-import subprocess
 import sys
-from typing import Callable, Counter, Optional, Tuple, Type, TypeVar
+from typing import Optional, Tuple, Type, TypeVar
 
+from hdr_forge.analyze.crop_video import CropResult, VideoCropper
+from hdr_forge.analyze.grain_score import GrainAnalyzer
 from hdr_forge.cli.cli_output import print_err, print_warn
-from hdr_forge.cli.video_codec_base import callback_handler_crop_video
 from hdr_forge.ffmpeg.video_codec.service.presets import calc_hw_prest_params
-from hdr_forge.typedefs.encoder_typing import CropHandler, CropMode, CropSettings, EncoderSettings, HdrSdrFormat, ScaleMode, VideoEncoderLibrary
+from hdr_forge.typedefs.encoder_typing import EncoderSettings, HdrSdrFormat, ScaleMode, VideoEncoderLibrary
 from hdr_forge.video import Video
 
 T = TypeVar("T")
@@ -45,14 +43,18 @@ class VideoCodecBase(ABC):
             print_err(f"{self.lib.value} does not support the selected {self._hdr_sdr_format_for_encoding.value}-format for encoding.")
             sys.exit(1)
 
-        self._crop_width: int = video.width
-        self._crop_height: int = video.height
-        self._crop_x: int = 0
-        self._crop_y: int = 0
-        if encoder_settings.crop.mode != CropMode.OFF:
-            self._crop_video(
-                crop_settings=encoder_settings.crop,
-            )
+        self._cropper = VideoCropper(
+            video=video,
+            crop_settings=encoder_settings.crop,
+            encoding_hdr_sdr_format=self._hdr_sdr_format_for_encoding,
+        )
+        self._cropper.process_crop()
+
+        self._grain = GrainAnalyzer(
+            video=video,
+        )
+        self._grain.analyze()
+        # print(f"Detected grain score: {self._grain._result.score:.4f} (Category: {self._grain._result.category})")
 
         self._scale_width: Optional[int]
         self._scale_height: Optional[int]
@@ -129,33 +131,21 @@ class VideoCodecBase(ABC):
         """
         return self._hdr_sdr_format_for_encoding in [HdrSdrFormat.HDR10, HdrSdrFormat.DOLBY_VISION]
 
-    def is_cropped(self) -> bool:
-        """Check if video has cropping applied.
-
-        Returns:
-            True if cropping is applied, False otherwise
-        """
-        return (self._crop_width != self._video.width or
-                self._crop_height != self._video.height or
-                self._crop_x != 0 or
-                self._crop_y != 0)
-
-    def get_crop(self) -> Optional[Tuple[int, int, int, int]]:
+    def get_crop(self) -> CropResult:
         """Get ffmpeg crop filter string if cropping is needed.
 
         Returns:
-            Crop filter string or None if no cropping needed
+            Crop filter
         """
-        if self.is_cropped():
-            return (self._crop_width, self._crop_height, self._crop_x, self._crop_y)
-        return None
+        return self._cropper.get_crop_result()
 
     def get_encoding_resolution(self) -> Tuple[int, int]:
         if self._scale_width and self._scale_height:
             return self._scale_width, self._scale_height
 
-        if self.is_cropped():
-            return self._crop_width, self._crop_height
+        if self._cropper.is_cropped():
+            crop: CropResult = self._cropper.get_crop_result()
+            return crop.width, crop.height
         return self._video.width, self._video.height
 
     def calc_hw_preset_settings(self, cls: Type[T]) -> T:
@@ -186,10 +176,9 @@ class VideoCodecBase(ABC):
         Returns:
             Crop filter string or None if no cropping needed
         """
-        crop: Tuple[int, int, int, int] | None = self.get_crop()
-        if crop:
-            width, height, x, y = crop
-            return f"crop={width}:{height}:{x}:{y}"
+        crop: CropResult = self._cropper.get_crop_result()
+        if crop.is_valid:
+            return f"crop={crop.width}:{crop.height}:{crop.x}:{crop.y}"
         return None
 
     def _get_pixel_count(self) -> int:
@@ -238,174 +227,6 @@ class VideoCodecBase(ABC):
         # Valid downgrade
         return hdr_sdr_format
 
-    def _detect_crop_at_position(self, position_seconds: int) -> Optional[Tuple[int, int, int, int]]:
-        """Detect crop parameters at a specific video position.
-
-        Args:
-            position_seconds: Time position in seconds to analyze
-
-        Returns:
-            Tuple of (width, height, x, y) or None if detection fails
-        """
-        hdr_cropdetect_filter: str = ""
-        if self._video.is_hdr_video():
-            hdr_cropdetect_filter = "zscale=transfer=bt709,format=yuv420p,hqdn3d=1.5:1.5:6:6,"
-
-        cmd: list[str] = [
-            'ffmpeg',
-            '-ss', str(position_seconds),
-            '-i', str(self._video._filepath),
-            '-vf', f'{hdr_cropdetect_filter}cropdetect=24:16:0',
-            '-frames:v', '30',
-            '-f', 'null',
-            '-'
-        ]
-
-        try:
-            result: subprocess.CompletedProcess[str] = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=30
-            )
-
-            # Parse cropdetect output
-            import re
-            crop_pattern = re.compile(r'crop=(\d+):(\d+):(\d+):(\d+)')
-
-            for line in result.stderr.split('\n'):
-                match = crop_pattern.search(line)
-                if match:
-                    w, h, x, y = map(int, match.groups())
-                    return (w, h, x, y)
-
-        except (subprocess.TimeoutExpired, Exception):
-            pass
-
-        return None
-
-    def _detect_crop_auto(
-        self,
-        check_samples: int = 10,
-        max_workers: int = 16,
-        callback: Optional[Callable[[CropHandler], None]] = None,
-    ) -> Optional[Tuple[int, int, int, int]]:
-        if callback:
-            callback(CropHandler(
-                finish_progress=False,
-                completed_samples=0,
-                total_samples=check_samples,
-            ))
-
-        # Get video duration
-        duration = self._video.get_duration_seconds()
-
-        if duration <= 0:
-            return
-
-        # Calculate positions to sample (evenly distributed)
-        interval: float = duration / (check_samples + 1)
-        positions: list[int] = [int(interval * (i + 1)) for i in range(check_samples)]
-
-        # Run crop detection in parallel
-        crop_results: list = []
-        completed = 0
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = {
-                executor.submit(self._detect_crop_at_position, pos): pos
-                for pos in positions
-            }
-
-            for future in as_completed(futures):
-                result = future.result()
-                if result:
-                    crop_results.append(result)
-                completed += 1
-
-                if callback:
-                    callback(CropHandler(
-                        finish_progress=False,
-                        completed_samples=completed,
-                        total_samples=check_samples,
-                    ))
-
-        # Send final crop handler
-        if callback:
-            callback(CropHandler(
-                finish_progress=True,
-                completed_samples=completed,
-                total_samples=check_samples,
-            ))
-
-        if not crop_results:
-            return
-
-        # Find most common crop dimensions
-        crop_counter = Counter(crop_results)
-        most_common_crop: Tuple[int, int, int, int] = crop_counter.most_common(1)[0][0]
-
-        return most_common_crop
-
-    def _crop_video(
-        self,
-        crop_settings: CropSettings,
-    ) -> None:
-        """Detect and apply optimal crop parameters using multi-threaded analysis.
-
-        Args:
-            num_threads: Number of concurrent threads for crop detection
-            callback: Optional callback function for progress updates
-        """
-
-        if crop_settings.mode == CropMode.OFF:
-            return
-
-        if (
-            self.get_encoding_hdr_sdr_format() == HdrSdrFormat.DOLBY_VISION
-        ):
-            print_err(msg="Crop detection is not supported for Dolby Vision encoding.")
-            sys.exit(1)
-
-        if crop_settings.mode == CropMode.AUTO:
-            cpu_kerne: int = min(crop_settings.check_samples, os.cpu_count() or 4)
-            c: Tuple[int, int, int, int] | None = self._detect_crop_auto(
-                check_samples=crop_settings.check_samples,
-                max_workers=cpu_kerne,
-                callback=callback_handler_crop_video,
-            )
-            if c is None:
-                print_warn("Auto crop detection failed or no crop needed.")
-                return
-            self._crop_width, self._crop_height, self._crop_x, self._crop_y = c
-
-        if crop_settings.mode == CropMode.MANUAL:
-            if crop_settings.manual_crop is not None:
-                self._crop_x, self._crop_y, self._crop_width, self._crop_height = crop_settings.manual_crop
-
-        if crop_settings.mode == CropMode.RATIO:
-            if crop_settings.ratio is not None:
-                ar_w, ar_h = crop_settings.ratio
-                target_aspect_ratio: float = ar_w / ar_h
-                current_aspect_ratio: float = self._video.width / self._video.height
-
-                if current_aspect_ratio > target_aspect_ratio:
-                    # Video is wider than target aspect ratio - crop width
-                    new_width: int = int(self._video.height * target_aspect_ratio)
-                    self._crop_width = new_width
-                    self._crop_height = self._video.height
-                    self._crop_x = (self._video.width - new_width) // 2
-                    self._crop_y = 0
-                elif current_aspect_ratio < target_aspect_ratio:
-                    # Video is taller than target aspect ratio - crop height
-                    new_height: int = int(self._video.width / target_aspect_ratio)
-                    self._crop_width = self._video.width
-                    self._crop_height = new_height
-                    self._crop_x = 0
-                    self._crop_y = (self._video.height - new_height) // 2
-                else:
-                    # Aspect ratios match - no cropping needed
-                    pass
-
     def _determine_scale_width_height(
         self,
         scale_mode: ScaleMode = ScaleMode.HEIGHT,
@@ -433,17 +254,18 @@ class VideoCodecBase(ABC):
 
             return new_w, new_h
 
-        if self.is_cropped() is False:
+        crop_result: CropResult = self._cropper.get_crop_result()
+        if crop_result.is_valid is False:
             return __check_rounding(new_scale_width, new_scale_height)
 
-        new_aspect_ratio: float = self._crop_width / self._crop_height
+        new_aspect_ratio: float = crop_result.width / crop_result.height
 
         if scale_mode == ScaleMode.HEIGHT:
             # scale-mode height
 
             height: int
-            if self._crop_height < new_scale_height:
-                height = self._crop_height
+            if crop_result.height < new_scale_height:
+                height = crop_result.height
             else:
                 height = new_scale_height
 
@@ -453,14 +275,14 @@ class VideoCodecBase(ABC):
 
         if scale_mode == ScaleMode.ADAPTIVE:
             # scale-mode adaptive
-            if self._crop_width > new_scale_width:
+            if crop_result.width > new_scale_width:
                 new_scale_height = math.floor(new_scale_width / new_aspect_ratio)
                 return (new_scale_width, new_scale_height)
 
-            if self._crop_height > new_scale_height:
+            if crop_result.height > new_scale_height:
                 new_scale_width = math.ceil(new_scale_height * new_aspect_ratio)
                 return (new_scale_width, new_scale_height)
 
-            return __check_rounding(self._crop_width, self._crop_height)
+            return __check_rounding(crop_result.width, crop_result.height)
 
         return None, None

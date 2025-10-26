@@ -1,6 +1,7 @@
 """CLI output and progress tracking functionality."""
 
 from typing import Tuple
+from hdr_forge.analyze.crop_video import CropResult
 from hdr_forge.cli.cli_output import BLUE, color_str, create_aspect_ratio_str
 from hdr_forge.ffmpeg.video_codec.video_codec_base import VideoCodecBase
 from hdr_forge.typedefs.dolby_vision_typing import DolbyVisionEnhancementLayer, DolbyVisionProfile
@@ -31,11 +32,9 @@ def print_encoding_params(encoder: Encoder) -> None:
         print(f"    Preset: {color_str(v_param.get('preset') or '-', color)}")
         print(f"    Tune: {color_str(v_param.get('tune') or '-', color)}")
 
-        crop: Tuple[int, int, int, int] | None = video_codec_lib.get_crop()
-        if crop:
-            width, height, x, y = crop
-            crop_filter: str | None = f"{width}:{height}:{x}:{y}"
-            print(f"  Crop: {color_str(crop_filter, color)}")
+        crop: CropResult = video_codec_lib.get_crop()
+        if crop.is_valid:
+            print(f"  Crop: {color_str(f"{crop.width}:{crop.height}:{crop.x}:{crop.y}", color)}")
         else:
             print(f"  Crop: {color_str('-', color)}")
 

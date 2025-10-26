@@ -1,73 +1,93 @@
 import cv2
 import numpy as np
+from dataclasses import dataclass
+from typing import List, Tuple
+from hdr_forge.cli.cli_output import ProgressBarSpinner
+from hdr_forge.video import Video
 
-def compute_grain_score(video_path, duration_sec=5, sample_rate=1, resize_width=640):
-    """
-    Berechnet den Grain-Score eines Videos.
+@dataclass
+class GrainResult:
+    category: int = 0
+    score: float = 0.0
+    scores: List[float] | None = None
 
-    Args:
-        video_path (str): Pfad zum Video
-        duration_sec (int): Anzahl der Sekunden, die analysiert werden
-        sample_rate (float): Sample alle x Sekunden
-        resize_width (int): Breite, um Videoframes auf kleiner Größe zu analysieren (schneller)
+    def __post_init__(self):
+        if self.scores is None:
+            self.scores = []
 
-    Returns:
-        int: Grain Score Kategorie 0-3
-        float: normalisierter Grain Score
-    """
-    cap = cv2.VideoCapture(video_path)
-    if not cap.isOpened():
-        raise RuntimeError("Video konnte nicht geöffnet werden")
+class GrainAnalyzer:
+    def __init__(
+        self,
+        video: Video,
+        duration_sec: int | None = 5,
+        sample_rate: float | None = 1,
+        resize_width: int | None = 640
+    ):
+        self._video: Video = video
+        self._duration_sec: int = duration_sec or 5
+        self._sample_rate: float = sample_rate or 1
+        self._resize_width: int = resize_width or 640
+        self._result: GrainResult = GrainResult()
 
-    fps = cap.get(cv2.CAP_PROP_FPS)
-    total_frames = int(min(duration_sec * fps, cap.get(cv2.CAP_PROP_FRAME_COUNT)))
-    sample_interval = max(int(fps * sample_rate), 1)
-
-    scores = []
-
-    for i in range(0, total_frames, sample_interval):
-        cap.set(cv2.CAP_PROP_POS_FRAMES, i)
-        ret, frame = cap.read()
-        if not ret:
-            break
-
-        # Optional: kleiner skalieren für schnellere Analyse
+    def _analyze_frame(self, frame: np.ndarray) -> float:
         h, w = frame.shape[:2]
-        scale = resize_width / w
-        frame_small = cv2.resize(frame, (resize_width, int(h*scale)))
+        scale = self._resize_width / w
+        frame_small = cv2.resize(frame, (self._resize_width, int(h*scale)))
 
-        # Luma (Helligkeit) extrahieren
         gray = cv2.cvtColor(frame_small, cv2.COLOR_BGR2GRAY)
-
-        # Highpass Filter: Original - Blur
         blur = cv2.GaussianBlur(gray, (5, 5), 0)
         highpass = gray.astype(np.float32) - blur.astype(np.float32)
 
-        # Standardabweichung der hochfrequenten Komponenten
-        score = np.std(highpass) / 255.0
-        scores.append(score)
+        return float(np.std(highpass) / 255.0)
 
-    cap.release()
-    if not scores:
-        return 0, 0.0
+    def _calculate_category(self, avg_score: float) -> int:
+        if avg_score < 0.01:
+            return 0
+        elif avg_score < 0.02:
+            return 1
+        elif avg_score < 0.03:
+            return 2
+        return 3
 
-    avg_score = float(np.mean(scores))
+    def analyze(self) -> None:
+        cap = cv2.VideoCapture(str(self._video._filepath))
+        if not cap.isOpened():
+            raise RuntimeError("Video cannot be opened")
 
-    # Umrechnung in Kategorien 0-3
-    if avg_score < 0.01:
-        category = 0
-    elif avg_score < 0.02:
-        category = 1
-    elif avg_score < 0.03:
-        category = 2
-    else:
-        category = 3
+        fps = self._video.get_fps()
+        total_frames = int(min(self._duration_sec * fps, self._video.get_total_frames()))
+        sample_interval = max(int(fps * self._sample_rate), 1)
 
-    return category, avg_score
+        scores: List[float] = []
+        spinner = ProgressBarSpinner("Analyzing grain...")
+        spinner.start()
 
+        for i in range(0, total_frames, sample_interval):
+            cap.set(cv2.CAP_PROP_POS_FRAMES, i)
+            ret, frame = cap.read()
+            if not ret:
+                break
 
-# -----------------------
-# Beispiel
-video_file = "/home/jan/Dokumente/GitHub/ehdr/samples/grain_test.mp4"
-grain_cat, grain_val = compute_grain_score(video_file)
-print(f"Grain Kategorie: {grain_cat}, Grain Score: {grain_val:.4f}")
+            score = self._analyze_frame(frame)
+            scores.append(score)
+            spinner.update()
+
+        cap.release()
+
+        if scores:
+            avg_score = float(np.mean(scores))
+            category = self._calculate_category(avg_score)
+            self._result = GrainResult(
+                category=category,
+                score=avg_score,
+                scores=scores
+            )
+            spinner.stop(f"Detected grain category: {category}")
+        else:
+            spinner.stop()
+
+    def get_result(self) -> GrainResult:
+        return self._result
+
+    def get_category_and_score(self) -> Tuple[int, float]:
+        return self._result.category, self._result.score
