@@ -54,7 +54,6 @@ class VideoCodecBase(ABC):
             video=video,
         )
         self._grain.analyze()
-        # print(f"Detected grain score: {self._grain._result.score:.4f} (Category: {self._grain._result.category})")
 
         self._scale_width: Optional[int]
         self._scale_height: Optional[int]
@@ -312,7 +311,7 @@ class VideoCodecBase(ABC):
         """
         if crf_delta == 0.0:
             return 0.0
-        
+
         # Skaliere Basis-CRF auf 0..1
         crf_norm = (current_crf - min_crf) / (max_crf - min_crf)
         crf_norm = max(0.0, min(crf_norm, 1.0))
