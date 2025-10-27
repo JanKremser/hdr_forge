@@ -19,6 +19,8 @@ class Libx264Codec(VideoCodecBase):
 
     SDR_PIXEL_FORMAT = 'yuv420p'
 
+    SDR_PROFILE = 'high'
+
     def __init__(self, encoder_settings: EncoderSettings, video: Video, scale: Tuple[int, int]):
         super().__init__(
             lib=VideoEncoderLibrary.LIBX264,
@@ -35,9 +37,10 @@ class Libx264Codec(VideoCodecBase):
     def get_ffmpeg_params(self) -> dict:
         output_options: dict = super().get_ffmpeg_params()
         output_options.update({
+            "profile:v": self.SDR_PROFILE,
+            "pix_fmt": self.SDR_PIXEL_FORMAT,
             "preset": self._preset.value,
             "crf": str(self._crf),
-            "pix_fmt": self.SDR_PIXEL_FORMAT,
         })
 
         if self._tune is not None:

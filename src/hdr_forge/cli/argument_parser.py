@@ -104,7 +104,7 @@ Examples:
         '--x265-params',
         help="""Custom x265 parameters for advanced users. Format:
 Example:
-    preset=medium,crf=20
+    preset=medium:crf=20
 Parameters:
     preset= : x265 encoding preset (ultrafast, superfast, veryfast, faster, fast, medium, slow, slower, veryslow)
               [ultrafast] : Lowest compression, fastest encoding
@@ -146,7 +146,7 @@ Parameters:
 
     convert_parser.add_argument(
         '-p', '--preset',
-        choices=["auto", "film", "grain", "action", "animation", "web"],
+        choices=["auto", "film", "action", "animation"],
         default="auto",
         help="""HDR Forge encoding preset for simplified settings. Default is the automation mode. Not x265/x264 presets.
 You can combine Presets with HW-Presets.
@@ -155,7 +155,6 @@ Examples:
     hdr_forge convert -i input.mkv -o output.mkv --preset film
 Presets:
     [auto]        : Automatic preset selection based on input video characteristics. This is the default.
-    [minimal]     : Minimal. Without any preset and crf optimizations. Only by Resolution.
 
     [film]        : Optimized for film content with moderate motion
     [action]      : Optimized for action-packed content with fast motion
@@ -176,7 +175,7 @@ Presets:
     [cpu:quality]  : Focus on quality. You need a high-performance system for this preset.
 
     [gpu:balanced] : Balanced quality and size
-    [gpu:quality] : Focus on quality\n
+    [gpu:quality]  : Focus on quality\n
 """
     # [cpu:opt]      : Optimized settings for your system with balanced speed and quality
     )
@@ -187,8 +186,15 @@ Presets:
 [auto]             : Automatically detect and crop black bars
 [width:height:x:y] : Manually specify crop dimensions. The basis for the calculation is the original video, not the target resolution.
 [16:9] or [1.77:1] : 16:9, 21:9 etc. to crop to specific aspect ratio
-[cinema]           : CinemaScope Classic 2.35:1 ratio\n
+[cinema]           : CinemaScope Classic 2.35:1 ratio
 [cinema-modern]    : CinemaScope Modern 2.39:1 ratio\n
+"""
+    )
+
+    convert_parser.add_argument(
+        '--grain',
+        help="""Analyze grain in the input video and optimize encoding settings accordingly.
+[auto]             : Disable grain analysis
 """
     )
 

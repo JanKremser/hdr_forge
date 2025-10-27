@@ -13,6 +13,8 @@ class H264NvencCodec(VideoCodecBase):
 
     SDR_PIXEL_FORMAT = 'yuv420p'
 
+    SDR_PROFILE = 'high'
+
     def __init__(self, encoder_settings: EncoderSettings, video: Video, scale: Tuple[int, int]):
         super().__init__(
             lib=VideoEncoderLibrary.H264_NVENC,
@@ -29,11 +31,12 @@ class H264NvencCodec(VideoCodecBase):
         output_options: dict = super().get_ffmpeg_params()
         output_options.update({
             "rc": "vbr_hq", # variable Bitrate mit hoher Qualität (NVENC-spezifisch)
+            "profile:v": self.SDR_PROFILE,
+            "pix_fmt": self.SDR_PIXEL_FORMAT,
             "preset": self._preset.value,
             "cq": str(self._cq)
         })
 
-        output_options['pix_fmt'] = self.SDR_PIXEL_FORMAT
         if self._video.is_hdr_video():
             print_warn("H264_NVENC-SDR encoding does not support HDR metadata removal;")
 

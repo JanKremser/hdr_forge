@@ -15,6 +15,7 @@ class Libx265Codec(VideoCodecBase):
 
     # HDR x265 parameters for HDR10 encoding
     HDR_X265_PARAMS: list[str] = [
+        'profile=main10',
         'hdr-opt=1',
         'repeat-headers=1',
         'colorprim=bt2020',
@@ -24,6 +25,7 @@ class Libx265Codec(VideoCodecBase):
 
     # SDR x265 parameters
     SDR_X265_PARAMS: list[str] = [
+        'profile=main',
         'colorprim=bt709',
         'transfer=bt709',
         'colormatrix=bt709',

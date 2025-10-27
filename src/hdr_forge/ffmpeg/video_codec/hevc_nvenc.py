@@ -14,8 +14,11 @@ class HevcNvencCodec(VideoCodecBase):
         HdrSdrFormat.DOLBY_VISION,
     ]
 
-    HDR_PIXEL_FORMAT = 'yuv420p10le'
+    HDR_PIXEL_FORMAT = 'p010le' # 'yuv420p10le'
     SDR_PIXEL_FORMAT = 'yuv420p'
+
+    HDR_PROFILE = 'main10'
+    SDR_PROFILE = 'main'
 
     def __init__(self, encoder_settings: EncoderSettings, video: Video, scale: Tuple[int, int]):
         super().__init__(
@@ -41,6 +44,7 @@ class HevcNvencCodec(VideoCodecBase):
 
         if encoding_hdr_sdr_format in [HdrSdrFormat.HDR10, HdrSdrFormat.DOLBY_VISION]:
             output_options['pix_fmt'] = self.HDR_PIXEL_FORMAT
+            output_options['profile:v'] = self.HDR_PROFILE
 
             master_display: MasterDisplayMetadata | None = self._get_master_display_for_encoding()
             if master_display:
@@ -55,6 +59,7 @@ class HevcNvencCodec(VideoCodecBase):
                 print_warn("HEVC_NVENC HDR Metadata for Dolby Vision encoding is not yet supported;")
         elif encoding_hdr_sdr_format == HdrSdrFormat.SDR:
             output_options['pix_fmt'] = self.SDR_PIXEL_FORMAT
+            output_options['profile:v'] = self.SDR_PROFILE
             if self._video.is_hdr_video():
                 print_warn("HEVC_NVENC-SDR encoding does not support HDR metadata removal;")
 
