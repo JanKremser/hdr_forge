@@ -213,7 +213,7 @@ def process_info_command(args) -> int:
 def main() -> None:
     """Main entry point for CLI."""
     args = argument_parser.parse_args()
-    config.debug_mode = args.debug
+    config.debug_mode = getattr(args, 'debug', False) or False
     if config.debug_mode:
         print_debug("Debug mode enabled")
 

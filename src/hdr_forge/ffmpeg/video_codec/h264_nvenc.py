@@ -49,30 +49,46 @@ class H264NvencCodec(VideoCodecBase):
         }
 
     def _get_auto_preset(self, hw_preset: Hdr_Forge_HEVC_H264_NVENC_Preset) -> HEVC_NVENC_Preset:
-        """Select optimal encoding preset based on resolution.
+        """Select optimal encoding preset based on resolution and parameter priority.
+
+        Priority:
+            1. nvenc_params.preset (from --encoder-params)
+            2. hw_preset.preset (from --hw-preset)
 
         Returns:
-            Preset string (faster preset = quicker encoding, lower compression)
+            HEVC_NVENC_Preset enum value
         """
-        # x265_params: X265Params = self._encoder_settings.x265_prams
-        # if x265_params.preset is not None:
-        #     return x265_params.preset
+        # Priority 1: nvenc_params from --encoder-params
+        nvenc_params = self._encoder_settings.nvenc_params
+        if nvenc_params.preset is not None:
+            return nvenc_params.preset
 
+        # Priority 2: Auto-detection from hw_preset
         preset = hw_preset.preset
         return HEVC_NVENC_Preset(preset)
 
     def _get_auto_cq(self, hw_preset: Hdr_Forge_HEVC_H264_NVENC_Preset) -> int:
-        """Calculate optimal CRF value based on resolution.
+        """Calculate optimal CQ value based on parameter priority.
+
+        Priority:
+            1. nvenc_params.cq (from --encoder-params)
+            2. universal_params.quality (from --quality)
+            3. hw_preset.cq (auto-detection)
 
         Returns:
-            CRF value (lower = higher quality)
-
-        libx265 generally uses higher CRF values than libx264 for similar quality. 2-5 points higher.
+            CQ value (lower = higher quality)
         """
-        # x265_params: X265Params = self._encoder_settings.x265_prams
-        # if x265_params.crf is not None:
-        #     return x265_params.crf
+        # Priority 1: nvenc_params from --encoder-params
+        nvenc_params = self._encoder_settings.nvenc_params
+        if nvenc_params.cq is not None:
+            return nvenc_params.cq
 
+        # Priority 2: universal_params from --quality
+        universal_params = self._encoder_settings.universal_params
+        if universal_params.quality is not None:
+            return universal_params.quality
+
+        # Priority 3: Auto-detection from hw_preset
         cq: float = hw_preset.cq
         if self.is_hdr_encoding():
             cq += 1.0  # 10-Bit HDR allows slightly higher CRF without quality loss

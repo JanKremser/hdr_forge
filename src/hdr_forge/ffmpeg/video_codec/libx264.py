@@ -1,7 +1,7 @@
 from typing import Optional, Tuple
 from hdr_forge.ffmpeg.video_codec.service.presets import Hdr_Forge_X265_X264_Preset
 from hdr_forge.ffmpeg.video_codec.video_codec_base import VideoCodecBase
-from hdr_forge.typedefs.encoder_typing import EncoderSettings, HdrForgeEncodingPresets, HdrSdrFormat, VideoEncoderLibrary, X264Params, X264Tune, x265_x264_Preset
+from hdr_forge.typedefs.encoder_typing import EncoderSettings, HdrForgeEncodingPresets, HdrSdrFormat, VideoEncoderLibrary, Libx264Params, X264Tune, x265_x264_Preset
 from hdr_forge.video import Video
 
 class Libx264Codec(VideoCodecBase):
@@ -32,7 +32,7 @@ class Libx264Codec(VideoCodecBase):
         hw_preset: Hdr_Forge_X265_X264_Preset = self.calc_hw_preset_settings(Hdr_Forge_X265_X264_Preset)
         self._crf: int = self._get_auto_crf(hw_preset)
         self._preset: x265_x264_Preset = self._get_auto_preset(hw_preset)
-        self._tune: X264Tune | None = encoder_settings.x264_prams.tune
+        self._tune: X264Tune | None = self._get_auto_tune()
 
     def get_ffmpeg_params(self) -> dict:
         output_options: dict = super().get_ffmpeg_params()
@@ -59,15 +59,21 @@ class Libx264Codec(VideoCodecBase):
         }
 
     def _get_auto_tune(self) -> Optional[X264Tune]:
-        """Select optimal encoding tune based on content.
+        """Select optimal encoding tune based on parameter priority.
+
+        Priority:
+            1. libx264_params.tune (from --encoder-params)
+            2. Auto-detection (preset or grain analysis)
 
         Returns:
-            X265Tune enum or None if no tune is set
+            X264Tune enum or None if no tune is set
         """
-        x265_params: X264Params = self._encoder_settings.x264_prams
-        if x265_params.tune is not None:
-            return x265_params.tune
+        # Priority 1: libx264_params from --encoder-params
+        libx264_params: Libx264Params = self._encoder_settings.libx264_params
+        if libx264_params.tune is not None:
+            return libx264_params.tune
 
+        # Priority 2: Auto-detection
         hdr_forge_preset: HdrForgeEncodingPresets = self._encoder_settings.hdr_forge_encoding_preset.preset
         if hdr_forge_preset == HdrForgeEncodingPresets.ANIMATION:
             return X264Tune.ANIMATION
@@ -80,31 +86,55 @@ class Libx264Codec(VideoCodecBase):
         return None
 
     def _get_auto_preset(self, hw_preset: Hdr_Forge_X265_X264_Preset) -> x265_x264_Preset:
-        """Select optimal encoding preset based on resolution.
+        """Select optimal encoding preset based on parameter priority.
+
+        Priority:
+            1. libx264_params.preset (from --encoder-params)
+            2. universal_params.speed (from --speed)
+            3. hw_preset.preset (auto-detection)
 
         Returns:
-            Preset string (faster preset = quicker encoding, lower compression)
+            x265_x264_Preset enum value
 
         TODO:
         slow bringt spürbare Vorteile, slower oder veryslow nur noch marginal — dafür viel mehr Zeit.
         """
-        x264_params: X264Params = self._encoder_settings.x264_prams
-        if x264_params.preset is not None:
-            return x264_params.preset
+        # Priority 1: libx264_params from --encoder-params
+        libx264_params: Libx264Params = self._encoder_settings.libx264_params
+        if libx264_params.preset is not None:
+            return libx264_params.preset
 
+        # Priority 2: universal_params from --speed
+        universal_params = self._encoder_settings.universal_params
+        if universal_params.speed is not None:
+            return universal_params.speed
+
+        # Priority 3: Auto-detection from hw_preset
         preset = hw_preset.preset
         return x265_x264_Preset(preset)
 
     def _get_auto_crf(self, hw_preset: Hdr_Forge_X265_X264_Preset) -> int:
-        """Calculate optimal CRF value based on resolution.
+        """Calculate optimal CRF value based on parameter priority.
+
+        Priority:
+            1. libx264_params.crf (from --encoder-params)
+            2. universal_params.quality (from --quality)
+            3. hw_preset.crf (auto-detection)
 
         Returns:
             CRF value (lower = higher quality)
         """
-        x264_params: X264Params = self._encoder_settings.x264_prams
-        if x264_params.crf is not None:
-            return x264_params.crf
+        # Priority 1: libx264_params from --encoder-params
+        libx264_params: Libx264Params = self._encoder_settings.libx264_params
+        if libx264_params.crf is not None:
+            return libx264_params.crf
 
+        # Priority 2: universal_params from --quality
+        universal_params = self._encoder_settings.universal_params
+        if universal_params.quality is not None:
+            return universal_params.quality
+
+        # Priority 3: Auto-detection from hw_preset
         crf: float = hw_preset.crf
 
         hdr_forge_preset: HdrForgeEncodingPresets = self._encoder_settings.hdr_forge_encoding_preset.preset

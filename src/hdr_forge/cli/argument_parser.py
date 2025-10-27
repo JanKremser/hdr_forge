@@ -5,7 +5,7 @@ import sys
 
 from hdr_forge import __version__
 from hdr_forge.cli.cli_output import print_err
-from hdr_forge.typedefs.encoder_typing import CropMode, CropSettings, HdrForgeEncodingHardwarePresets, HdrForgeEncodingPresetSettings, HdrForgeEncodingPresets, HdrSdrFormat, EncoderSettings, SampleSettings, ScaleMode, VideoCodec, X264Params, X264Tune, X265Params, X265Tune, x265_x264_Preset
+from hdr_forge.typedefs.encoder_typing import CropMode, CropSettings, EncoderOverride, HEVC_NVENC_Preset, HdrForgeEncodingHardwarePresets, HdrForgeEncodingPresetSettings, HdrForgeEncodingPresets, HdrSdrFormat, EncoderSettings, NvencParams, NvencRcMode, SampleSettings, ScaleMode, UniversalEncoderParams, VideoCodec, Libx264Params, X264Tune, Libx265Params, X265Tune, x265_x264_Preset
 from hdr_forge.typedefs.dolby_vision_typing import DolbyVisionProfileEncodingMode
 from hdr_forge.typedefs.video_typing import ContentLightLevelMetadata, HdrMetadata, MasterDisplayMetadata
 
@@ -101,46 +101,60 @@ Examples:
     )
 
     convert_parser.add_argument(
-        '--x265-params',
-        help="""Custom x265 parameters for advanced users. Format:
-Example:
-    preset=medium:crf=20
-Parameters:
-    preset= : x265 encoding preset (ultrafast, superfast, veryfast, faster, fast, medium, slow, slower, veryslow)
-              [ultrafast] : Lowest compression, fastest encoding
-              [superfast] : Very low compression, very fast encoding
-              [veryfast]  : Low compression, fast encoding
-              [faster]    : Below average compression and speed
-              [fast]      : Slightly below average compression and speed
-              [medium]    : Balanced compression and speed
-              [slow]      : Above average compression, slower encoding
-              [slower]    : High compression, slow encoding
-              [veryslow]  : Maximum compression, very slow encoding
-    crf=    : Constant Rate Factor for quality control (lower = better quality).
-              The range of the CRF scale is 0–51
-    tune=   : x265 tuning for specific content types (animation, grain)
+        '--encoder',
+        choices=['auto', 'libx265', 'libx264', 'hevc_nvenc', 'h264_nvenc'],
+        default='auto',
+        help="""Encoder selection override. By default, encoder is automatically selected based on --hw-preset.
+[auto]         : Automatic encoder selection (default)
+[libx265]      : Force libx265 encoder
+[libx264]      : Force libx264 encoder
+[hevc_nvenc]   : Force NVIDIA NVENC HEVC encoder
+[h264_nvenc]   : Force NVIDIA NVENC H.264 encoder\n
 """
     )
 
     convert_parser.add_argument(
-        '--x264-params',
-        help="""Custom x264 parameters for advanced users. Format:
-Example:
-    preset=medium:crf=20:tune=film
-Parameters:
-    preset= : x264 encoding preset (ultrafast, superfast, veryfast, faster, fast, medium, slow, slower, veryslow)
-              [ultrafast] : Lowest compression, fastest encoding
-              [superfast] : Very low compression, very fast encoding
-              [veryfast]  : Low compression, fast encoding
-              [faster]    : Below average compression and speed
-              [fast]      : Slightly below average compression and speed
-              [medium]    : Balanced compression and speed
-              [slow]      : Above average compression, slower encoding
-              [slower]    : High compression, slow encoding
-              [veryslow]  : Maximum compression, very slow encoding
-    crf=    : Constant Rate Factor for quality control (lower = better quality).
-              The range of the CRF scale is 0–51
-    tune=   : x264 tuning for specific content types (film, animation, grain)
+        '--encoder-params',
+        help="""Encoder-specific parameters. Requires --encoder to be set (not 'auto').
+Format depends on selected encoder:
+
+x265/x264:
+    preset=<value>:crf=<value>:tune=<value>
+    Example: preset=slow:crf=16:tune=grain
+
+hevc_nvenc/h264_nvenc:
+    preset=<value>:cq=<value>:rc=<value>
+    Example: preset=hq:cq=18:rc=vbr_hq
+
+    NVENC Presets: default, slow, hq, llhq, llhp
+    RC Modes: vbr, vbr_hq, cbr, cqp\n
+"""
+    )
+
+    convert_parser.add_argument(
+        '--quality',
+        type=int,
+        help="""Universal quality parameter (0-51, lower = better quality).
+Works with all encoders and automatically maps to CRF (x265/x264) or CQ (NVENC).
+This is overridden by encoder-specific parameters (--encoder-params).\n
+"""
+    )
+
+    convert_parser.add_argument(
+        '--speed',
+        choices=['ultrafast', 'superfast', 'veryfast', 'faster', 'fast', 'medium', 'slow', 'slower', 'veryslow'],
+        help="""Universal speed preset. ONLY works with x265/x264 encoders.
+[ultrafast] : Fastest encoding, lowest compression
+[superfast] : Very fast encoding, very low compression
+[veryfast]  : Fast encoding, low compression
+[faster]    : Below average compression and speed
+[fast]      : Slightly below average compression and speed
+[medium]    : Balanced compression and speed
+[slow]      : Above average compression, slower encoding
+[slower]    : High compression, slow encoding
+[veryslow]  : Maximum compression, very slow encoding
+
+Note: This parameter is NOT compatible with NVENC encoders. Use --encoder-params instead.\n
 """
     )
 
@@ -482,20 +496,20 @@ def get_content_lightLevel_metadata_from_string(cll_str: str | None) -> ContentL
         print_err(f"Invalid content light level value '{cll_str}'")
         sys.exit(1)
 
-def get_x265_params_from_string(params_str: str | None) -> X265Params:
-    """Convert x265 parameters argument string to X265Params object.
+def get_libx265_params_from_string(params_str: str | None) -> Libx265Params:
+    """Convert libx265 parameters argument string to libx265Params object.
 
     Args:
-        params_str: x265 parameters argument string
+        params_str: libx265 parameters argument string
 
     Returns:
-        X265Params object
+        Libx265Params object
     """
-    params = X265Params()
+    params = Libx265Params()
     if params_str is None:
         return params
 
-    parts: list[str] = params_str.split(',')
+    parts: list[str] = params_str.split(':')
     try:
         for part in parts:
             if part.startswith('crf='):
@@ -507,21 +521,21 @@ def get_x265_params_from_string(params_str: str | None) -> X265Params:
             elif part.startswith('tune='):
                 params.tune = X265Tune(part.split('=')[1])
     except ValueError as err:
-        print_err(msg=f"Invalid x265 parameters value '{params_str}'. Err: {err}")
+        print_err(msg=f"Invalid libx265 parameters value '{params_str}'. Err: {err}")
         sys.exit(1)
 
     return params
 
-def get_x264_params_from_string(params_str: str | None) -> X264Params:
-    """Convert x264 parameters argument string to X264Params object.
+def get_libx264_params_from_string(params_str: str | None) -> Libx264Params:
+    """Convert libx264 parameters argument string to libx264Params object.
 
     Args:
-        params_str: x264 parameters argument string
+        params_str: libx264 parameters argument string
 
     Returns:
-        X264Params object
+        libx264Params object
     """
-    params = X264Params()
+    params = Libx264Params()
     if params_str is None:
         return params
 
@@ -537,10 +551,125 @@ def get_x264_params_from_string(params_str: str | None) -> X264Params:
             elif part.startswith('tune='):
                 params.tune = X264Tune(part.split('=')[1])
     except ValueError as err:
-        print_err(msg=f"Invalid x264 parameters value '{params_str}'. Err: {err}")
+        print_err(msg=f"Invalid libx264 parameters value '{params_str}'. Err: {err}")
         sys.exit(1)
 
     return params
+
+def get_encoder_override_from_string(encoder_str: str | None) -> EncoderOverride:
+    """Convert string to EncoderOverride enum.
+
+    Args:
+        encoder_str: Encoder override string
+
+    Returns:
+        Corresponding EncoderOverride enum value
+    """
+    if encoder_str is None or encoder_str == 'auto':
+        return EncoderOverride.AUTO
+
+    encoder_str = encoder_str.lower()
+    if encoder_str == 'libx265':
+        return EncoderOverride.LIBX265
+    elif encoder_str == 'libx264':
+        return EncoderOverride.LIBX264
+    elif encoder_str == 'hevc_nvenc':
+        return EncoderOverride.HEVC_NVENC
+    elif encoder_str == 'h264_nvenc':
+        return EncoderOverride.H264_NVENC
+
+    return EncoderOverride.AUTO
+
+
+def get_nvenc_params_from_string(params_str: str | None) -> NvencParams:
+    """Convert NVENC parameters argument string to NvencParams object.
+
+    Args:
+        params_str: NVENC parameters argument string
+
+    Returns:
+        NvencParams object
+    """
+    params = NvencParams()
+    if params_str is None:
+        return params
+
+    parts: list[str] = params_str.split(':')
+    try:
+        for part in parts:
+            if part.startswith('cq='):
+                params.cq = int(part.split('=')[1])
+                if not (0 <= params.cq <= 51):
+                    raise ValueError("CQ out of range")
+            elif part.startswith('preset='):
+                params.preset = HEVC_NVENC_Preset(part.split('=')[1])
+            elif part.startswith('rc='):
+                params.rc = NvencRcMode(part.split('=')[1])
+    except ValueError as err:
+        print_err(msg=f"Invalid NVENC parameters value '{params_str}'. Err: {err}")
+        sys.exit(1)
+
+    return params
+
+
+def parse_encoder_params(params_str: str | None, encoder_override: EncoderOverride) -> tuple[Libx265Params | None, Libx264Params | None, NvencParams | None]:
+    """Parse --encoder-params based on the selected encoder.
+
+    Args:
+        params_str: Encoder parameters string
+        encoder_override: Selected encoder override
+
+    Returns:
+        Tuple of (libx265_params, libx264_params, nvenc_params), where only one is non-None
+    """
+    if params_str is None:
+        return (None, None, None)
+
+    if encoder_override == EncoderOverride.AUTO:
+        print_err("Error: --encoder-params requires --encoder to be set (not 'auto')")
+        sys.exit(1)
+
+    if encoder_override in [EncoderOverride.LIBX265]:
+        return (get_libx265_params_from_string(params_str), None, None)
+    elif encoder_override in [EncoderOverride.LIBX264]:
+        return (None, get_libx264_params_from_string(params_str), None)
+    elif encoder_override in [EncoderOverride.HEVC_NVENC, EncoderOverride.H264_NVENC]:
+        return (None, None, get_nvenc_params_from_string(params_str))
+
+    return (None, None, None)
+
+
+def get_universal_params_from_args(args) -> UniversalEncoderParams:
+    """Create UniversalEncoderParams object from parsed command-line arguments.
+
+    Args:
+        args: Parsed arguments from parse_args()
+
+    Returns:
+        UniversalEncoderParams object with quality and speed
+    """
+    quality = getattr(args, 'quality', None)
+    speed_str = getattr(args, 'speed', None)
+
+    speed = None
+    if speed_str is not None:
+        try:
+            speed = x265_x264_Preset(speed_str)
+        except ValueError:
+            print_err(msg=f"Invalid speed value '{speed_str}'")
+            sys.exit(1)
+
+    # Validate quality range
+    if quality is not None:
+        if not (0 <= quality <= 51):
+            print_err(msg=f"Invalid quality value '{quality}'. Must be between 0 and 51.")
+            sys.exit(1)
+
+    return UniversalEncoderParams(
+        quality=quality,
+        speed=speed
+    )
+
 
 def get_hdr_forge_encoder_presets_from_args(args) -> HdrForgeEncodingPresetSettings:
     """Create HdrForgeEncodingPresetSettings object from parsed command-line arguments.
@@ -585,18 +714,44 @@ def create_encoder_settings_from_args(args) -> EncoderSettings:
     Returns:
         EncoderSettings object with all encoding parameters
     """
+    # Parse encoder override
+    encoder_override: EncoderOverride = get_encoder_override_from_string(getattr(args, 'encoder', 'auto'))
+
+    # Parse universal parameters
+    universal_params: UniversalEncoderParams = get_universal_params_from_args(args)
+
+    # Validate --speed with NVENC encoders
+    if universal_params.speed is not None and encoder_override in [EncoderOverride.HEVC_NVENC, EncoderOverride.H264_NVENC]:
+        print_err("Error: --speed is not supported with NVENC encoders. Use --encoder-params 'preset=hq' instead.")
+        sys.exit(1)
+
+    # Parse encoder-specific parameters from --encoder-params
+    encoder_params_libx265, encoder_params_libx264, encoder_params_nvenc = parse_encoder_params(
+        getattr(args, 'encoder_params', None),
+        encoder_override
+    )
+
+    # Use encoder-params if provided, otherwise default to empty params
+    libx265_params: Libx265Params = encoder_params_libx265 if encoder_params_libx265 is not None else Libx265Params()
+    libx264_params: Libx264Params = encoder_params_libx264 if encoder_params_libx264 is not None else Libx264Params()
+    nvenc_params: NvencParams = encoder_params_nvenc if encoder_params_nvenc is not None else NvencParams()
+
     hdr_metadata = HdrMetadata(
         mastering_display_metadata=get_master_display_from_string(getattr(args, 'master_display', None)),
         content_light_level_metadata=get_content_lightLevel_metadata_from_string(getattr(args, 'max_cll', None))
     )
+
     return EncoderSettings(
         video_codec=get_video_codec_from_string(args.video_codec),
         hdr_forge_encoding_preset=get_hdr_forge_encoder_presets_from_args(args),
         hdr_sdr_format=get_hdr_sdr_format_from_string(args.hdr_sdr_format),
         enable_gpu_acceleration=args.hw_preset.startswith('gpu:'),
         target_dv_profile=get_dolby_vision_profile_from_string(args.dv_profile),
-        x265_prams=get_x265_params_from_string(getattr(args, 'x265_params', None)),
-        x264_prams=get_x264_params_from_string(getattr(args, 'x264_params', None)),
+        libx265_params=libx265_params,
+        libx264_params=libx264_params,
+        nvenc_params=nvenc_params,
+        universal_params=universal_params,
+        encoder_override=encoder_override,
         scale_height=get_scale_height(args.scale),
         scale_mode=ScaleMode(args.scale_mode),
         crop=get_crop_settings_from_string(args.crop),

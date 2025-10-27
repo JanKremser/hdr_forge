@@ -15,7 +15,7 @@ from hdr_forge.ffmpeg.video_codec.video_codec_base import VideoCodecBase
 from hdr_forge.ffmpeg.video_codec.libx264 import Libx264Codec
 from hdr_forge.ffmpeg.video_codec.libx265 import Libx265Codec
 from hdr_forge.hdr_formats import dolby_vision
-from hdr_forge.typedefs.encoder_typing import HdrSdrFormat, EncoderSettings, SampleSettings, VideoCodec, VideoEncoderLibrary
+from hdr_forge.typedefs.encoder_typing import EncoderOverride, HdrSdrFormat, EncoderSettings, SampleSettings, VideoCodec, VideoEncoderLibrary
 from hdr_forge.typedefs.dolby_vision_typing import DolbyVisionEnhancementLayer, DolbyVisionProfile, DolbyVisionProfileEncodingMode
 from hdr_forge.video import Video
 
@@ -40,6 +40,7 @@ class Encoder:
         self._video: Video = video
         self._target_file: Path = target_file
         self._target_video_codec: VideoCodec = settings.video_codec
+        self._encoder_settings: EncoderSettings = settings
 
         self._video_codec_lib: VideoCodecBase | None = self._get_video_codec_lib_instance(
             video=video,
@@ -107,7 +108,11 @@ class Encoder:
         video: Video,
         scale_tuple: Tuple[int, int],
     ) -> VideoCodecBase | None:
-        """Get the codec library instance based on target video codec.
+        """Get the codec library instance based on encoder override or automatic selection.
+
+        Priority:
+            1. encoder_override (if not AUTO)
+            2. video_codec + enable_gpu_acceleration (automatic selection)
 
         Args:
             encoder_settings: EncoderSettings object with encoding parameters
@@ -115,6 +120,11 @@ class Encoder:
         Returns:
             VideoCodecBase instance for the selected video codec
         """
+        # Priority 1: Check encoder_override
+        if encoder_settings.encoder_override != EncoderOverride.AUTO:
+            return self._get_codec_from_override(encoder_settings, video, scale_tuple)
+
+        # Priority 2: Automatic selection based on video_codec and GPU acceleration
         if encoder_settings.video_codec == VideoCodec.X265:
             if encoder_settings.enable_gpu_acceleration:
                 test: list[VideoEncoderLibrary] = self.get_available_hw_encoders()
@@ -138,6 +148,48 @@ class Encoder:
 
         return None
 
+    def _get_codec_from_override(
+        self,
+        encoder_settings: EncoderSettings,
+        video: Video,
+        scale_tuple: Tuple[int, int],
+    ) -> VideoCodecBase | None:
+        """Get codec instance based on encoder override.
+
+        Args:
+            encoder_settings: EncoderSettings object with encoding parameters
+            video: Video object
+            scale_tuple: Scale dimensions tuple
+
+        Returns:
+            VideoCodecBase instance for the overridden encoder
+        """
+        override = encoder_settings.encoder_override
+
+        if override == EncoderOverride.LIBX265:
+            return Libx265Codec(encoder_settings=encoder_settings, video=video, scale=scale_tuple)
+
+        elif override == EncoderOverride.LIBX264:
+            return Libx264Codec(encoder_settings=encoder_settings, video=video, scale=scale_tuple)
+
+        elif override == EncoderOverride.HEVC_NVENC:
+            available_encoders = self.get_available_hw_encoders()
+            if VideoEncoderLibrary.HEVC_NVENC in available_encoders:
+                return HevcNvencCodec(encoder_settings=encoder_settings, video=video, scale=scale_tuple)
+            else:
+                print_err("Error: HEVC NVENC encoder not available on this system.")
+                sys.exit(1)
+
+        elif override == EncoderOverride.H264_NVENC:
+            available_encoders = self.get_available_hw_encoders()
+            if VideoEncoderLibrary.H264_NVENC in available_encoders:
+                return H264NvencCodec(encoder_settings=encoder_settings, video=video, scale=scale_tuple)
+            else:
+                print_err("Error: H264 NVENC encoder not available on this system.")
+                sys.exit(1)
+
+        return None
+
     def get_video_codec_lib(self) -> VideoCodecBase | None:
         """Get the codec library instance.
 
@@ -145,6 +197,14 @@ class Encoder:
             VideoCodecBase instance or None if copying
         """
         return self._video_codec_lib
+
+    def get_encoder_settings(self) -> EncoderSettings:
+        """Get the encoder settings.
+
+        Returns:
+            EncoderSettings object
+        """
+        return self._encoder_settings
 
     def _determine_video_sample(
         self,

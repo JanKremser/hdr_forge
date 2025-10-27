@@ -110,7 +110,7 @@ class X265Tune(Enum):
     GRAIN = "grain"
 
 @dataclass
-class X265Params:
+class Libx265Params:
     preset: Optional[x265_x264_Preset] = None
     crf: Optional[int] = None
     tune: Optional[X265Tune] = None
@@ -121,10 +121,38 @@ class X264Tune(Enum):
     GRAIN = "grain"
 
 @dataclass
-class X264Params:
+class Libx264Params:
     preset: Optional[x265_x264_Preset] = None
     crf: Optional[int] = None
     tune: Optional[X264Tune] = None
+
+class NvencRcMode(Enum):
+    """NVENC rate control modes."""
+    VBR = "vbr"
+    VBR_HQ = "vbr_hq"
+    CBR = "cbr"
+    CQP = "cqp"
+
+@dataclass
+class NvencParams:
+    """NVENC encoder parameters."""
+    preset: Optional[HEVC_NVENC_Preset] = None
+    cq: Optional[int] = None
+    rc: Optional[NvencRcMode] = None
+
+@dataclass
+class UniversalEncoderParams:
+    """Universal encoder parameters that work across all encoders."""
+    quality: Optional[int] = None  # Maps to CRF/CQ depending on encoder
+    speed: Optional[x265_x264_Preset] = None  # Only for x265/x264, not NVENC
+
+class EncoderOverride(Enum):
+    """Encoder override for manual encoder selection."""
+    AUTO = "auto"
+    LIBX265 = "x265"
+    LIBX264 = "x264"
+    HEVC_NVENC = "hevc_nvenc"
+    H264_NVENC = "h264_nvenc"
 
 class HdrForgeEncodingPresets(Enum):
     AUTO = "auto"
@@ -156,6 +184,9 @@ class EncoderSettings:
         target_dv_profile: Dolby Vision profile for encoding (AUTO or 8)
         scale_height: Target height for video scaling (downscaling only)
         crop: CropSettings object defining cropping behavior
+        encoder_override: Manual encoder selection (overrides hw_preset logic)
+        universal_params: Universal encoding parameters (quality, speed)
+        nvenc_params: NVENC-specific encoding parameters
     """
     video_codec: VideoCodec = VideoCodec.X265
     hdr_forge_encoding_preset: HdrForgeEncodingPresetSettings = field(
@@ -166,8 +197,15 @@ class EncoderSettings:
     hdr_metadata: HdrMetadata = field(default_factory=HdrMetadata)
     target_dv_profile: DolbyVisionProfileEncodingMode = DolbyVisionProfileEncodingMode.AUTO
 
-    x265_prams: X265Params = field(default_factory=X265Params)
-    x264_prams: X264Params = field(default_factory=X264Params)
+    # Encoder-specific parameters
+    libx265_params: Libx265Params = field(default_factory=Libx265Params)
+    libx264_params: Libx264Params = field(default_factory=Libx264Params)
+    nvenc_params: NvencParams = field(default_factory=NvencParams)
+
+    # Universal parameters and encoder override
+    universal_params: UniversalEncoderParams = field(default_factory=UniversalEncoderParams)
+    encoder_override: EncoderOverride = EncoderOverride.AUTO
+
     crop: CropSettings = field(default_factory=lambda: CropSettings(mode=CropMode.AUTO))
 
     scale_height: Optional[int] = None
