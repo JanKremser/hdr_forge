@@ -146,8 +146,8 @@ class MkvTrackType(Enum):
 
 def string_to_track_type(type_str: str) -> MkvTrackType:
     """
-    Konvertiert einen String-Track-Typ in den entsprechenden MkvTrackType-Enum-Wert.
-    Gibt MkvTrackType.UNKNOWN zurück, wenn kein passender Wert gefunden wird.
+    Converts a string track type to the corresponding MkvTrackType enum value.
+    Returns MkvTrackType.UNKNOWN if no matching value is found.
     """
     type_str = type_str.lower() if isinstance(type_str, str) else ""
 
@@ -216,7 +216,7 @@ def parse_mkv_info(info_dict: Dict) -> MkvInfo:
         track_props = MkvTrackProperties(**known_track_props)
         #add_dynamic_attributes(track_props, unknown_track_props)
 
-        # Create track mit automatischer Konvertierung des Track-Typs
+        # Create track with automatic track type conversion
         track = MkvTrack(
             codec=track_dict.get('codec', 'Unknown'),
             id=track_dict.get('id', 0),

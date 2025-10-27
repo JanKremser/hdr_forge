@@ -4,20 +4,20 @@ import sys
 
 def compute_motion_score(video_path, resize_width=320, resize_height=180):
     """
-    Berechnet einen Motion-Score für ein Video.
-    Score = Durchschnittliche Bewegung zwischen Frames, normiert auf 0..1
+    Calculates a motion score for a video.
+    Score = Average motion between frames, normalized to 0..1
     """
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
-        print(f"Fehler: Konnte Video '{video_path}' nicht öffnen")
+        print(f"Error: Could not open video '{video_path}'")
         return None
 
     ret, prev_frame = cap.read()
     if not ret:
-        print("Fehler: Konnte ersten Frame nicht lesen")
+        print("Error: Could not read first frame")
         return None
 
-    # Frames verkleinern und in Graustufen umwandeln
+    # Resize frames and convert to grayscale
     prev_frame = cv2.resize(prev_frame, (resize_width, resize_height))
     prev_gray = cv2.cvtColor(prev_frame, cv2.COLOR_BGR2GRAY)
 
@@ -32,10 +32,10 @@ def compute_motion_score(video_path, resize_width=320, resize_height=180):
         frame = cv2.resize(frame, (resize_width, resize_height))
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
-        # Absolute Differenz zwischen Frames
+        # Absolute difference between frames
         diff = cv2.absdiff(gray, prev_gray)
-        diff = diff.astype(np.float32)  # Konvertieren in float32 für Kompatibilität
-        motion_level = np.mean(diff) / 255.0  # Normalisieren auf 0..1
+        diff = diff.astype(np.float32)  # Convert to float32 for compatibility
+        motion_level = np.mean(diff) / 255.0  # Normalize to 0..1
         motion_values.append(motion_level)
 
         prev_gray = gray
@@ -46,7 +46,7 @@ def compute_motion_score(video_path, resize_width=320, resize_height=180):
     if not motion_values:
         return 0.0
 
-    # Durchschnittlicher Motion-Score
+    # Average motion score
     motion_score = np.mean(motion_values)
     return motion_score
 
@@ -57,4 +57,4 @@ if __name__ == "__main__":
 
     video_file = sys.argv[1]
     score = compute_motion_score(video_file)
-    print(f"Motion-Score für '{video_file}': {score:.3f}")
+    print(f"Motion score for '{video_file}': {score:.3f}")

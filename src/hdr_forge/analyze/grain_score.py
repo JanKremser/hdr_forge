@@ -151,7 +151,7 @@ class GrainAnalyzer:
             cap.set(cv2.CAP_PROP_POS_FRAMES, safe_pos)
             ret, frame = cap.read()
 
-            # Lies ein paar Frames, um Decoder zu stabilisieren
+            # Read a few frames to stabilize the decoder
             for _ in range(3):
                 spinner.update()
                 ret, frame = cap.read()

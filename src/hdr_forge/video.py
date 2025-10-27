@@ -60,7 +60,7 @@ class Video:
 
 
     def extract_hdr_metadata(self) -> HdrMetadata:
-        # ffmpeg-Kommando: showinfo nur so lange laufen lassen, bis Daten auftauchen
+        # FFmpeg command: run showinfo only until data appears
         cmd: list = [
             "ffmpeg", "-hide_banner",
             "-i", self._filepath,
@@ -79,7 +79,7 @@ class Video:
         mastering_data: MasterDisplayMetadata | None = None
         light_data: ContentLightLevelMetadata | None = None
 
-        # Regex für Mastering Display Metadata - beide Formate abdecken
+        # Regex for Mastering Display Metadata - cover both formats
         mastering_re: re.Pattern[str] = re.compile(
             r"(?:Mastering display metadata|side data - mastering display).*?"
             r"r\((?P<r_x>[\d\.]+)[\s,]+(?P<r_y>[\d\.]+)\)\s*"
@@ -89,7 +89,7 @@ class Video:
             r"min_luminance=(?P<min_lum>[\d\.]+)[\s,]*max_luminance=(?P<max_lum>[\d\.]+)"
         )
 
-        # Regex für Content Light Level Metadata - beide Formate abdecken
+        # Regex for Content Light Level Metadata - cover both formats
         light_re: re.Pattern[str] = re.compile(
             r"(?:Content light level metadata|side data - Content Light Level information).*?"
             r"MaxCLL=(?P<maxcll>\d+),\s*MaxFALL=(?P<maxfall>\d+)"
@@ -106,14 +106,14 @@ class Video:
                     if l:
                         light_data = ContentLightLevelMetadata(**{k: int(v) for k, v in l.groupdict().items()})
 
-                # Falls beide gefunden wurden, abbrechen
+                # If both found, terminate early
                 if mastering_data and light_data:
                     process.kill()
                     break
 
         process.wait()
 
-        # Werte bereinigen (0 → None)
+        # Clean up values (0 → None)
         if light_data:
             if light_data.maxcll == 0:
                 light_data.maxcll = None

@@ -35,7 +35,7 @@ class HevcNvencCodec(VideoCodecBase):
     def get_ffmpeg_params(self) -> dict:
         output_options: dict = super().get_ffmpeg_params()
         output_options.update({
-            "rc": "vbr_hq", # variable Bitrate mit hoher Qualität (NVENC-spezifisch)
+            "rc": "vbr_hq", # variable bitrate with high quality (NVENC-specific)
             "preset": self._preset.value,
             "cq": str(self._cq)
         })

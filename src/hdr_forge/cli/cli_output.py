@@ -19,7 +19,7 @@ MOVE_TO_START = '\r'    # Moves cursor to the beginning of the line
 # Complete code to clear current and previous line
 CLEAR_TWO_LINES = f"{CLEAR_LINE}{CURSOR_UP_ONE}{CLEAR_LINE}{MOVE_TO_START}"
 
-# ANSI Farbcodes
+# ANSI color codes
 RED = '\033[91m'
 GREEN = '\033[92m'
 YELLOW = '\033[93m'
@@ -426,35 +426,35 @@ def create_aspect_ratio_str(width: int, height: int, tolerance: float = 0.02) ->
 
 def calculate_speed_backup(current_frame: int, process_time_seconds: float, fps: float) -> float | None:
     """
-    Berechnet eine Backup-Speed falls speed None ist.
-    Nutzt aktuelle Frames und vergangene Prozesszeit.
+    Calculates a backup speed value if speed is None.
+    Uses current frames and elapsed process time.
 
     Args:
-        current_frame (int): Aktueller Frame
-        process_time_seconds (float): Vergangene Prozesszeit in Sekunden
-        fps (float): Aktuelle FPS
+        current_frame (int): Current frame number
+        process_time_seconds (float): Elapsed process time in seconds
+        fps (float): Current FPS
 
     Returns:
-        float | None: Berechnete Geschwindigkeit (z.B. 1.23 für 1.23x), oder None falls nicht berechenbar
+        float | None: Calculated speed (e.g. 1.23 for 1.23x), or None if not calculable
     """
     if process_time_seconds > 0 and fps > 0 and current_frame > 0:
-        # Tatsächliche Geschwindigkeit = (verarbeitete Frames pro Sekunde) / (Soll-FPS)
+        # Actual speed = (processed frames per second) / (target FPS)
         actual_fps = current_frame / process_time_seconds
         return actual_fps / fps
     return None
 
 def calculate_time_seconds_backup(current_frame: int, total_frames: int, duration_seconds: float) -> float | None:
     """
-    Berechnet eine Backup-Zeit (time_seconds), falls diese None ist.
-    Nutzt das Verhältnis von current_frame zu total_frames und multipliziert mit duration_seconds.
+    Calculates a backup time value (time_seconds) if it is None.
+    Uses the ratio of current_frame to total_frames and multiplies by duration_seconds.
 
     Args:
-        current_frame (int): Aktueller Frame
-        total_frames (int): Gesamtanzahl Frames
-        duration_seconds (float): Gesamtdauer in Sekunden
+        current_frame (int): Current frame number
+        total_frames (int): Total number of frames
+        duration_seconds (float): Total duration in seconds
 
     Returns:
-        float | None: Berechnete Zeit in Sekunden oder None, falls nicht berechenbar
+        float | None: Calculated time in seconds or None if not calculable
     """
     if total_frames > 0 and duration_seconds > 0 and current_frame >= 0:
         return (current_frame / total_frames) * duration_seconds
