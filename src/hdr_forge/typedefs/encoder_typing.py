@@ -153,7 +153,7 @@ class NvencParams:
 class UniversalEncoderParams:
     """Universal encoder parameters that work across all encoders."""
     quality: Optional[int] = None  # Maps to CRF/CQ depending on encoder
-    speed: Optional[x265_x264_Preset] = None  # Only for x265/x264, not NVENC
+    speed: Optional[x265_x264_Preset] = None  # Only for libx265/libx264, not NVENC
 
 class EncoderOverride(Enum):
     """Encoder override for manual encoder selection."""

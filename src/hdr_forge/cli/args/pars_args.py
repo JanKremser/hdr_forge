@@ -112,7 +112,7 @@ Examples:
         '-p', '--preset',
         choices=["auto", "film", "action", "animation"],
         default="auto",
-        help="""HDR Forge encoding preset for simplified settings. Default is the automation mode. Not x265/x264 presets.
+        help="""HDR Forge encoding preset for simplified settings. Default is the automation mode. Not libx265/libx264 presets.
 You can combine Presets with HW-Presets.
 Examples:
     hdr_forge convert -i input.mkv -o output.mkv --preset auto
@@ -130,7 +130,7 @@ Presets:
         '--hw-preset',
         choices=["cpu:balanced", "cpu:quality", "gpu:balanced", "gpu:quality", "balanced", "quality"],
         default="cpu:balanced",
-        help="""HDR Forge hardware preset for encoding optimization. Not x265/x264 presets.
+        help="""HDR Forge hardware preset for encoding optimization. Not libx265/libx264 presets.
 You can specify presets with or without hardware prefix (cpu:/gpu:).
 When using prefix-free presets (balanced, quality), the hardware is automatically derived from --encoder.
 
@@ -159,7 +159,7 @@ Explicit hardware presets (validated against encoder):
         '--quality',
         type=int,
         help="""Universal quality parameter (0-51, lower = better quality).
-Works with all encoders and automatically maps to CRF (x265/x264) or CQ (NVENC).
+Works with all encoders and automatically maps to CRF (libx265/libx264) or CQ (NVENC).
 This is overridden by encoder-specific parameters (--encoder-params).\n
 """
     )
@@ -167,7 +167,7 @@ This is overridden by encoder-specific parameters (--encoder-params).\n
     convert_parser.add_argument(
         '--speed',
         choices=['ultrafast', 'superfast', 'veryfast', 'faster', 'fast', 'medium', 'slow', 'slower', 'veryslow'],
-        help="""Universal speed preset. ONLY works with x265/x264 encoders.
+        help="""Universal speed preset. ONLY works with libx265/libx264 encoders.
 [ultrafast] : Fastest encoding, lowest compression
 [superfast] : Very fast encoding, very low compression
 [veryfast]  : Fast encoding, low compression
