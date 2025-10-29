@@ -101,64 +101,6 @@ Examples:
     )
 
     convert_parser.add_argument(
-        '--encoder',
-        choices=['auto', 'libx265', 'libx264', 'hevc_nvenc', 'h264_nvenc'],
-        default='auto',
-        help="""Encoder selection override. By default, encoder is automatically selected based on --hw-preset.
-[auto]         : Automatic encoder selection (default)
-[libx265]      : Force libx265 encoder
-[libx264]      : Force libx264 encoder
-[hevc_nvenc]   : Force NVIDIA NVENC HEVC encoder
-[h264_nvenc]   : Force NVIDIA NVENC H.264 encoder\n
-"""
-    )
-
-    convert_parser.add_argument(
-        '--encoder-params',
-        help="""Encoder-specific parameters. Requires --encoder to be set (not 'auto').
-Format depends on selected encoder:
-
-x265/x264:
-    preset=<value>:crf=<value>:tune=<value>
-    Example: preset=slow:crf=16:tune=grain
-
-hevc_nvenc/h264_nvenc:
-    preset=<value>:cq=<value>:rc=<value>
-    Example: preset=hq:cq=18:rc=vbr_hq
-
-    NVENC Presets: default, slow, hq, llhq, llhp
-    RC Modes: vbr, vbr_hq, cbr, cqp\n
-"""
-    )
-
-    convert_parser.add_argument(
-        '--quality',
-        type=int,
-        help="""Universal quality parameter (0-51, lower = better quality).
-Works with all encoders and automatically maps to CRF (x265/x264) or CQ (NVENC).
-This is overridden by encoder-specific parameters (--encoder-params).\n
-"""
-    )
-
-    convert_parser.add_argument(
-        '--speed',
-        choices=['ultrafast', 'superfast', 'veryfast', 'faster', 'fast', 'medium', 'slow', 'slower', 'veryslow'],
-        help="""Universal speed preset. ONLY works with x265/x264 encoders.
-[ultrafast] : Fastest encoding, lowest compression
-[superfast] : Very fast encoding, very low compression
-[veryfast]  : Fast encoding, low compression
-[faster]    : Below average compression and speed
-[fast]      : Slightly below average compression and speed
-[medium]    : Balanced compression and speed
-[slow]      : Above average compression, slower encoding
-[slower]    : High compression, slow encoding
-[veryslow]  : Maximum compression, very slow encoding
-
-Note: This parameter is NOT compatible with NVENC encoders. Use --encoder-params instead.\n
-"""
-    )
-
-    convert_parser.add_argument(
         '-p', '--preset',
         choices=["auto", "film", "action", "animation"],
         default="auto",
@@ -206,8 +148,36 @@ Explicit hardware presets (validated against encoder):
     )
 
     convert_parser.add_argument(
+        '--quality',
+        type=int,
+        help="""Universal quality parameter (0-51, lower = better quality).
+Works with all encoders and automatically maps to CRF (x265/x264) or CQ (NVENC).
+This is overridden by encoder-specific parameters (--encoder-params).\n
+"""
+    )
+
+    convert_parser.add_argument(
+        '--speed',
+        choices=['ultrafast', 'superfast', 'veryfast', 'faster', 'fast', 'medium', 'slow', 'slower', 'veryslow'],
+        help="""Universal speed preset. ONLY works with x265/x264 encoders.
+[ultrafast] : Fastest encoding, lowest compression
+[superfast] : Very fast encoding, very low compression
+[veryfast]  : Fast encoding, low compression
+[faster]    : Below average compression and speed
+[fast]      : Slightly below average compression and speed
+[medium]    : Balanced compression and speed
+[slow]      : Above average compression, slower encoding
+[slower]    : High compression, slow encoding
+[veryslow]  : Maximum compression, very slow encoding
+
+Note: This parameter is NOT compatible with NVENC encoders. Use --encoder-params instead.\n
+"""
+    )
+
+    convert_parser.add_argument(
         '--crop',
         help="""Crop black bars from video. Not supported for Dolby Vision encoding.
+[off]              : Default: No cropping
 [auto]             : Automatically detect and crop black bars
 [width:height:x:y] : Manually specify crop dimensions. The basis for the calculation is the original video, not the target resolution.
 [16:9] or [1.77:1] : 16:9, 21:9 etc. to crop to specific aspect ratio
@@ -219,13 +189,23 @@ Explicit hardware presets (validated against encoder):
     convert_parser.add_argument(
         '--grain',
         help="""Analyze grain in the input video and optimize encoding settings accordingly.
-[auto]             : Disable grain analysis
+[off]              : Default: Do not analyze grain
+[auto]             : Automatically detect grain and adjust encoding settings
 """
     )
 
     convert_parser.add_argument(
         '--scale',
-        help='Scale video to specified resolution (4K, 2K, UHD, FHD, HD, SD or height in pixels)'
+        help="""Scale video to specified resolution (8K, UHD, FHD, HD, SD or height in pixels)
+[8K]       : 4320p
+[UHD]      : 2160p
+[QHD]      : 1440p
+[FHD]      : 1080p
+[HD]       : 720p
+[SD]       : 480p
+[<height>] : Specify target height in pixels (e.g., 1440 for 2560x1440). Width is calculated based on aspect ratio.
+             If not specified, original resolution is maintained.\n
+"""
     )
 
     convert_parser.add_argument(
@@ -253,26 +233,6 @@ Explicit hardware presets (validated against encoder):
     )
 
     convert_parser.add_argument(
-        '--master-display',
-        help="""Set custom Master Display metadata for HDR10 videos. Format:
-G(x,y)B(x,y)R(x,y)WP(x,y)L(max,min)
-Example:
---master-display "G(13250,34500)B(7500,30000)R(34000,16000)WP(15635,16450)L(1000,0.05)"
-Input Video Master Display metadata will be used if not specified.
-"""
-    )
-
-    convert_parser.add_argument(
-        '--max-cll',
-        help="""Set custom MaxCLL and MaxFALL values for HDR10 videos. Format:
-MaxCLL,MaxFALL
-Example:
---max-cll "1000,400"
-Input Video MaxCLL and MaxFALL values will be used if not specified.
-"""
-    )
-
-    convert_parser.add_argument(
         '--dv-profile',
         choices=['auto', '8'],
         default='auto',
@@ -284,6 +244,64 @@ Input Video MaxCLL and MaxFALL values will be used if not specified.
         help="""Process only a short sample of the video for testing purposes. Not supported for Dolby Vision encoding
 [auto]      : Process a 30 seconds sample starting at 1 minute into the video
 [start:end] : Specify start and end time in seconds (e.g., 60:90 for a sample from 1:00 to 1:30)\n
+"""
+    )
+
+    convert_parser.add_argument(
+        '--master-display',
+        help="""Expert function:
+Set custom Master Display metadata for HDR10 videos. Format:
+G(x,y)B(x,y)R(x,y)WP(x,y)L(max,min)
+
+Example:
+    --master-display "G(13250,34500)B(7500,30000)R(34000,16000)WP(15635,16450)L(1000,0.05)"
+
+Input Video Master Display metadata will be used if not specified.
+"""
+    )
+
+    convert_parser.add_argument(
+        '--max-cll',
+        help="""Expert function:
+Set custom MaxCLL and MaxFALL values for HDR10 videos. Format:
+
+Example:
+    --max-cll "1000,400"
+
+Input Video MaxCLL and MaxFALL values will be used if not specified.
+"""
+    )
+
+    convert_parser.add_argument(
+        '--encoder',
+        choices=['auto', 'libx265', 'libx264', 'hevc_nvenc', 'h264_nvenc'],
+        default='auto',
+        help="""Expert function:
+Encoder selection override. By default, encoder is automatically selected based on --hw-preset.
+[auto]         : Automatic encoder selection (default)
+[libx265]      : Force libx265 encoder
+[libx264]      : Force libx264 encoder
+[hevc_nvenc]   : Force NVIDIA NVENC HEVC encoder
+[h264_nvenc]   : Force NVIDIA NVENC H.264 encoder\n
+"""
+    )
+
+    convert_parser.add_argument(
+        '--encoder-params',
+        help="""Expert function:
+Encoder-specific parameters. Requires --encoder to be set (not 'auto').
+Format depends on selected encoder:
+
+libx265/libx264:
+    preset=<value>:crf=<value>:tune=<value>
+    Example: preset=slow:crf=16:tune=grain
+
+hevc_nvenc/h264_nvenc:
+    preset=<value>:cq=<value>:rc=<value>
+    Example: preset=hq:cq=18:rc=vbr_hq
+
+    NVENC Presets: default, slow, hq, llhq, llhp
+    RC Modes: vbr, vbr_hq, cbr, cqp\n
 """
     )
 
