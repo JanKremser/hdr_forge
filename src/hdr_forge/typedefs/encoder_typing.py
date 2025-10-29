@@ -3,6 +3,7 @@ from enum import Enum
 from typing import Optional
 
 
+
 from hdr_forge.typedefs.dolby_vision_typing import DolbyVisionProfileEncodingMode
 from hdr_forge.typedefs.video_typing import HdrMetadata
 
@@ -79,6 +80,14 @@ class CropSettings:
     ratio: Optional[tuple[float, float]] = None # Aspect ratio for RATIO mode
     check_samples: int = 10  # Number of samples to analyze for auto crop detection
 
+
+class GrainMode(Enum):
+    """Grain analysis and application modes."""
+    OFF = "off"
+    AUTO = "auto"
+    CAT1 = "cat1"
+    CAT2 = "cat2"
+    CAT3 = "cat3"
 
 @dataclass
 class SampleSettings:
@@ -211,6 +220,7 @@ class EncoderSettings:
     encoder_override: EncoderOverride = EncoderOverride.AUTO
 
     crop: CropSettings = field(default_factory=lambda: CropSettings(mode=CropMode.AUTO))
+    grain: GrainMode = GrainMode.OFF
 
     scale_height: Optional[int] = None
     scale_mode: ScaleMode = ScaleMode.HEIGHT

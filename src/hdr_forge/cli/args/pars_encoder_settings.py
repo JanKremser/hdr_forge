@@ -4,7 +4,7 @@ import sys
 
 from hdr_forge import __version__
 from hdr_forge.cli.cli_output import print_err, print_warn
-from hdr_forge.typedefs.encoder_typing import CropMode, CropSettings, EncoderOverride, HEVC_NVENC_Preset, HdrForgeEncodingHardwarePresets, HdrForgeEncodingPresetSettings, HdrForgeEncodingPresets, HdrSdrFormat, EncoderSettings, NvencParams, NvencRcMode, SampleSettings, ScaleMode, UniversalEncoderParams, VideoCodec, VideoEncoderLibrary, Libx264Params, X264Tune, Libx265Params, X265Tune, x265_x264_Preset
+from hdr_forge.typedefs.encoder_typing import CropMode, CropSettings, EncoderOverride, GrainMode, HEVC_NVENC_Preset, HdrForgeEncodingHardwarePresets, HdrForgeEncodingPresetSettings, HdrForgeEncodingPresets, HdrSdrFormat, EncoderSettings, NvencParams, NvencRcMode, SampleSettings, ScaleMode, UniversalEncoderParams, VideoCodec, VideoEncoderLibrary, Libx264Params, X264Tune, Libx265Params, X265Tune, x265_x264_Preset
 from hdr_forge.typedefs.dolby_vision_typing import DolbyVisionProfileEncodingMode
 from hdr_forge.typedefs.video_typing import ContentLightLevelMetadata, HdrMetadata, MasterDisplayMetadata
 
@@ -111,7 +111,7 @@ def _get_crop_settings_from_string(crop_str: str | None) -> CropSettings:
     Returns:
         CropSettings object
     """
-    if crop_str is None:
+    if crop_str is None or crop_str.lower() == 'off':
         return CropSettings(mode=CropMode.OFF)
 
     # Preset for cinema aspect ratios
@@ -137,6 +137,33 @@ def _get_crop_settings_from_string(crop_str: str | None) -> CropSettings:
             except ValueError:
                 pass
     print_err(f"Invalid crop value '{crop_str}', using automatic cropping")
+    sys.exit(1)
+
+def _get_grain_settings_from_string(grain_str: str | None) -> GrainMode:
+    """Convert grain argument string to GrainMode enum.
+
+    Args:
+        grain_str: Grain argument string
+
+    Returns:
+        GrainMode enum value
+    """
+    if grain_str is None:
+        return GrainMode.OFF
+
+    grain_str = grain_str.lower()
+    if grain_str == 'off':
+        return GrainMode.OFF
+    elif grain_str == 'auto':
+        return GrainMode.AUTO
+    elif grain_str == 'cat1':
+        return GrainMode.CAT1
+    elif grain_str == 'cat2':
+        return GrainMode.CAT2
+    elif grain_str == 'cat3':
+        return GrainMode.CAT3
+
+    print_err(f"Invalid grain value '{grain_str}', using 'off'")
     sys.exit(1)
 
 
@@ -538,6 +565,7 @@ def create_encoder_settings_from_args(args) -> EncoderSettings:
         scale_height=_get_scale_height(scale=args.scale),
         scale_mode=ScaleMode(args.scale_mode),
         crop=_get_crop_settings_from_string(crop_str=args.crop),
+        grain=_get_grain_settings_from_string(grain_str=args.grain),
         sample=_get_sample_settings_from_string(sample_str=args.sample),
         hdr_metadata=hdr_metadata,
     )

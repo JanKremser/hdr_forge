@@ -1,4 +1,6 @@
 import os
+
+from hdr_forge.typedefs.encoder_typing import GrainMode
 os.environ["OPENCV_FFMPEG_LOGLEVEL"] = "quiet"
 import cv2
 import numpy as np
@@ -21,6 +23,7 @@ class GrainAnalyzer:
     def __init__(
         self,
         video: Video,
+        grain_mode: GrainMode = GrainMode.OFF,
         duration_sec: int | None = 20,
         sample_rate: float | None = 2,
         resize_width: int | None = 640,
@@ -32,7 +35,19 @@ class GrainAnalyzer:
         self._resize_width: int = resize_width or 640
         self._start_sec: float = start_sec or (video.get_duration_seconds() / 2 if start_sec == "middle" else 0)
 
-        self._result: GrainResult = GrainResult()
+        self._grain_mode: GrainMode = grain_mode
+        self._result: GrainResult = self._get_grain_result_by_grain_mode(mode=grain_mode)
+
+    def _get_grain_result_by_grain_mode(self, mode: GrainMode) -> GrainResult:
+        if mode == GrainMode.OFF:
+            return GrainResult(category=0, score=0.0, scores=[])
+        elif mode == GrainMode.CAT1:
+            return GrainResult(category=1, score=0.04, scores=[])
+        elif mode == GrainMode.CAT2:
+            return GrainResult(category=2, score=0.07, scores=[])
+        elif mode == GrainMode.CAT3:
+            return GrainResult(category=3, score=0.15, scores=[])
+        return GrainResult()
 
     def _analyze_frame_legacy(self, frame: np.ndarray) -> float:
         h, w = frame.shape[:2]
@@ -128,7 +143,11 @@ class GrainAnalyzer:
             return 2
         return 3
 
-    def analyze(self) -> None:
+    def analyze_by_mode(self) -> None:
+        if self._grain_mode == GrainMode.AUTO:
+            self.analyze_auto()
+
+    def analyze_auto(self) -> None:
         cap = cv2.VideoCapture(str(self._video._filepath))
         if not cap.isOpened():
             raise RuntimeError("Video cannot be opened")

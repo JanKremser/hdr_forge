@@ -199,12 +199,15 @@ Note: This parameter is NOT compatible with NVENC encoders. Use --encoder-params
         help="""Analyze grain in the input video and optimize encoding settings accordingly.
 [off]              : Default: Do not analyze grain
 [auto]             : Automatically detect grain and adjust encoding settings
+[cat1]             : Apply light grain settings
+[cat2]             : Apply medium grain settings
+[cat3]             : Apply strong grain settings\n
 """
     )
 
     convert_parser.add_argument(
         '--scale',
-        help="""Scale video to specified resolution (8K, UHD, FHD, HD, SD or height in pixels)
+        help="""Scale video to specified resolution. Default is original resolution.
 [8K]       : 4320p
 [UHD]      : 2160p
 [QHD]      : 1440p

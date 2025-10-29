@@ -52,8 +52,9 @@ class VideoCodecBase(ABC):
 
         self._grain = GrainAnalyzer(
             video=video,
+            grain_mode=encoder_settings.grain,
         )
-        self._grain.analyze()
+        self._grain.analyze_by_mode()
 
         self._scale_width: Optional[int]
         self._scale_height: Optional[int]
