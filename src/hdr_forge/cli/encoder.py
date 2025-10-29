@@ -2,39 +2,12 @@
 
 from typing import Tuple
 from hdr_forge.analyze.crop_video import CropResult
-from hdr_forge.cli.cli_output import BLUE, color_str, create_aspect_ratio_str, print_warn
+from hdr_forge.cli.cli_output import BLUE, color_str, create_aspect_ratio_str
+from hdr_forge.cli.argument_parser import print_parameter_warnings
 from hdr_forge.ffmpeg.video_codec.video_codec_base import VideoCodecBase
 from hdr_forge.typedefs.dolby_vision_typing import DolbyVisionEnhancementLayer, DolbyVisionProfile
 from hdr_forge.typedefs.encoder_typing import EncoderSettings, VideoEncoderLibrary
 from hdr_forge.encoder import Encoder
-
-
-
-
-def _print_parameter_warnings(encoder_settings: EncoderSettings, active_encoder_lib: VideoEncoderLibrary) -> None:
-    """Print warnings for incompatible encoder parameters.
-
-    Args:
-        encoder_settings: EncoderSettings object
-        active_encoder_lib: Currently active encoder library
-    """
-    # Check for x265-specific parameters with non-x265 encoder
-    if active_encoder_lib != VideoEncoderLibrary.LIBX265:
-        libx265_params = encoder_settings.libx265_params
-        if libx265_params.crf is not None or libx265_params.preset is not None or libx265_params.tune is not None:
-            print_warn(f"Warning: --encoder-params for x265 specified but using {active_encoder_lib.value} encoder. Parameters will be ignored.")
-
-    # Check for x264-specific parameters with non-x264 encoder
-    if active_encoder_lib != VideoEncoderLibrary.LIBX264:
-        libx264_params = encoder_settings.libx264_params
-        if libx264_params.crf is not None or libx264_params.preset is not None or libx264_params.tune is not None:
-            print_warn(f"Warning: --encoder-params for x264 specified but using {active_encoder_lib.value} encoder. Parameters will be ignored.")
-
-    # Check for nvenc-specific parameters with non-nvenc encoder
-    if active_encoder_lib not in [VideoEncoderLibrary.HEVC_NVENC, VideoEncoderLibrary.H264_NVENC]:
-        nvenc_params = encoder_settings.nvenc_params
-        if nvenc_params.cq is not None or nvenc_params.preset is not None or nvenc_params.rc is not None:
-            print_warn(f"Warning: --encoder-params for NVENC specified but using {active_encoder_lib.value} encoder. Parameters will be ignored.")
 
 
 def print_encoding_params(encoder: Encoder) -> None:
@@ -55,7 +28,7 @@ def print_encoding_params(encoder: Encoder) -> None:
     if video_codec_lib:
         # Print warnings for incompatible parameters
         encoder_settings = encoder.get_encoder_settings()
-        _print_parameter_warnings(encoder_settings, video_codec_lib.lib)
+        print_parameter_warnings(encoder_settings, video_codec_lib.lib)
 
         v_param: dict = video_codec_lib.get_custom_lib_parameters()
         print(f"  Video Encoder Library: {color_str(video_codec_lib.lib.value, color)}")

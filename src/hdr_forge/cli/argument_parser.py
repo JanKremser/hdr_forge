@@ -4,8 +4,8 @@ import argparse
 import sys
 
 from hdr_forge import __version__
-from hdr_forge.cli.cli_output import print_err
-from hdr_forge.typedefs.encoder_typing import CropMode, CropSettings, EncoderOverride, HEVC_NVENC_Preset, HdrForgeEncodingHardwarePresets, HdrForgeEncodingPresetSettings, HdrForgeEncodingPresets, HdrSdrFormat, EncoderSettings, NvencParams, NvencRcMode, SampleSettings, ScaleMode, UniversalEncoderParams, VideoCodec, Libx264Params, X264Tune, Libx265Params, X265Tune, x265_x264_Preset
+from hdr_forge.cli.cli_output import print_err, print_warn
+from hdr_forge.typedefs.encoder_typing import CropMode, CropSettings, EncoderOverride, HEVC_NVENC_Preset, HdrForgeEncodingHardwarePresets, HdrForgeEncodingPresetSettings, HdrForgeEncodingPresets, HdrSdrFormat, EncoderSettings, NvencParams, NvencRcMode, SampleSettings, ScaleMode, UniversalEncoderParams, VideoCodec, VideoEncoderLibrary, Libx264Params, X264Tune, Libx265Params, X265Tune, x265_x264_Preset
 from hdr_forge.typedefs.dolby_vision_typing import DolbyVisionProfileEncodingMode
 from hdr_forge.typedefs.video_typing import ContentLightLevelMetadata, HdrMetadata, MasterDisplayMetadata
 
@@ -178,18 +178,29 @@ Presets:
 
     convert_parser.add_argument(
         '--hw-preset',
-        choices=["cpu:balanced", "cpu:quality", "gpu:balanced"],
+        choices=["cpu:balanced", "cpu:quality", "gpu:balanced", "gpu:quality", "balanced", "quality"],
         default="cpu:balanced",
         help="""HDR Forge hardware preset for encoding optimization. Not x265/x264 presets.
-Examples:
-    hdr_forge convert -i input.mkv -o output.mkv --hw-preset cpu:quality
-Presets:
-  CPU based encoding:
-    [cpu:balanced] : Balanced speed and quality, this is the default for CPU encoding
-    [cpu:quality]  : Focus on quality. You need a high-performance system for this preset.
+You can specify presets with or without hardware prefix (cpu:/gpu:).
+When using prefix-free presets (balanced, quality), the hardware is automatically derived from --encoder.
 
-    [gpu:balanced] : Balanced quality and size
-    [gpu:quality]  : Focus on quality\n
+Examples:
+    hdr_forge convert -i input.mkv -o output.mkv --hw-preset quality
+    hdr_forge convert -i input.mkv -o output.mkv --encoder hevc_nvenc --hw-preset balanced
+    hdr_forge convert -i input.mkv -o output.mkv --hw-preset cpu:quality
+
+Prefix-free presets (hardware derived from encoder):
+    [balanced] : Balanced speed and quality (default)
+    [quality]  : Focus on quality. You need a high-performance system for this preset.
+
+Explicit hardware presets (validated against encoder):
+  CPU based encoding:
+    [cpu:balanced] : Balanced speed and quality for CPU encoding
+    [cpu:quality]  : Quality-focused for CPU encoding
+
+  GPU based encoding:
+    [gpu:balanced] : Balanced quality and size for GPU encoding
+    [gpu:quality]  : Quality-focused for GPU encoding\n
 """
     # [cpu:opt]      : Optimized settings for your system with balanced speed and quality
     )
@@ -671,11 +682,81 @@ def get_universal_params_from_args(args) -> UniversalEncoderParams:
     )
 
 
-def get_hdr_forge_encoder_presets_from_args(args) -> HdrForgeEncodingPresetSettings:
+def validate_hw_preset_with_encoder(hw_preset_str: str, encoder_override: EncoderOverride) -> str:
+    """Validate hw-preset compatibility with encoder and add prefix if needed.
+
+    Args:
+        hw_preset_str: Hardware preset string from arguments
+        encoder_override: Encoder override selection
+
+    Returns:
+        Validated hardware preset string with prefix (cpu: or gpu:)
+
+    Raises:
+        SystemExit: If explicit prefix doesn't match encoder type
+    """
+    # Determine if encoder is GPU-based
+    is_gpu_encoder = False
+    if encoder_override != EncoderOverride.AUTO:
+        # Explicit encoder specified
+        is_gpu_encoder = encoder_override in [EncoderOverride.HEVC_NVENC, EncoderOverride.H264_NVENC]
+    # If AUTO, default is CPU (libx265/libx264)
+
+    # Check if preset already has a prefix
+    if hw_preset_str.startswith('cpu:') or hw_preset_str.startswith('gpu:'):
+        # Validate explicit prefix against encoder
+        preset_is_gpu = hw_preset_str.startswith('gpu:')
+
+        if encoder_override != EncoderOverride.AUTO:
+            if is_gpu_encoder and not preset_is_gpu:
+                print_err(f"Error: Hardware preset '{hw_preset_str}' is not compatible with GPU encoder '{encoder_override.value}'.")
+                print_err(f"Use 'gpu:{hw_preset_str.split(':')[1]}' or a prefix-free preset like '{hw_preset_str.split(':')[1]}'.")
+                sys.exit(1)
+            elif not is_gpu_encoder and preset_is_gpu:
+                print_err(f"Error: Hardware preset '{hw_preset_str}' is not compatible with CPU encoder '{encoder_override.value}'.")
+                print_err(f"Use 'cpu:{hw_preset_str.split(':')[1]}' or a prefix-free preset like '{hw_preset_str.split(':')[1]}'.")
+                sys.exit(1)
+
+        # Prefix is valid or encoder is AUTO
+        return hw_preset_str
+
+    # Prefix-free preset - add appropriate prefix based on encoder
+    prefix = 'gpu' if is_gpu_encoder else 'cpu'
+    return f"{prefix}:{hw_preset_str}"
+
+
+def print_parameter_warnings(encoder_settings: EncoderSettings, active_encoder_lib: VideoEncoderLibrary) -> None:
+    """Print warnings for incompatible encoder parameters.
+
+    Args:
+        encoder_settings: EncoderSettings object
+        active_encoder_lib: Currently active encoder library
+    """
+    # Check for x265-specific parameters with non-x265 encoder
+    if active_encoder_lib != VideoEncoderLibrary.LIBX265:
+        libx265_params = encoder_settings.libx265_params
+        if libx265_params.crf is not None or libx265_params.preset is not None or libx265_params.tune is not None:
+            print_warn(f"Warning: --encoder-params for x265 specified but using {active_encoder_lib.value} encoder. Parameters will be ignored.")
+
+    # Check for x264-specific parameters with non-x264 encoder
+    if active_encoder_lib != VideoEncoderLibrary.LIBX264:
+        libx264_params = encoder_settings.libx264_params
+        if libx264_params.crf is not None or libx264_params.preset is not None or libx264_params.tune is not None:
+            print_warn(f"Warning: --encoder-params for x264 specified but using {active_encoder_lib.value} encoder. Parameters will be ignored.")
+
+    # Check for nvenc-specific parameters with non-nvenc encoder
+    if active_encoder_lib not in [VideoEncoderLibrary.HEVC_NVENC, VideoEncoderLibrary.H264_NVENC]:
+        nvenc_params = encoder_settings.nvenc_params
+        if nvenc_params.cq is not None or nvenc_params.preset is not None or nvenc_params.rc is not None:
+            print_warn(f"Warning: --encoder-params for NVENC specified but using {active_encoder_lib.value} encoder. Parameters will be ignored.")
+
+
+def get_hdr_forge_encoder_presets_from_args(args, encoder_override: EncoderOverride) -> HdrForgeEncodingPresetSettings:
     """Create HdrForgeEncodingPresetSettings object from parsed command-line arguments.
 
     Args:
         args: Parsed arguments from parse_args()
+        encoder_override: Encoder override for validation
 
     Returns:
         HdrForgeEncodingPresetSettings object with preset and hardware preset
@@ -691,14 +772,15 @@ def get_hdr_forge_encoder_presets_from_args(args) -> HdrForgeEncodingPresetSetti
             print_err(msg=f"Invalid preset value '{args.preset}'")
             sys.exit(1)
 
-    if args.hw_preset is None:
-        hw_preset = HdrForgeEncodingHardwarePresets.CPU_BALANCED
-    else:
-        try:
-            hw_preset = HdrForgeEncodingHardwarePresets(args.hw_preset)
-        except ValueError:
-            print_err(msg=f"Invalid hardware preset value '{args.hw_preset}'")
-            sys.exit(1)
+    # Validate and normalize hw_preset with encoder compatibility check
+    hw_preset_str = args.hw_preset if args.hw_preset is not None else "cpu:balanced"
+    validated_hw_preset_str = validate_hw_preset_with_encoder(hw_preset_str, encoder_override)
+
+    try:
+        hw_preset = HdrForgeEncodingHardwarePresets(validated_hw_preset_str)
+    except ValueError:
+        print_err(msg=f"Invalid hardware preset value '{validated_hw_preset_str}'")
+        sys.exit(1)
 
     return HdrForgeEncodingPresetSettings(
         preset=preset,
@@ -741,11 +823,14 @@ def create_encoder_settings_from_args(args) -> EncoderSettings:
         content_light_level_metadata=get_content_lightLevel_metadata_from_string(getattr(args, 'max_cll', None))
     )
 
+    # Get validated hardware preset settings (includes encoder compatibility check)
+    hdr_forge_preset_settings = get_hdr_forge_encoder_presets_from_args(args, encoder_override)
+
     return EncoderSettings(
         video_codec=get_video_codec_from_string(args.video_codec),
-        hdr_forge_encoding_preset=get_hdr_forge_encoder_presets_from_args(args),
+        hdr_forge_encoding_preset=hdr_forge_preset_settings,
         hdr_sdr_format=get_hdr_sdr_format_from_string(args.hdr_sdr_format),
-        enable_gpu_acceleration=args.hw_preset.startswith('gpu:'),
+        enable_gpu_acceleration=hdr_forge_preset_settings.hardware_preset.value.startswith('gpu:'),
         target_dv_profile=get_dolby_vision_profile_from_string(args.dv_profile),
         libx265_params=libx265_params,
         libx264_params=libx264_params,

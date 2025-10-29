@@ -161,10 +161,14 @@ class HdrForgeEncodingPresets(Enum):
     ANIMATION = "animation"
 
 class HdrForgeEncodingHardwarePresets(Enum):
+    # Prefixed presets (explicit hardware specification)
     CPU_BALANCED = "cpu:balanced"
     CPU_QUALITY = "cpu:quality"
     GPU_BALANCED = "gpu:balanced"
     GPU_QUALITY = "gpu:quality"
+    # Prefix-free presets (hardware derived from encoder)
+    BALANCED = "balanced"
+    QUALITY = "quality"
 
 @dataclass
 class HdrForgeEncodingPresetSettings:
