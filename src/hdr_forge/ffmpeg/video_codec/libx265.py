@@ -2,7 +2,7 @@ from typing import Optional, Tuple
 from hdr_forge.ffmpeg.video_codec.service.presets import Hdr_Forge_X265_X264_Preset
 from hdr_forge.ffmpeg.video_codec.video_codec_base import VideoCodecBase
 from hdr_forge.typedefs.encoder_typing import EncoderSettings, HdrForgeEncodingPresets, HdrSdrFormat, VideoEncoderLibrary, Libx265Params, X265Tune, x265_x264_Preset
-from hdr_forge.typedefs.video_typing import ContentLightLevelMetadata, MasterDisplayMetadata, build_master_display_string, build_max_cll_string
+from hdr_forge.typedefs.video_typing import ContentLightLevelMetadata, HdrMetadata, MasterDisplayMetadata, build_master_display_string, build_max_cll_string
 from hdr_forge.video import Video
 
 class Libx265Codec(VideoCodecBase):
@@ -106,6 +106,18 @@ class Libx265Codec(VideoCodecBase):
             "master-display": build_master_display_string(masterdisplay) if masterdisplay else None,
             "max-cll": build_max_cll_string(max_cll_max_fll) if max_cll_max_fll else None,
         }
+
+    def get_hdr_metadata_for_encoding(self) -> Optional[HdrMetadata]:
+        master_display: MasterDisplayMetadata | None = self._get_master_display_for_encoding()
+        max_cll: ContentLightLevelMetadata | None = self._get_max_cll_for_encoding()
+
+        if master_display is None and max_cll is None:
+            return None
+
+        return HdrMetadata(
+            mastering_display_metadata=master_display,
+            content_light_level_metadata=max_cll,
+        )
 
     def _get_master_display_for_encoding(self) -> Optional[MasterDisplayMetadata]:
         master_display: MasterDisplayMetadata | None = self._encoder_settings.hdr_metadata.mastering_display_metadata

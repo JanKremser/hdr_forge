@@ -47,6 +47,11 @@ def _add_info_subcommand(parser: argparse._SubParsersAction) -> None:
         help='Video file for information display'
     )
 
+    info_parser.add_argument(
+        '-d', '--debug',
+        action='store_true',
+    )
+
 
 def _add_maxcll_subcommand(parser: argparse._SubParsersAction) -> None:
     """Add arguments for the 'calc_maxcll' subcommand.
@@ -64,6 +69,11 @@ def _add_maxcll_subcommand(parser: argparse._SubParsersAction) -> None:
         '-i', '--input',
         required=True,
         help='Video file for MaxCLL and MaxFALL calculation'
+    )
+
+    maxcll_parser.add_argument(
+        '-d', '--debug',
+        action='store_true',
     )
 
 
@@ -322,6 +332,57 @@ hevc_nvenc/h264_nvenc:
         help='Enable debug output'
     )
 
+def _add_inject_hdr_metadata_subcommand(parser: argparse._SubParsersAction) -> None:
+    """Add arguments for the 'inject_hdr_metadata' subcommand.
+
+    Args:
+        parser: Argument parser to add arguments to
+    """
+    inject_parser: argparse.ArgumentParser = parser.add_parser('inject-hdr-metadata',
+        description='Inject HDR metadata into an existing HEVC video stream, without re-encoding',
+        help='Inject HDR metadata'
+    )
+
+    inject_parser.add_argument(
+        '-i', '--input',
+        required=True,
+        help='Input Video file'
+    )
+
+    inject_parser.add_argument(
+        '-o', '--output',
+        required=False,
+        help='Output MKV video file with injected HDR metadata'
+    )
+
+    inject_parser.add_argument(
+        '--master-display',
+        required=True,
+        help="""
+Set custom Master Display metadata for HDR10 videos. Format:
+G(x,y)B(x,y)R(x,y)WP(x,y)L(max,min)
+
+Example:
+    --master-display "G(13250,34500)B(7500,30000)R(34000,16000)WP(15635,16450)L(1000,0.05)"
+"""
+    )
+
+    inject_parser.add_argument(
+        '--max-cll',
+        required=False,
+        help="""
+Set custom MaxCLL and MaxFALL values for HDR10 videos. Format:
+
+Example:
+    --max-cll "1000,400"
+"""
+    )
+
+    inject_parser.add_argument(
+        '-d', '--debug',
+        action='store_true',
+    )
+
 def parse_args():
     """Parse command-line arguments with subcommands.
 
@@ -344,5 +405,7 @@ def parse_args():
     _add_maxcll_subcommand(parser=subparsers)
 
     _add_convert_subcommand(parser=subparsers)
+
+    _add_inject_hdr_metadata_subcommand(parser=subparsers)
 
     return parser.parse_args()

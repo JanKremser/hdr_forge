@@ -1,8 +1,9 @@
-from typing import Tuple
+from typing import Optional, Tuple
 from hdr_forge.cli.cli_output import print_warn
 from hdr_forge.ffmpeg.video_codec.service.presets import Hdr_Forge_HEVC_H264_NVENC_Preset
 from hdr_forge.ffmpeg.video_codec.video_codec_base import VideoCodecBase
 from hdr_forge.typedefs.encoder_typing import EncoderSettings, HEVC_NVENC_Preset, HdrForgeEncodingPresets, HdrSdrFormat, VideoEncoderLibrary
+from hdr_forge.typedefs.video_typing import HdrMetadata
 from hdr_forge.video import Video
 
 class H264NvencCodec(VideoCodecBase):
@@ -47,6 +48,9 @@ class H264NvencCodec(VideoCodecBase):
             "cq": self._cq,
             "preset": self._preset.value,
         }
+
+    def get_hdr_metadata_for_encoding(self) -> Optional[HdrMetadata]:
+        return None
 
     def _get_auto_preset(self, hw_preset: Hdr_Forge_HEVC_H264_NVENC_Preset) -> HEVC_NVENC_Preset:
         """Select optimal encoding preset based on resolution and parameter priority.

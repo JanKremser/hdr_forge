@@ -3,7 +3,7 @@ from hdr_forge.cli.cli_output import print_warn
 from hdr_forge.ffmpeg.video_codec.service.presets import Hdr_Forge_HEVC_H264_NVENC_Preset
 from hdr_forge.ffmpeg.video_codec.video_codec_base import VideoCodecBase
 from hdr_forge.typedefs.encoder_typing import EncoderSettings, HEVC_NVENC_Preset, HdrForgeEncodingPresets, HdrSdrFormat, VideoEncoderLibrary
-from hdr_forge.typedefs.video_typing import ContentLightLevelMetadata, MasterDisplayMetadata, build_master_display_string, build_max_cll_string
+from hdr_forge.typedefs.video_typing import ContentLightLevelMetadata, HdrMetadata, MasterDisplayMetadata, build_master_display_string, build_max_cll_string
 from hdr_forge.video import Video
 
 class HevcNvencCodec(VideoCodecBase):
@@ -75,6 +75,18 @@ class HevcNvencCodec(VideoCodecBase):
             "master-display": build_master_display_string(masterdisplay) if masterdisplay else None,
             "max-cll": build_max_cll_string(max_cll_max_fll) if max_cll_max_fll else None,
         }
+
+    def get_hdr_metadata_for_encoding(self) -> Optional[HdrMetadata]:
+        master_display: MasterDisplayMetadata | None = self._get_master_display_for_encoding()
+        max_cll_max_fll: ContentLightLevelMetadata | None = self._get_max_cll_for_encoding()
+
+        if master_display is None and max_cll_max_fll is None:
+            return None
+
+        return HdrMetadata(
+            mastering_display_metadata=master_display,
+            content_light_level_metadata=max_cll_max_fll,
+        )
 
     def _get_master_display_for_encoding(self) -> Optional[MasterDisplayMetadata]:
         master_display: MasterDisplayMetadata | None = self._encoder_settings.hdr_metadata.mastering_display_metadata

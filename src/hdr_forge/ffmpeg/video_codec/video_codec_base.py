@@ -8,6 +8,7 @@ from hdr_forge.analyze.grain_score import GrainAnalyzer
 from hdr_forge.cli.cli_output import print_err, print_warn
 from hdr_forge.ffmpeg.video_codec.service.presets import calc_hw_prest_params
 from hdr_forge.typedefs.encoder_typing import EncoderSettings, HdrSdrFormat, ScaleMode, VideoEncoderLibrary
+from hdr_forge.typedefs.video_typing import HdrMetadata
 from hdr_forge.video import Video
 
 T = TypeVar("T")
@@ -110,6 +111,15 @@ class VideoCodecBase(ABC):
     @abstractmethod
     def get_custom_lib_parameters(self) -> dict:
         """Get custom parameters specific to the codec library."""
+        pass
+
+    @abstractmethod
+    def get_hdr_metadata_for_encoding(self) -> Optional[HdrMetadata]:
+        """Get HDR metadata to be used for encoding.
+
+        Returns:
+            HdrMetadata or None if not applicable
+        """
         pass
 
     def get_name(self) -> str:

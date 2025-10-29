@@ -9,6 +9,7 @@
 /.devcontainer
 /.docs
 dovi_tool
+hevc_hdr_editor
 
 # Python
 __pycache__/

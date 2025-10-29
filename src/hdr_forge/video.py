@@ -6,8 +6,8 @@ import subprocess
 from pathlib import Path
 from typing import Dict, LiteralString, Optional, Tuple
 
-from hdr_forge.container import mkv
-from hdr_forge.hdr_formats import dolby_vision
+from hdr_forge.tools import mkvmerge
+from hdr_forge.tools import dovi_tool
 from hdr_forge.typedefs.encoder_typing import HdrSdrFormat
 from hdr_forge.typedefs.dolby_vision_typing import DolbyVisionEnhancementLayer, DolbyVisionInfo, DolbyVisionProfile, DolbyVisionSiteDataInfo, DolbyVisionRpuInfo
 from hdr_forge.typedefs.video_typing import ContentLightLevelMetadata, HdrMetadata, MasterDisplayMetadata
@@ -39,7 +39,7 @@ class Video:
         self._video_metadata: dict = self._extract_video_metadata()
         self._hdr_metadata: HdrMetadata = self.extract_hdr_metadata()
 
-        self._container_metadata: MkvInfo = mkv.extract_container_info_json(input_mkv_mp4_ts_file=filepath)
+        self._container_metadata: MkvInfo = mkvmerge.extract_container_info_json(input_mkv_mp4_ts_file=filepath)
 
         # Extract dimensions from video stream
         video_stream: dict = self._get_video_stream()
@@ -49,11 +49,11 @@ class Video:
         self._dolby_vision_rpu_info: Optional[DolbyVisionRpuInfo] = None
         if self.is_dolby_vision_video():
             ## get dolby vision rpu infos
-            rpu_file_path: Path = dolby_vision.extract_rpu(
+            rpu_file_path: Path = dovi_tool.extract_rpu(
                 input_path=self.get_filepath(),
                 dv_profile_source=self.get_dolby_vision_profile(),
             )
-            self._dolby_vision_rpu_info = dolby_vision.get_rpu_info(
+            self._dolby_vision_rpu_info = dovi_tool.get_rpu_info(
                 rpu_path=Path(rpu_file_path)
             )
             rpu_file_path.unlink(missing_ok=True)

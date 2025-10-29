@@ -2,6 +2,7 @@ from typing import Optional, Tuple
 from hdr_forge.ffmpeg.video_codec.service.presets import Hdr_Forge_X265_X264_Preset
 from hdr_forge.ffmpeg.video_codec.video_codec_base import VideoCodecBase
 from hdr_forge.typedefs.encoder_typing import EncoderSettings, HdrForgeEncodingPresets, HdrSdrFormat, VideoEncoderLibrary, Libx264Params, X264Tune, x265_x264_Preset
+from hdr_forge.typedefs.video_typing import HdrMetadata
 from hdr_forge.video import Video
 
 class Libx264Codec(VideoCodecBase):
@@ -57,6 +58,9 @@ class Libx264Codec(VideoCodecBase):
             "preset": self._preset.value,
             "tune": self._tune.value if self._tune else None,
         }
+
+    def get_hdr_metadata_for_encoding(self) -> Optional[HdrMetadata]:
+        return None
 
     def _get_auto_tune(self) -> Optional[X264Tune]:
         """Select optimal encoding tune based on parameter priority.

@@ -8,10 +8,11 @@ from hdr_forge.cli.cli_output import print_conversion_summary, print_debug, prin
 from hdr_forge.cli.encoder import print_encoding_params
 from hdr_forge.cli.video import print_video_infos
 from hdr_forge.core import config
+from hdr_forge.hdr_metadata_injector import HdrMetadataInjector
 from hdr_forge.typedefs.encoder_typing import EncoderSettings
 from hdr_forge.encoder import Encoder
 from hdr_forge.video import Video
-from hdr_forge.hdr_formats.hdr10 import calc_maxcll
+from hdr_forge.analyze.maxcll import calc_maxcll
 
 # Supported input video formats
 SUPPORTED_FORMATS: list[str] = ['.mkv', '.m2ts', '.ts', '.mp4']
@@ -209,6 +210,32 @@ def process_info_command(args) -> int:
             show_video_info(video_file)
     return 0
 
+def process_inject_hdr_metadata_command(args) -> int:
+    """Process the inject-hdr-metadata subcommand."""
+    input_path = Path(args.input)
+    output_path = Path(args.output)
+
+    # Validate input
+    if not input_path.exists():
+        print(f"Error: Input path does not exist: {input_path}")
+        return 1
+
+    # Determine output file
+    if output_path is None:
+        output_path = input_path.with_suffix('.mkv')
+
+    hdr_metadata: pars_encoder_settings.HdrMetadata = pars_encoder_settings.get_hdr_metadata_from_args(args)
+
+    injector = HdrMetadataInjector(
+        input_file=input_path,
+        target_file=output_path,
+        metadata=hdr_metadata,
+    )
+
+    success: bool = injector.inject_metadata()
+
+    return 0 if success else 1
+
 
 def main() -> None:
     """Main entry point for CLI."""
@@ -223,6 +250,8 @@ def main() -> None:
         code = process_info_command(args)
     elif args.command == 'convert':
         code = process_convert_command(args)
+    elif args.command == 'inject-hdr-metadata':
+        code = process_inject_hdr_metadata_command(args)
     elif args.command == 'calc_maxcll':
         input_path = Path(args.input)
         if not input_path.exists():

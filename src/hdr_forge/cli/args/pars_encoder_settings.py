@@ -213,14 +213,14 @@ def _get_master_display_from_string(md_str: str | None) -> MasterDisplayMetadata
         max_lum, min_lum = map(float, lum_part.split(','))
 
         md_values = parts[0]
-        r_x = float(md_values.split('R(')[1].split(',')[0])
-        r_y = float(md_values.split('R(')[1].split(')')[0].split(',')[1])
-        g_x = float(md_values.split('G(')[1].split(',')[0])
-        g_y = float(md_values.split('G(')[1].split(')')[0].split(',')[1])
-        b_x = float(md_values.split('B(')[1].split(',')[0])
-        b_y = float(md_values.split('B(')[1].split(')')[0].split(',')[1])
-        wp_x = float(md_values.split('WP(')[1].split(',')[0])
-        wp_y = float(md_values.split('WP(')[1].split(')')[0].split(',')[1])
+        r_x = float(md_values.split('R(')[1].split(',')[0]) / 50000
+        r_y = float(md_values.split('R(')[1].split(')')[0].split(',')[1]) / 50000
+        g_x = float(md_values.split('G(')[1].split(',')[0]) / 50000
+        g_y = float(md_values.split('G(')[1].split(')')[0].split(',')[1]) / 50000
+        b_x = float(md_values.split('B(')[1].split(',')[0]) / 50000
+        b_y = float(md_values.split('B(')[1].split(')')[0].split(',')[1]) / 50000
+        wp_x = float(md_values.split('WP(')[1].split(',')[0]) / 10000
+        wp_y = float(md_values.split('WP(')[1].split(')')[0].split(',')[1]) / 10000
 
         return MasterDisplayMetadata(
             r_x=r_x, r_y=r_y,
@@ -509,6 +509,20 @@ def _get_hdr_forge_encoder_presets_from_args(args, encoder_override: EncoderOver
         hardware_preset=hw_preset,
     )
 
+def get_hdr_metadata_from_args(args) -> HdrMetadata:
+    """Create HdrMetadata object from parsed command-line arguments.
+
+    Args:
+        args: Parsed arguments from parse_args()
+
+    Returns:
+        HdrMetadata object with mastering display and content light level metadata
+    """
+    return HdrMetadata(
+        mastering_display_metadata=_get_master_display_from_string(getattr(args, 'master_display', None)),
+        content_light_level_metadata=_get_content_lightLevel_metadata_from_string(getattr(args, 'max_cll', None))
+    )
+
 def create_encoder_settings_from_args(args) -> EncoderSettings:
     """Create EncoderSettings object from parsed command-line arguments.
 
@@ -543,10 +557,7 @@ def create_encoder_settings_from_args(args) -> EncoderSettings:
     libx264_params: Libx264Params = encoder_params_libx264 if encoder_params_libx264 is not None else Libx264Params()
     nvenc_params: NvencParams = encoder_params_nvenc if encoder_params_nvenc is not None else NvencParams()
 
-    hdr_metadata = HdrMetadata(
-        mastering_display_metadata=_get_master_display_from_string(getattr(args, 'master_display', None)),
-        content_light_level_metadata=_get_content_lightLevel_metadata_from_string(getattr(args, 'max_cll', None))
-    )
+    hdr_metadata: HdrMetadata = get_hdr_metadata_from_args(args)
 
     # Get validated hardware preset settings (includes encoder compatibility check)
     hdr_forge_preset_settings: HdrForgeEncodingPresetSettings = _get_hdr_forge_encoder_presets_from_args(args, encoder_override)

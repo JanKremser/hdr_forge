@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Optional
 
 from hdr_forge.cli.cli_output import monitor_process_progress, print_debug
+from hdr_forge.core.service import build_cmd_array_to_str, build_cmd_pipe_str
 from hdr_forge.typedefs.dolby_vision_typing import DolbyVisionProfile, DolbyVisionRpuInfo
 
 
@@ -65,6 +66,8 @@ def extract_base_layer(input_path: Path, output_hevc: Optional[Path] = None) -> 
             '-',
             '-o', str(output_hevc)
         ]
+
+        print_debug(build_cmd_pipe_str([ffmpeg_cmd, dovi_cmd]))
 
         # Create pipeline: ffmpeg | dovi_tool
         ffmpeg_process = subprocess.Popen(
@@ -148,6 +151,8 @@ def inject_rpu(input_path: Path, input_rpu: Path, output_hevc: Optional[Path] = 
             '--rpu-in', str(input_rpu),
             '-o', str(output_hevc)
         ]
+
+        print_debug(build_cmd_array_to_str(dovi_cmd))
 
         dovi_process = subprocess.Popen(
             dovi_cmd,
@@ -235,6 +240,8 @@ def extract_rpu(input_path: Path, output_rpu: Optional[Path] = None, dv_profile_
             '-o', str(output_rpu)
         ])
 
+        print_debug(build_cmd_pipe_str([ffmpeg_cmd, dovi_cmd]))
+
         # Create pipeline: ffmpeg | dovi_tool
         ffmpeg_process = subprocess.Popen(
             ffmpeg_cmd,
@@ -318,6 +325,8 @@ def inject_dolby_vision_layers(bl_path: Path, el_path: Path, output_bl_el: Optio
             '-o', str(output_bl_el)
         ]
 
+        print_debug(build_cmd_array_to_str(dovi_cmd))
+
         dovi_process = subprocess.Popen(
             dovi_cmd,
             stdout=subprocess.PIPE,
@@ -394,6 +403,8 @@ def extract_enhancement_layer(input_file: Path, output_el: Optional[Path] = None
             '--el-only',
             '--el-out', str(output_el)
         ]
+
+        print_debug(build_cmd_pipe_str([ffmpeg_cmd, dovi_cmd]))
 
         # Create pipeline: ffmpeg | dovi_tool
         ffmpeg_process = subprocess.Popen(
@@ -582,6 +593,8 @@ def get_rpu_info(rpu_path: Path) -> DolbyVisionRpuInfo:
             '--input', str(rpu_path),
             '--summary'
         ]
+
+        print_debug(build_cmd_array_to_str(dovi_cmd))
 
         result = subprocess.run(
             dovi_cmd,

@@ -4,7 +4,8 @@ import json
 from pathlib import Path
 from typing import Optional
 
-from hdr_forge.cli.cli_output import monitor_process_progress
+from hdr_forge.cli.cli_output import monitor_process_progress, print_debug
+from hdr_forge.core.service import build_cmd_array_to_str
 from hdr_forge.typedefs.mkv_typing import MkvInfo, parse_mkv_info
 
 def get_mkvmerge_path() -> str:
@@ -37,6 +38,8 @@ def extract_hevc(input_path: Path, output_hevc: Optional[Path] = None) -> Path:
             '-f', 'hevc',
             str(output_hevc)
         ]
+
+        print_debug(build_cmd_array_to_str(ffmpeg_cmd))
 
         # Execute ffmpeg to extract HEVC
         ffmpeg_process = subprocess.Popen(
@@ -95,6 +98,8 @@ def mux_hevc_to_mkv(input_hevc_path: Path, input_mkv: Optional[Path] = None, out
             str(input_hevc_path),
         ])
 
+        print_debug(build_cmd_array_to_str(mkvmerge_cmd))
+
         # Execute mkvmerge to mux HEVC into MKV
         mkvmerge_process = subprocess.Popen(
             mkvmerge_cmd,
@@ -151,6 +156,8 @@ def extract_container_info_json(input_mkv_mp4_ts_file: Path) -> MkvInfo:
             '-J',
             str(input_mkv_mp4_ts_file)
         ]
+
+        print_debug(build_cmd_array_to_str(mkvmerge_cmd))
 
         # Execute mkvmerge to extract JSON information
         process = subprocess.run(

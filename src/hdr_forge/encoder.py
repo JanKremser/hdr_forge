@@ -7,14 +7,15 @@ import time
 from typing import Dict, Optional, Tuple
 
 from hdr_forge.cli.cli_output import create_progress_handler, print_debug, print_err
-from hdr_forge.container import mkv
+from hdr_forge.core.service import build_ffmpeg_cmd_dict_to_str
+from hdr_forge.tools import mkvmerge
 from hdr_forge.ffmpeg.ffmpeg_wrapper import run_ffmpeg
 from hdr_forge.ffmpeg.video_codec.h264_nvenc import H264NvencCodec
 from hdr_forge.ffmpeg.video_codec.hevc_nvenc import HevcNvencCodec
 from hdr_forge.ffmpeg.video_codec.video_codec_base import VideoCodecBase
 from hdr_forge.ffmpeg.video_codec.libx264 import Libx264Codec
 from hdr_forge.ffmpeg.video_codec.libx265 import Libx265Codec
-from hdr_forge.hdr_formats import dolby_vision
+from hdr_forge.tools import dovi_tool
 from hdr_forge.typedefs.encoder_typing import EncoderOverride, HdrSdrFormat, EncoderSettings, SampleSettings, VideoCodec, VideoEncoderLibrary
 from hdr_forge.typedefs.dolby_vision_typing import DolbyVisionEnhancementLayer, DolbyVisionProfile, DolbyVisionProfileEncodingMode
 from hdr_forge.video import Video
@@ -420,11 +421,11 @@ class Encoder:
             output_options: dict = self._build_ffmpeg_output_options()
 
             # Debug output
-            debug_ffmpeg = ' '.join(f"-{k} {v}" for k, v in output_options.items())
-            print_debug(f"ffmpeg command: ffmpeg -y -i {input_file} {debug_ffmpeg} {target_file}")
+            debug_ffmpeg: str = build_ffmpeg_cmd_dict_to_str(output_options)
+            print_debug(f"Run command: ffmpeg -y -i {input_file} {debug_ffmpeg} {target_file}")
 
             # Execute FFmpeg with progress tracking
-            success = run_ffmpeg(
+            success: bool = run_ffmpeg(
                 input_file=input_file,
                 output_file=target_file,
                 output_options=output_options,
@@ -451,7 +452,7 @@ class Encoder:
         Returns:
             True if conversion succeeded, False otherwise
         """
-        input_file = self._video.get_filepath()
+        input_file: Path = self._video.get_filepath()
 
         return self._run_ffmpeg_encoding_process(
             input_file=input_file,
@@ -467,14 +468,14 @@ class Encoder:
         temp_dir: Path = self._get_temp_directory()
 
         # Step 1: Extract base layer (HEVC without EL+RPU) from original video
-        base_layer_hevc_path: Path = dolby_vision.extract_base_layer(
+        base_layer_hevc_path: Path = dovi_tool.extract_base_layer(
             input_path=input_file,
             output_hevc=temp_dir / f"video_BL.hevc"
         )
 
         # Step 2: Mux base layer HEVC with original audio/subtitles into final MKV
         # This creates a playable MKV file with base layer video + original audio/subs
-        _base_layer_mkv_path: Path = mkv.mux_hevc_to_mkv(
+        _base_layer_mkv_path: Path = mkvmerge.mux_hevc_to_mkv(
             input_hevc_path=base_layer_hevc_path,
             input_mkv=input_file,
             output_mkv=self._target_file,
@@ -494,7 +495,7 @@ class Encoder:
         temp_dir: Path = self._get_temp_directory()
 
         # Step 1: Extract RPU metadata from original Dolby Vision video
-        rpu_file_path: Path = dolby_vision.extract_rpu(
+        rpu_file_path: Path = dovi_tool.extract_rpu(
             input_path=input_file,
             output_rpu=temp_dir / f"RPU.rpu",
             dv_profile_source=source_dv_profile,
@@ -505,11 +506,11 @@ class Encoder:
         # Setup 2: If AUTO profile and source is profile 7, demux EL profile 7 RPU
         if self._target_dv_el is not None:
             # start demux EL profile 7 for profile 7 encoding
-            el_path: Path = dolby_vision.extract_enhancement_layer(
+            el_path: Path = dovi_tool.extract_enhancement_layer(
                 input_file=input_file,
                 output_el=temp_dir / f"video_EL.hevc",
             )
-            bl_el_hevc: Path = dolby_vision.inject_dolby_vision_layers(
+            bl_el_hevc: Path = dovi_tool.inject_dolby_vision_layers(
                 bl_path=hevc_bl,
                 el_path=el_path,
                 output_bl_el=temp_dir / f"video_encoded_BL_EL.hevc",
@@ -517,7 +518,7 @@ class Encoder:
             hevc = bl_el_hevc
 
         # Step 3: Inject original RPU metadata back into encoded HEVC
-        encoded_hevc_with_rpu_path: Path = dolby_vision.inject_rpu(
+        encoded_hevc_with_rpu_path: Path = dovi_tool.inject_rpu(
             input_path=hevc,
             input_rpu=rpu_file_path,
             output_hevc=temp_dir / f"video_encoded_BL_{'EL_' if self._target_dv_el else ''}RPU.hevc"
@@ -535,7 +536,7 @@ class Encoder:
         temp_dir: Path = self._get_temp_directory()
 
         # Step 1: Extract base layer (HEVC without RPU) from original video
-        base_layer_hevc_path: Path = dolby_vision.extract_base_layer(
+        base_layer_hevc_path: Path = dovi_tool.extract_base_layer(
             input_path=input_file,
             output_hevc=temp_dir / f"video_BL.hevc",
         )
@@ -549,7 +550,7 @@ class Encoder:
         )
 
         # Step 3: Mux final HEVC (with RPU) + audio/subtitles into target file
-        mkv.mux_hevc_to_mkv(
+        mkvmerge.mux_hevc_to_mkv(
             input_hevc_path=hevc_with_rpu,
             input_mkv=input_file,
             output_mkv=self._target_file,
@@ -593,14 +594,14 @@ class Encoder:
         temp_dir: Path = self._get_temp_directory()
 
         # Step 1: Extract base layer (HEVC without RPU) from original video
-        base_layer_hevc_path: Path = dolby_vision.extract_base_layer(
+        base_layer_hevc_path: Path = dovi_tool.extract_base_layer(
             input_path=input_file,
             output_hevc=temp_dir / f"video_BL.hevc",
         )
 
         # Step 2: Mux base layer HEVC with original audio/subtitles into temporary MKV
         # This creates a playable MKV file with base layer video + original audio/subs
-        base_layer_mkv_path: Path = mkv.mux_hevc_to_mkv(
+        base_layer_mkv_path: Path = mkvmerge.mux_hevc_to_mkv(
             input_hevc_path=base_layer_hevc_path,
             input_mkv=input_file,
             output_mkv=temp_dir / f"video_BL.mkv",
@@ -634,7 +635,7 @@ class Encoder:
         print()
 
         # Step 4: Extract encoded HEVC video stream from MKV
-        encoded_hevc_bl_path: Path = mkv.extract_hevc(
+        encoded_hevc_bl_path: Path = mkvmerge.extract_hevc(
             input_path=encoded_base_layer_mkv,
             output_hevc=temp_dir / f"video_encoded_BL.hevc"
         )
@@ -651,7 +652,7 @@ class Encoder:
         encoded_hevc_bl_path.unlink(missing_ok=True)
 
         # Step 6: Mux final HEVC (with RPU) + audio/subtitles into target file
-        mkv.mux_hevc_to_mkv(
+        mkvmerge.mux_hevc_to_mkv(
             input_hevc_path=hevc_with_rpu,
             input_mkv=encoded_base_layer_mkv,
             output_mkv=self._target_file,
