@@ -25,12 +25,27 @@ ANSI_GREEN = '\033[92m'
 ANSI_YELLOW = '\033[93m'
 ANSI_BLUE = '\033[94m'
 ANSI_PURPLE = '\033[95m'
+ANSI_CYAN = '\033[96m'
 ANSI_BLACK = '\033[30m'
+ANSI_ORANGE = '\033[38;5;208m'
+ANSI_PINK = '\033[38;5;213m'
 
 ANSI_GREEN_BG = '\033[102m'
 ANSI_GRAY_BG = '\033[100m'
 
 ANSI_RESET = '\033[0m'
+
+# Rainbow color sequence
+RAINBOW_COLORS = [
+    ANSI_RED,
+    ANSI_PINK,
+    ANSI_ORANGE,
+    ANSI_YELLOW,
+    ANSI_GREEN,
+    ANSI_CYAN,
+    ANSI_BLUE,
+    ANSI_PURPLE,
+]
 
 
 def clear_lines(n: int) -> str:
@@ -56,6 +71,38 @@ def color_str(value: str | int | float | None, color: str) -> str:
         Colored text string
     """
     return f"{color}{str(value)}{ANSI_RESET}"
+
+
+def rainbow_text(text: str, color_sequence: list[str] | None = None) -> str:
+    """Apply rainbow colors to each character in a multi-line text.
+
+    Each non-whitespace character gets a different color from the rainbow sequence.
+    Whitespace characters (spaces, newlines, tabs) are preserved without color.
+
+    Args:
+        text: The multi-line text to colorize
+        color_sequence: Optional custom color sequence (default: RAINBOW_COLORS)
+
+    Returns:
+        Text with rainbow color codes applied to each character
+    """
+    if color_sequence is None:
+        color_sequence = RAINBOW_COLORS
+
+    colored_text = []
+    color_index = 0
+
+    for char in text:
+        # Skip coloring whitespace characters
+        if char in (' ', '\n', '\t', '\r'):
+            colored_text.append(char)
+        else:
+            # Apply color to non-whitespace character
+            color = color_sequence[color_index % len(color_sequence)]
+            colored_text.append(f"{color}{char}{ANSI_RESET}")
+            color_index += 1
+
+    return ''.join(colored_text)
 
 
 def print_warn(msg: str) -> None:
