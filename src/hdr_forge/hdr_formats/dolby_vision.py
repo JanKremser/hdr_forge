@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Optional
 
 from hdr_forge.cli.cli_output import monitor_process_progress, print_debug
-from hdr_forge.typedefs.dolby_vision_typing import DolbyVisionProfile, DolbyVisionProfileEncodingMode, DolbyVisionRpuInfo
+from hdr_forge.typedefs.dolby_vision_typing import DolbyVisionProfile, DolbyVisionRpuInfo
 
 
 def get_dovi_tool_path() -> str:
@@ -447,43 +447,6 @@ def extract_enhancement_layer(input_file: Path, output_el: Optional[Path] = None
         )
     except Exception as e:
         raise RuntimeError(f"Failed to extract Enhancement Layer: {e}")
-
-
-# def build_dolby_vision_params(video, crf: int, preset: str) -> list:
-#     """Build x265 parameters for Dolby Vision encoding.
-
-#     Args:
-#         video: Video object with metadata
-#         crf: Constant Rate Factor for quality
-#         preset: Encoding preset
-
-#     Returns:
-#         List of x265 parameter strings
-#     """
-#     params = [
-#         f"crf={crf}",
-#         f"preset={preset}",
-#         "profile=main10",  # 10-bit profile required for Dolby Vision
-#         "level-idc=5.1",
-#         "high-tier=1",
-#         "hdr10=1",
-#         "repeat-headers=1",
-#         "colorprim=bt2020",
-#         "transfer=smpte2084",
-#         "colormatrix=bt2020nc",
-#         "vbv-bufsize=20000",
-#         "vbv-maxrate=20000",
-#     ]
-#         video: Video object with metadata
-#         crf: Constant Rate Factor for quality
-#         preset: Encoding preset
-#     Returns:master_display()
-#         List of x265 parameter strings#     if master_display:
-#     """ms.append(f"master-display={master_display}")
-#     params = [
-#         f"crf={crf}",urn params
-#         f"preset={preset}",#         "profile=main10",  # 10-bit profile required for Dolby Vision#         "level-idc=5.1",#         "high-tier=1",#         "hdr10=1",#         "repeat-headers=1",#         "colorprim=bt2020",#         "transfer=smpte2084",#         "colormatrix=bt2020nc",#         "vbv-bufsize=20000",#         "vbv-maxrate=20000",#     ]#     # Add master display metadata if available#     master_display = video.get_master_display()#     if master_display:#         params.append(f"master-display={master_display}")#     return params
-
 
 def _parse_rpu_info(output: str) -> DolbyVisionRpuInfo:
     """Parse dovi_tool info --summary output into RpuInfo dataclass.

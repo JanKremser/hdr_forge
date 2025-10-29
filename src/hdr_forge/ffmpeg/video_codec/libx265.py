@@ -17,7 +17,28 @@ class Libx265Codec(VideoCodecBase):
     HDR_X265_PARAMS: list[str] = [
         'profile=main10',
         'hdr-opt=1',
+        'hdr10=1',
         'repeat-headers=1',
+        # //
+        # "level-idc=5.1",
+        # "high-tier=1",
+            # Main Tier → for Streaming, Blu-ray, Web
+            # High Tier → only for very high bitrate encodings, not needed for typical HDR10 use cases
+        # //
+        # 'vbv-bufsize=20000',
+        # 'vbv-maxrate=20000',
+# | --------------------- | ------------------------ | ----------------------
+# | **480p (SD)**         | 2 000                    | 4 000
+# | **720p (HD)**         | 5 000                    | 10 000
+# | **720p60 (HD)**       | 7 000                    | 14 000
+# | **1080p (Full HD)**   | 10 000                   | 20 000
+# | **1080p60 (Full HD)** | 15 000                   | 30 000
+# | **1440p (2K)**        | 24 000                   | 48 000
+# | **1440p60 (2K)**      | 30 000                   | 60 000
+# | **2160p (4K UHD)**    | 35 000–45 000            | 70 000–90 000
+# | **2160p60 (4K UHD)**  | 45 000–60 000            | 90 000–120 000
+# | **4320p (8K)**        | 100 000–160 000          | 200 000–300 000
+        # //
         'colorprim=bt2020',
         'transfer=smpte2084',
         'colormatrix=bt2020nc',
@@ -26,10 +47,13 @@ class Libx265Codec(VideoCodecBase):
     # SDR x265 parameters
     SDR_X265_PARAMS: list[str] = [
         'profile=main',
+        'hdr-opt=0',
+        'hdr10=0',
+        'no-hdr10-opt=1',
+        # //
         'colorprim=bt709',
         'transfer=bt709',
         'colormatrix=bt709',
-        'no-hdr10-opt=1',
     ]
 
     HDR_PIXEL_FORMAT = 'yuv420p10le'
