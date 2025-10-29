@@ -3,7 +3,7 @@
 import sys
 from pathlib import Path
 
-from hdr_forge.cli import argument_parser
+from hdr_forge.cli.args import pars_args, pars_encoder_settings
 from hdr_forge.cli.cli_output import print_conversion_summary, print_debug, print_err, print_warn
 from hdr_forge.cli.encoder import print_encoding_params
 from hdr_forge.cli.video import print_video_infos
@@ -153,7 +153,7 @@ def process_convert_command(args) -> int:
             sys.exit(1)
 
     # Create encoder settings from CLI arguments
-    settings: EncoderSettings = argument_parser.create_encoder_settings_from_args(args)
+    settings: EncoderSettings = pars_encoder_settings.create_encoder_settings_from_args(args)
 
     # Process each video file
     success_count = 0
@@ -212,7 +212,7 @@ def process_info_command(args) -> int:
 
 def main() -> None:
     """Main entry point for CLI."""
-    args = argument_parser.parse_args()
+    args = pars_args.parse_args()
     config.debug_mode = getattr(args, 'debug', False) or False
     if config.debug_mode:
         print_debug("Debug mode enabled")

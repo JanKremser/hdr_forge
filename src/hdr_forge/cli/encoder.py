@@ -1,12 +1,11 @@
 """CLI output and progress tracking functionality."""
 
-from typing import Tuple
 from hdr_forge.analyze.crop_video import CropResult
-from hdr_forge.cli.cli_output import BLUE, color_str, create_aspect_ratio_str
-from hdr_forge.cli.argument_parser import print_parameter_warnings
+from hdr_forge.cli.args.pars_encoder_settings import print_parameter_warnings
+from hdr_forge.cli.cli_output import ANSI_BLUE, color_str, create_aspect_ratio_str
 from hdr_forge.ffmpeg.video_codec.video_codec_base import VideoCodecBase
 from hdr_forge.typedefs.dolby_vision_typing import DolbyVisionEnhancementLayer, DolbyVisionProfile
-from hdr_forge.typedefs.encoder_typing import EncoderSettings, VideoEncoderLibrary
+from hdr_forge.typedefs.encoder_typing import EncoderSettings, VideoCodec
 from hdr_forge.encoder import Encoder
 
 
@@ -16,19 +15,20 @@ def print_encoding_params(encoder: Encoder) -> None:
     Args:
         encoder: Encoder object with encoding configuration
     """
-    color = BLUE
+
+    color = ANSI_BLUE
     print()
     print(f"{color_str('_', color)}" * 70)
     print("Encoding Parameters:")
     print(f"  Output File: {color_str(str(encoder.get_target_file()), color)}")
 
-    video_codec = encoder.get_encoding_video_codec()
+    video_codec: VideoCodec = encoder.get_encoding_video_codec()
     print(f"  Video Codec: {color_str(video_codec.value, color)}")
     video_codec_lib: VideoCodecBase | None = encoder.get_video_codec_lib()
     if video_codec_lib:
-        # Print warnings for incompatible parameters
-        encoder_settings = encoder.get_encoder_settings()
-        print_parameter_warnings(encoder_settings, video_codec_lib.lib)
+         # Print warnings for incompatible parameters
+        encoder_settings: EncoderSettings = encoder.get_encoder_settings()
+        print_parameter_warnings(encoder_settings=encoder_settings, active_encoder_lib=video_codec_lib.lib)
 
         v_param: dict = video_codec_lib.get_custom_lib_parameters()
         print(f"  Video Encoder Library: {color_str(video_codec_lib.lib.value, color)}")

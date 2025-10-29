@@ -12,27 +12,25 @@ from hdr_forge.typedefs.ffmpeg_typing import ProgressInfo
 SUMMARY_LINE_WIDTH = 60
 PROGRESS_BAR_WIDTH = 70
 # ANSI escape codes for terminal control
-CURSOR_UP_ONE = '\033[1A'
-CLEAR_LINE = '\033[2K'  # Clears the current line
-MOVE_TO_START = '\r'    # Moves cursor to the beginning of the line
+ANSI_CURSOR_UP_ONE = '\033[1A'
+ANSI_CLEAR_LINE = '\033[2K'  # Clears the current line
+ANSI_MOVE_TO_START = '\r'    # Moves cursor to the beginning of the line
 
 # Complete code to clear current and previous line
-CLEAR_TWO_LINES = f"{CLEAR_LINE}{CURSOR_UP_ONE}{CLEAR_LINE}{MOVE_TO_START}"
+ANSI_CLEAR_TWO_LINES = f"{ANSI_CLEAR_LINE}{ANSI_CURSOR_UP_ONE}{ANSI_CLEAR_LINE}{ANSI_MOVE_TO_START}"
 
 # ANSI color codes
-RED = '\033[91m'
-GREEN = '\033[92m'
-YELLOW = '\033[93m'
-BLUE = '\033[94m'
-PURPLE = '\033[95m'
-BLACK = '\033[30m'
+ANSI_RED = '\033[91m'
+ANSI_GREEN = '\033[92m'
+ANSI_YELLOW = '\033[93m'
+ANSI_BLUE = '\033[94m'
+ANSI_PURPLE = '\033[95m'
+ANSI_BLACK = '\033[30m'
 
-GREEN_BG = '\033[102m'
-GRAY_BG = '\033[100m'
+ANSI_GREEN_BG = '\033[102m'
+ANSI_GRAY_BG = '\033[100m'
 
-RESET = '\033[0m'
-
-DEBUG_MODE = False
+ANSI_RESET = '\033[0m'
 
 
 def clear_lines(n: int) -> str:
@@ -44,7 +42,7 @@ def clear_lines(n: int) -> str:
     Returns:
         ANSI escape code string to clear n lines
     """
-    return ''.join(f"{CLEAR_LINE}{CURSOR_UP_ONE}" for _ in range(n)) + CLEAR_LINE + MOVE_TO_START
+    return ''.join(f"{ANSI_CLEAR_LINE}{ANSI_CURSOR_UP_ONE}" for _ in range(n)) + ANSI_CLEAR_LINE + ANSI_MOVE_TO_START
 
 
 def color_str(value: str | int | float | None, color: str) -> str:
@@ -57,7 +55,7 @@ def color_str(value: str | int | float | None, color: str) -> str:
     Returns:
         Colored text string
     """
-    return f"{color}{str(value)}{RESET}"
+    return f"{color}{str(value)}{ANSI_RESET}"
 
 
 def print_warn(msg: str) -> None:
@@ -66,7 +64,7 @@ def print_warn(msg: str) -> None:
     Args:
         message: The warning message to print
     """
-    print(f"{color_str('Warning:', YELLOW)} {msg}")
+    print(f"{color_str('Warning:',ANSI_YELLOW)} {msg}")
 
 
 def print_err(msg: str) -> None:
@@ -75,7 +73,7 @@ def print_err(msg: str) -> None:
     Args:
         message: The error message to print
     """
-    print(f"{color_str('Error:', RED)} {msg}")
+    print(f"{color_str('Error:', ANSI_RED)} {msg}")
 
 
 def print_debug(msg: str) -> None:
@@ -86,7 +84,7 @@ def print_debug(msg: str) -> None:
     """
     if config.debug_mode == False:
         return
-    print(f"{color_str(f'Debug: {msg}', PURPLE)}")
+    print(f"{color_str(f'Debug: {msg}', ANSI_PURPLE)}")
 
 
 def create_progress_bar(percent: float, text: Optional[str] = None, width: int = PROGRESS_BAR_WIDTH) -> str:
@@ -113,15 +111,15 @@ def create_progress_bar(percent: float, text: Optional[str] = None, width: int =
         if text is not None and text_pos <= i < text_pos + text_len:
             # Percent string in filled area: green foreground + green background
             if i < filled:
-                bar_chars.append(f"{GREEN_BG}{BLACK}{text[i - text_pos]}{RESET}")
+                bar_chars.append(f"{ANSI_GREEN_BG}{ANSI_BLACK}{text[i - text_pos]}{ANSI_RESET}")
             else:
-                bar_chars.append(f"{GRAY_BG}{BLACK}{text[i - text_pos]}{RESET}")
+                bar_chars.append(f"{ANSI_GRAY_BG}{ANSI_BLACK}{text[i - text_pos]}{ANSI_RESET}")
         elif i < filled:
-            bar_chars.append(f"{GREEN}█{RESET}")
+            bar_chars.append(f"{ANSI_GREEN}█{ANSI_RESET}")
         elif i == filled and empty > 0:
-            bar_chars.append(f"{GREEN}░{RESET}")
+            bar_chars.append(f"{ANSI_GREEN}░{ANSI_RESET}")
         else:
-            bar_chars.append(f"{GRAY_BG} {RESET}")
+            bar_chars.append(f"{ANSI_GRAY_BG} {ANSI_RESET}")
 
     bar = ''.join(bar_chars)
     return bar
@@ -242,19 +240,19 @@ def print_progress_info(first_update: bool, current_frame: int, total_frames: in
 
     # Format for multi-line output
     info_line: str = f"""
-{color_str("-" * 70, GREEN)}
-Frame         : {color_str(current_frame, GREEN)}/{total_frames}
-Speed         : {color_str(speed_str, GREEN)}x | {color_str(fps, GREEN)} FPS
+{color_str("-" * 70, ANSI_GREEN)}
+Frame         : {color_str(current_frame, ANSI_GREEN)}/{total_frames}
+Speed         : {color_str(speed_str, ANSI_GREEN)}x | {color_str(fps, ANSI_GREEN)} FPS
 
-ETA           : {color_str(eta, GREEN)}
-Time          : {color_str(time_str, GREEN)}/{duration_str}
-Process Time  : {color_str(process_time_str, GREEN)}
+ETA           : {color_str(eta, ANSI_GREEN)}
+Time          : {color_str(time_str, ANSI_GREEN)}/{duration_str}
+Process Time  : {color_str(process_time_str, ANSI_GREEN)}
 
-Bitrate       : {color_str(bitrate_str, GREEN)} kb/s
-Size          : {color_str(size_kb_str, GREEN)} KB ~> {color_str(size_gb_str, GREEN)} GB
-Final size    : {color_str(estimated_size_kb_str, GREEN)} KB ~> {color_str(estimated_size_gb_str, GREEN)} GB
+Bitrate       : {color_str(bitrate_str, ANSI_GREEN)} kb/s
+Size          : {color_str(size_kb_str, ANSI_GREEN)} KB ~> {color_str(size_gb_str, ANSI_GREEN)} GB
+Final size    : {color_str(estimated_size_kb_str, ANSI_GREEN)} KB ~> {color_str(estimated_size_gb_str, ANSI_GREEN)} GB
 {progress_bar}
-{color_str("-" * 70, GREEN)}"""
+{color_str("-" * 70, ANSI_GREEN)}"""
 
     # For the first output, we only need to print both lines
     print(clear_lines(13) if first_update is False else "", end="")
@@ -312,7 +310,7 @@ def print_conversion_summary(success_count: int, fail_count: int) -> None:
         success_count: Number of successful conversions
         fail_count: Number of failed conversions
     """
-    color = BLUE
+    color = ANSI_BLUE
     print(f"{color_str('_', color)}" * 70)
     print("Conversion complete:")
     print(f"  Success: {success_count}")
@@ -339,7 +337,7 @@ class ProgressBarSpinner:
         if not self.running:
             return
         bar: str = create_progress_bar(percent=(self.index % 20) * 5, text=f"Processing {self.spinner[self.index % 4]}")  # Indeterminate progress
-        status: str = f"{CLEAR_LINE}{MOVE_TO_START}{bar}"
+        status: str = f"{ANSI_CLEAR_LINE}{ANSI_MOVE_TO_START}{bar}"
         print(status, end='', flush=True)
         self.index += 1
 
@@ -347,7 +345,7 @@ class ProgressBarSpinner:
         """Stop the spinner."""
         self.running = False
         bar: str = create_progress_bar(percent=100, text=text or "Processing Done")
-        status: str = f"{CLEAR_LINE}{MOVE_TO_START}{bar}\n"
+        status: str = f"{ANSI_CLEAR_LINE}{ANSI_MOVE_TO_START}{bar}\n"
         print(status, end='', flush=True)
 
 def monitor_process_progress(process: subprocess.Popen, description: str) -> None:

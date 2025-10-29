@@ -2,7 +2,7 @@
 
 
 
-from hdr_forge.cli.cli_output import BLUE, color_str, create_aspect_ratio_str
+from hdr_forge.cli.cli_output import ANSI_BLUE, color_str, create_aspect_ratio_str
 from hdr_forge.typedefs.dolby_vision_typing import DolbyVisionInfo
 from hdr_forge.typedefs.mkv_typing import MkvTrack
 from hdr_forge.typedefs.video_typing import MasterDisplayMetadata, build_master_display_string
@@ -15,7 +15,7 @@ def print_video_infos(video: Video) -> None:
         video: Video object with metadata
     """
 
-    color = BLUE
+    color = ANSI_BLUE
     print()
     print(f"{color_str('_', color)}" * 70)
 

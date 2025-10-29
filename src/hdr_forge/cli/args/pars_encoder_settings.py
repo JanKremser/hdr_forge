@@ -1,6 +1,5 @@
-"""Command-line argument parsing for HDR Forge."""
+"""Parse encoder settings from command-line arguments."""
 
-import argparse
 import sys
 
 from hdr_forge import __version__
@@ -9,9 +8,9 @@ from hdr_forge.typedefs.encoder_typing import CropMode, CropSettings, EncoderOve
 from hdr_forge.typedefs.dolby_vision_typing import DolbyVisionProfileEncodingMode
 from hdr_forge.typedefs.video_typing import ContentLightLevelMetadata, HdrMetadata, MasterDisplayMetadata
 
-
 # Resolution constants
-RESOLUTIONS = {
+RESOLUTIONS: dict = {
+    '8K': 4320,
     'UHD': 2160,
     'QHD': 1440,
     'FHD': 1080,
@@ -19,302 +18,7 @@ RESOLUTIONS = {
     'SD': 480
 }
 
-
-def parse_args():
-    """Parse command-line arguments with subcommands.
-
-    Returns:
-        Parsed arguments namespace
-    """
-    parser = argparse.ArgumentParser(
-        description='HDR Forge - HDR Video Converter',
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-    )
-
-    parser.add_argument(
-        '--version',
-        action='version',
-        version=f'HDR Forge {__version__}'
-    )
-
-    # Create subcommands
-    subparsers = parser.add_subparsers(dest='command', help='Subcommand')
-    subparsers.required = True
-
-    # "info" subcommand
-    info_parser = subparsers.add_parser('info',
-        description='Shows information about a video file',
-        help='Display video information'
-    )
-
-    info_parser.add_argument(
-        '-i', '--input',
-        required=True,
-        help='Video file for information display'
-    )
-
-    # "maccll" subcommand
-    maxcll_parser: argparse.ArgumentParser = subparsers.add_parser('calc_maxcll',
-        description='BETA function. Calculate MaxCLL and MaxFALL values for HDR videos',
-        help='Calculate MaxCLL and MaxFALL'
-    )
-
-    maxcll_parser.add_argument(
-        '-i', '--input',
-        required=True,
-        help='Video file for MaxCLL and MaxFALL calculation'
-    )
-
-    # "convert" subcommand
-    convert_parser: argparse.ArgumentParser = subparsers.add_parser('convert',
-        description='Convert videos',
-        formatter_class=argparse.RawTextHelpFormatter,
-        help='Convert videos',
-        epilog="""
-Examples:
-  hdr_forge convert -i input.mkv -o output.mkv
-  hdr_forge convert -i ./input_folder -o ./output_folder
-        """
-    )
-
-    convert_parser.add_argument(
-        '-i', '--input',
-        required=True,
-        help='Input video file or folder'
-    )
-
-    convert_parser.add_argument(
-        '-o', '--output',
-        required=True,
-        help='Output video file or folder'
-    )
-
-    convert_parser.add_argument(
-        '-v', '--video-codec',
-        choices=['x265', 'x264', 'copy'],
-        default='x265',
-        help="""Video codec to use for encoding.
-[x265]  : x265 encoding for HDR/DolbyVision and SDR outputs.
-[x264]  : x264 encoding for SDR outputs. Not recommended for HDR content.
-[copy]  : Copy stream without re-encoding\n
-"""
-    )
-
-    convert_parser.add_argument(
-        '-p', '--preset',
-        choices=["auto", "film", "action", "animation"],
-        default="auto",
-        help="""HDR Forge encoding preset for simplified settings. Default is the automation mode. Not x265/x264 presets.
-You can combine Presets with HW-Presets.
-Examples:
-    hdr_forge convert -i input.mkv -o output.mkv --preset auto
-    hdr_forge convert -i input.mkv -o output.mkv --preset film
-Presets:
-    [auto]        : Automatic preset selection based on input video characteristics. This is the default.
-
-    [film]        : Optimized for film content with moderate motion
-    [action]      : Optimized for action-packed content with fast motion
-    [animation]   : Optimized for animated content with vibrant colors\n
-"""
-    )
-
-    convert_parser.add_argument(
-        '--hw-preset',
-        choices=["cpu:balanced", "cpu:quality", "gpu:balanced", "gpu:quality", "balanced", "quality"],
-        default="cpu:balanced",
-        help="""HDR Forge hardware preset for encoding optimization. Not x265/x264 presets.
-You can specify presets with or without hardware prefix (cpu:/gpu:).
-When using prefix-free presets (balanced, quality), the hardware is automatically derived from --encoder.
-
-Examples:
-    hdr_forge convert -i input.mkv -o output.mkv --hw-preset quality
-    hdr_forge convert -i input.mkv -o output.mkv --encoder hevc_nvenc --hw-preset balanced
-    hdr_forge convert -i input.mkv -o output.mkv --hw-preset cpu:quality
-
-Prefix-free presets (hardware derived from encoder):
-    [balanced] : Balanced speed and quality (default)
-    [quality]  : Focus on quality. You need a high-performance system for this preset.
-
-Explicit hardware presets (validated against encoder):
-  CPU based encoding:
-    [cpu:balanced] : Balanced speed and quality for CPU encoding
-    [cpu:quality]  : Quality-focused for CPU encoding
-
-  GPU based encoding:
-    [gpu:balanced] : Balanced quality and size for GPU encoding
-    [gpu:quality]  : Quality-focused for GPU encoding\n
-"""
-    # [cpu:opt]      : Optimized settings for your system with balanced speed and quality
-    )
-
-    convert_parser.add_argument(
-        '--quality',
-        type=int,
-        help="""Universal quality parameter (0-51, lower = better quality).
-Works with all encoders and automatically maps to CRF (x265/x264) or CQ (NVENC).
-This is overridden by encoder-specific parameters (--encoder-params).\n
-"""
-    )
-
-    convert_parser.add_argument(
-        '--speed',
-        choices=['ultrafast', 'superfast', 'veryfast', 'faster', 'fast', 'medium', 'slow', 'slower', 'veryslow'],
-        help="""Universal speed preset. ONLY works with x265/x264 encoders.
-[ultrafast] : Fastest encoding, lowest compression
-[superfast] : Very fast encoding, very low compression
-[veryfast]  : Fast encoding, low compression
-[faster]    : Below average compression and speed
-[fast]      : Slightly below average compression and speed
-[medium]    : Balanced compression and speed
-[slow]      : Above average compression, slower encoding
-[slower]    : High compression, slow encoding
-[veryslow]  : Maximum compression, very slow encoding
-
-Note: This parameter is NOT compatible with NVENC encoders. Use --encoder-params instead.\n
-"""
-    )
-
-    convert_parser.add_argument(
-        '--crop',
-        help="""Crop black bars from video. Not supported for Dolby Vision encoding.
-[off]              : Default: No cropping
-[auto]             : Automatically detect and crop black bars
-[width:height:x:y] : Manually specify crop dimensions. The basis for the calculation is the original video, not the target resolution.
-[16:9] or [1.77:1] : 16:9, 21:9 etc. to crop to specific aspect ratio
-[cinema]           : CinemaScope Classic 2.35:1 ratio
-[cinema-modern]    : CinemaScope Modern 2.39:1 ratio\n
-"""
-    )
-
-    convert_parser.add_argument(
-        '--grain',
-        help="""Analyze grain in the input video and optimize encoding settings accordingly.
-[off]              : Default: Do not analyze grain
-[auto]             : Automatically detect grain and adjust encoding settings
-"""
-    )
-
-    convert_parser.add_argument(
-        '--scale',
-        help="""Scale video to specified resolution (8K, UHD, FHD, HD, SD or height in pixels)
-[8K]       : 4320p
-[UHD]      : 2160p
-[QHD]      : 1440p
-[FHD]      : 1080p
-[HD]       : 720p
-[SD]       : 480p
-[<height>] : Specify target height in pixels (e.g., 1440 for 2560x1440). Width is calculated based on aspect ratio.
-             If not specified, original resolution is maintained.\n
-"""
-    )
-
-    convert_parser.add_argument(
-        '--scale-mode',
-        choices=['height', 'adaptive'],
-        default="height",
-        help="""Specifies how the video should be scaled after cropping. Not supported for Dolby Vision encoding.
-[height]   : Uses the target height as a fixed reference. The width is calculated
-             from the aspect ratio. Ideal for standardized output formats like 1080p or 4K.
-[adaptive] : Scales the video dynamically to fit optimally within the target resolution,
-             without exceeding the specified width or height. Maintains the aspect ratio
-             and avoids unnecessary upscaling.\n
-"""
-    )
-
-    convert_parser.add_argument(
-        '--hdr-sdr-format',
-        choices=['auto', 'hdr10', 'sdr'],
-        default='auto',
-        help="""User-specified target color format for the output video.
-[auto]   : Automatically determine target color format based on input video
-[hdr10]  : Convert to HDR10 format
-[sdr]    : Convert to SDR format\n
-"""
-    )
-
-    convert_parser.add_argument(
-        '--dv-profile',
-        choices=['auto', '8'],
-        default='auto',
-        help='Dolby Vision profile for encoding (auto = automatic detection, 8 = force profile 8.1)'
-    )
-
-    convert_parser.add_argument(
-        '--sample',
-        help="""Process only a short sample of the video for testing purposes. Not supported for Dolby Vision encoding
-[auto]      : Process a 30 seconds sample starting at 1 minute into the video
-[start:end] : Specify start and end time in seconds (e.g., 60:90 for a sample from 1:00 to 1:30)\n
-"""
-    )
-
-    convert_parser.add_argument(
-        '--master-display',
-        help="""Expert function:
-Set custom Master Display metadata for HDR10 videos. Format:
-G(x,y)B(x,y)R(x,y)WP(x,y)L(max,min)
-
-Example:
-    --master-display "G(13250,34500)B(7500,30000)R(34000,16000)WP(15635,16450)L(1000,0.05)"
-
-Input Video Master Display metadata will be used if not specified.
-"""
-    )
-
-    convert_parser.add_argument(
-        '--max-cll',
-        help="""Expert function:
-Set custom MaxCLL and MaxFALL values for HDR10 videos. Format:
-
-Example:
-    --max-cll "1000,400"
-
-Input Video MaxCLL and MaxFALL values will be used if not specified.
-"""
-    )
-
-    convert_parser.add_argument(
-        '--encoder',
-        choices=['auto', 'libx265', 'libx264', 'hevc_nvenc', 'h264_nvenc'],
-        default='auto',
-        help="""Expert function:
-Encoder selection override. By default, encoder is automatically selected based on --hw-preset.
-[auto]         : Automatic encoder selection (default)
-[libx265]      : Force libx265 encoder
-[libx264]      : Force libx264 encoder
-[hevc_nvenc]   : Force NVIDIA NVENC HEVC encoder
-[h264_nvenc]   : Force NVIDIA NVENC H.264 encoder\n
-"""
-    )
-
-    convert_parser.add_argument(
-        '--encoder-params',
-        help="""Expert function:
-Encoder-specific parameters. Requires --encoder to be set (not 'auto').
-Format depends on selected encoder:
-
-libx265/libx264:
-    preset=<value>:crf=<value>:tune=<value>
-    Example: preset=slow:crf=16:tune=grain
-
-hevc_nvenc/h264_nvenc:
-    preset=<value>:cq=<value>:rc=<value>
-    Example: preset=hq:cq=18:rc=vbr_hq
-
-    NVENC Presets: default, slow, hq, llhq, llhp
-    RC Modes: vbr, vbr_hq, cbr, cqp\n
-"""
-    )
-
-    convert_parser.add_argument(
-        '-d', '--debug',
-        action='store_true',
-        help='Enable debug output'
-    )
-
-    return parser.parse_args()
-
-
-def get_scale_height(scale: str | None) -> int | None:
+def _get_scale_height(scale: str | None) -> int | None:
     """Get target height from scale argument.
     Args:
         scale: Scale argument string
@@ -336,7 +40,7 @@ def get_scale_height(scale: str | None) -> int | None:
     return target_height
 
 
-def get_hdr_sdr_format_from_string(format_str: str | None) -> HdrSdrFormat:
+def _get_hdr_sdr_format_from_string(format_str: str | None) -> HdrSdrFormat:
     """Convert string to ColorFormat enum.
 
     Args:
@@ -358,7 +62,7 @@ def get_hdr_sdr_format_from_string(format_str: str | None) -> HdrSdrFormat:
     else:
         return HdrSdrFormat.AUTO
 
-def get_dolby_vision_profile_from_string(profile_str: str | None) -> DolbyVisionProfileEncodingMode:
+def _get_dolby_vision_profile_from_string(profile_str: str | None) -> DolbyVisionProfileEncodingMode:
     """Convert string to DolbyVision enum.
 
     Args:
@@ -377,7 +81,7 @@ def get_dolby_vision_profile_from_string(profile_str: str | None) -> DolbyVision
     return DolbyVisionProfileEncodingMode.AUTO
 
 
-def get_video_codec_from_string(codec_str: str | None) -> VideoCodec:
+def _get_video_codec_from_string(codec_str: str | None) -> VideoCodec:
     """Convert string to VideoEncoder enum.
 
     Args:
@@ -398,7 +102,7 @@ def get_video_codec_from_string(codec_str: str | None) -> VideoCodec:
     return VideoCodec.X265
 
 
-def get_crop_settings_from_string(crop_str: str | None) -> CropSettings:
+def _get_crop_settings_from_string(crop_str: str | None) -> CropSettings:
     """Convert crop argument string to CropSettings object.
 
     Args:
@@ -436,7 +140,7 @@ def get_crop_settings_from_string(crop_str: str | None) -> CropSettings:
     sys.exit(1)
 
 
-def get_sample_settings_from_string(sample_str: str | None) -> SampleSettings:
+def _get_sample_settings_from_string(sample_str: str | None) -> SampleSettings:
     """Convert sample argument string to SampleSettings object.
 
     Args:
@@ -464,7 +168,7 @@ def get_sample_settings_from_string(sample_str: str | None) -> SampleSettings:
     return SampleSettings(enabled=False)
 
 
-def get_master_display_from_string(md_str: str | None) -> MasterDisplayMetadata | None:
+def _get_master_display_from_string(md_str: str | None) -> MasterDisplayMetadata | None:
     """Convert master display argument string.
 
     Args:
@@ -504,7 +208,7 @@ def get_master_display_from_string(md_str: str | None) -> MasterDisplayMetadata 
         sys.exit(1)
 
 
-def get_content_lightLevel_metadata_from_string(cll_str: str | None) -> ContentLightLevelMetadata | None:
+def _get_content_lightLevel_metadata_from_string(cll_str: str | None) -> ContentLightLevelMetadata | None:
     """Convert content light level argument string.
 
     Args:
@@ -525,7 +229,7 @@ def get_content_lightLevel_metadata_from_string(cll_str: str | None) -> ContentL
         print_err(f"Invalid content light level value '{cll_str}'")
         sys.exit(1)
 
-def get_libx265_params_from_string(params_str: str | None) -> Libx265Params:
+def _get_libx265_params_from_string(params_str: str | None) -> Libx265Params:
     """Convert libx265 parameters argument string to libx265Params object.
 
     Args:
@@ -555,7 +259,7 @@ def get_libx265_params_from_string(params_str: str | None) -> Libx265Params:
 
     return params
 
-def get_libx264_params_from_string(params_str: str | None) -> Libx264Params:
+def _get_libx264_params_from_string(params_str: str | None) -> Libx264Params:
     """Convert libx264 parameters argument string to libx264Params object.
 
     Args:
@@ -585,7 +289,7 @@ def get_libx264_params_from_string(params_str: str | None) -> Libx264Params:
 
     return params
 
-def get_encoder_override_from_string(encoder_str: str | None) -> EncoderOverride:
+def _get_encoder_override_from_string(encoder_str: str | None) -> EncoderOverride:
     """Convert string to EncoderOverride enum.
 
     Args:
@@ -610,7 +314,7 @@ def get_encoder_override_from_string(encoder_str: str | None) -> EncoderOverride
     return EncoderOverride.AUTO
 
 
-def get_nvenc_params_from_string(params_str: str | None) -> NvencParams:
+def _get_nvenc_params_from_string(params_str: str | None) -> NvencParams:
     """Convert NVENC parameters argument string to NvencParams object.
 
     Args:
@@ -641,7 +345,7 @@ def get_nvenc_params_from_string(params_str: str | None) -> NvencParams:
     return params
 
 
-def parse_encoder_params(params_str: str | None, encoder_override: EncoderOverride) -> tuple[Libx265Params | None, Libx264Params | None, NvencParams | None]:
+def _parse_encoder_params(params_str: str | None, encoder_override: EncoderOverride) -> tuple[Libx265Params | None, Libx264Params | None, NvencParams | None]:
     """Parse --encoder-params based on the selected encoder.
 
     Args:
@@ -659,16 +363,16 @@ def parse_encoder_params(params_str: str | None, encoder_override: EncoderOverri
         sys.exit(1)
 
     if encoder_override in [EncoderOverride.LIBX265]:
-        return (get_libx265_params_from_string(params_str), None, None)
+        return (_get_libx265_params_from_string(params_str), None, None)
     elif encoder_override in [EncoderOverride.LIBX264]:
-        return (None, get_libx264_params_from_string(params_str), None)
+        return (None, _get_libx264_params_from_string(params_str), None)
     elif encoder_override in [EncoderOverride.HEVC_NVENC, EncoderOverride.H264_NVENC]:
-        return (None, None, get_nvenc_params_from_string(params_str))
+        return (None, None, _get_nvenc_params_from_string(params_str))
 
     return (None, None, None)
 
 
-def get_universal_params_from_args(args) -> UniversalEncoderParams:
+def _get_universal_params_from_args(args) -> UniversalEncoderParams:
     """Create UniversalEncoderParams object from parsed command-line arguments.
 
     Args:
@@ -700,7 +404,7 @@ def get_universal_params_from_args(args) -> UniversalEncoderParams:
     )
 
 
-def validate_hw_preset_with_encoder(hw_preset_str: str, encoder_override: EncoderOverride) -> str:
+def _validate_hw_preset_with_encoder(hw_preset_str: str, encoder_override: EncoderOverride) -> str:
     """Validate hw-preset compatibility with encoder and add prefix if needed.
 
     Args:
@@ -742,34 +446,7 @@ def validate_hw_preset_with_encoder(hw_preset_str: str, encoder_override: Encode
     prefix = 'gpu' if is_gpu_encoder else 'cpu'
     return f"{prefix}:{hw_preset_str}"
 
-
-def print_parameter_warnings(encoder_settings: EncoderSettings, active_encoder_lib: VideoEncoderLibrary) -> None:
-    """Print warnings for incompatible encoder parameters.
-
-    Args:
-        encoder_settings: EncoderSettings object
-        active_encoder_lib: Currently active encoder library
-    """
-    # Check for x265-specific parameters with non-x265 encoder
-    if active_encoder_lib != VideoEncoderLibrary.LIBX265:
-        libx265_params = encoder_settings.libx265_params
-        if libx265_params.crf is not None or libx265_params.preset is not None or libx265_params.tune is not None:
-            print_warn(f"Warning: --encoder-params for x265 specified but using {active_encoder_lib.value} encoder. Parameters will be ignored.")
-
-    # Check for x264-specific parameters with non-x264 encoder
-    if active_encoder_lib != VideoEncoderLibrary.LIBX264:
-        libx264_params = encoder_settings.libx264_params
-        if libx264_params.crf is not None or libx264_params.preset is not None or libx264_params.tune is not None:
-            print_warn(f"Warning: --encoder-params for x264 specified but using {active_encoder_lib.value} encoder. Parameters will be ignored.")
-
-    # Check for nvenc-specific parameters with non-nvenc encoder
-    if active_encoder_lib not in [VideoEncoderLibrary.HEVC_NVENC, VideoEncoderLibrary.H264_NVENC]:
-        nvenc_params = encoder_settings.nvenc_params
-        if nvenc_params.cq is not None or nvenc_params.preset is not None or nvenc_params.rc is not None:
-            print_warn(f"Warning: --encoder-params for NVENC specified but using {active_encoder_lib.value} encoder. Parameters will be ignored.")
-
-
-def get_hdr_forge_encoder_presets_from_args(args, encoder_override: EncoderOverride) -> HdrForgeEncodingPresetSettings:
+def _get_hdr_forge_encoder_presets_from_args(args, encoder_override: EncoderOverride) -> HdrForgeEncodingPresetSettings:
     """Create HdrForgeEncodingPresetSettings object from parsed command-line arguments.
 
     Args:
@@ -792,7 +469,7 @@ def get_hdr_forge_encoder_presets_from_args(args, encoder_override: EncoderOverr
 
     # Validate and normalize hw_preset with encoder compatibility check
     hw_preset_str = args.hw_preset if args.hw_preset is not None else "cpu:balanced"
-    validated_hw_preset_str = validate_hw_preset_with_encoder(hw_preset_str, encoder_override)
+    validated_hw_preset_str: str = _validate_hw_preset_with_encoder(hw_preset_str=hw_preset_str, encoder_override=encoder_override)
 
     try:
         hw_preset = HdrForgeEncodingHardwarePresets(validated_hw_preset_str)
@@ -815,10 +492,10 @@ def create_encoder_settings_from_args(args) -> EncoderSettings:
         EncoderSettings object with all encoding parameters
     """
     # Parse encoder override
-    encoder_override: EncoderOverride = get_encoder_override_from_string(getattr(args, 'encoder', 'auto'))
+    encoder_override: EncoderOverride = _get_encoder_override_from_string(encoder_str=getattr(args, 'encoder', 'auto'))
 
     # Parse universal parameters
-    universal_params: UniversalEncoderParams = get_universal_params_from_args(args)
+    universal_params: UniversalEncoderParams = _get_universal_params_from_args(args)
 
     # Validate --speed with NVENC encoders
     if universal_params.speed is not None and encoder_override in [EncoderOverride.HEVC_NVENC, EncoderOverride.H264_NVENC]:
@@ -826,9 +503,12 @@ def create_encoder_settings_from_args(args) -> EncoderSettings:
         sys.exit(1)
 
     # Parse encoder-specific parameters from --encoder-params
-    encoder_params_libx265, encoder_params_libx264, encoder_params_nvenc = parse_encoder_params(
-        getattr(args, 'encoder_params', None),
-        encoder_override
+    encoder_params_libx265: Libx265Params | None
+    encoder_params_libx264: Libx264Params | None
+    encoder_params_nvenc: NvencParams | None
+    encoder_params_libx265, encoder_params_libx264, encoder_params_nvenc = _parse_encoder_params(
+        params_str=getattr(args, 'encoder_params', None),
+        encoder_override=encoder_override
     )
 
     # Use encoder-params if provided, otherwise default to empty params
@@ -837,27 +517,53 @@ def create_encoder_settings_from_args(args) -> EncoderSettings:
     nvenc_params: NvencParams = encoder_params_nvenc if encoder_params_nvenc is not None else NvencParams()
 
     hdr_metadata = HdrMetadata(
-        mastering_display_metadata=get_master_display_from_string(getattr(args, 'master_display', None)),
-        content_light_level_metadata=get_content_lightLevel_metadata_from_string(getattr(args, 'max_cll', None))
+        mastering_display_metadata=_get_master_display_from_string(getattr(args, 'master_display', None)),
+        content_light_level_metadata=_get_content_lightLevel_metadata_from_string(getattr(args, 'max_cll', None))
     )
 
     # Get validated hardware preset settings (includes encoder compatibility check)
-    hdr_forge_preset_settings = get_hdr_forge_encoder_presets_from_args(args, encoder_override)
+    hdr_forge_preset_settings: HdrForgeEncodingPresetSettings = _get_hdr_forge_encoder_presets_from_args(args, encoder_override)
 
     return EncoderSettings(
-        video_codec=get_video_codec_from_string(args.video_codec),
+        video_codec=_get_video_codec_from_string(codec_str=args.video_codec),
         hdr_forge_encoding_preset=hdr_forge_preset_settings,
-        hdr_sdr_format=get_hdr_sdr_format_from_string(args.hdr_sdr_format),
+        hdr_sdr_format=_get_hdr_sdr_format_from_string(format_str=args.hdr_sdr_format),
         enable_gpu_acceleration=hdr_forge_preset_settings.hardware_preset.value.startswith('gpu:'),
-        target_dv_profile=get_dolby_vision_profile_from_string(args.dv_profile),
+        target_dv_profile=_get_dolby_vision_profile_from_string(profile_str=args.dv_profile),
         libx265_params=libx265_params,
         libx264_params=libx264_params,
         nvenc_params=nvenc_params,
         universal_params=universal_params,
         encoder_override=encoder_override,
-        scale_height=get_scale_height(args.scale),
+        scale_height=_get_scale_height(scale=args.scale),
         scale_mode=ScaleMode(args.scale_mode),
-        crop=get_crop_settings_from_string(args.crop),
-        sample=get_sample_settings_from_string(args.sample),
+        crop=_get_crop_settings_from_string(crop_str=args.crop),
+        sample=_get_sample_settings_from_string(sample_str=args.sample),
         hdr_metadata=hdr_metadata,
     )
+
+
+def print_parameter_warnings(encoder_settings: EncoderSettings, active_encoder_lib: VideoEncoderLibrary) -> None:
+    """Print warnings for incompatible encoder parameters.
+
+    Args:
+        encoder_settings: EncoderSettings object
+        active_encoder_lib: Currently active encoder library
+    """
+    # Check for x265-specific parameters with non-x265 encoder
+    if active_encoder_lib != VideoEncoderLibrary.LIBX265:
+        libx265_params: Libx265Params = encoder_settings.libx265_params
+        if libx265_params.crf is not None or libx265_params.preset is not None or libx265_params.tune is not None:
+            print_warn(f"Warning: --encoder-params for x265 specified but using {active_encoder_lib.value} encoder. Parameters will be ignored.")
+
+    # Check for x264-specific parameters with non-x264 encoder
+    if active_encoder_lib != VideoEncoderLibrary.LIBX264:
+        libx264_params: Libx264Params = encoder_settings.libx264_params
+        if libx264_params.crf is not None or libx264_params.preset is not None or libx264_params.tune is not None:
+            print_warn(f"Warning: --encoder-params for x264 specified but using {active_encoder_lib.value} encoder. Parameters will be ignored.")
+
+    # Check for nvenc-specific parameters with non-nvenc encoder
+    if active_encoder_lib not in [VideoEncoderLibrary.HEVC_NVENC, VideoEncoderLibrary.H264_NVENC]:
+        nvenc_params: NvencParams = encoder_settings.nvenc_params
+        if nvenc_params.cq is not None or nvenc_params.preset is not None or nvenc_params.rc is not None:
+            print_warn(f"Warning: --encoder-params for NVENC specified but using {active_encoder_lib.value} encoder. Parameters will be ignored.")
