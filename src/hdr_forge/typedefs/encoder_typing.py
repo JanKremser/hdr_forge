@@ -1,0 +1,227 @@
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Optional
+
+
+
+from hdr_forge.typedefs.dolby_vision_typing import DolbyVisionProfileEncodingMode
+from hdr_forge.typedefs.video_typing import HdrMetadata
+
+
+class RESOLUTION_PRESETS(Enum):
+    """Vordefinierte Auflösungen für die Skalierung."""
+    K8 = "8K"
+    UHD = "UHD"
+    QHD = "QHD"
+    FHD = "FHD"
+    HD = "HD"
+    SD = "SD"
+
+
+RESOLUTION_PRESETS_VALUES: dict[RESOLUTION_PRESETS, tuple[int, int]] = {
+    RESOLUTION_PRESETS.K8: (7680, 4320),
+    RESOLUTION_PRESETS.UHD: (3840, 2160),
+    RESOLUTION_PRESETS.QHD: (2560, 1440),
+    RESOLUTION_PRESETS.FHD: (1920, 1080),
+    RESOLUTION_PRESETS.HD: (1280, 720),
+    RESOLUTION_PRESETS.SD: (854, 480),
+}
+
+
+@dataclass
+class CropHandler:
+    """Datenklasse für die Ergebnisse der Crop-Analyse."""
+    finish_progress: bool = False
+    completed_samples: int = 0
+    total_samples: int = 0
+
+
+class HdrSdrFormat(Enum):
+    """Target color format for video encoding."""
+    AUTO = "auto"
+    SDR = "sdr"
+    HDR10 = "hdr10"
+    DOLBY_VISION = "dolby_vision"
+
+
+class VideoCodec(Enum):
+    """Video encoder mode."""
+    X265 = "x265"
+    X264 = "x264"
+    COPY = "copy"
+
+
+class VideoEncoderLibrary(Enum):
+    """Video encoder library for FFmpeg."""
+    LIBX265 = "libx265"
+    LIBX264 = "libx264"
+    HEVC_NVENC = "hevc_nvenc"
+    H264_NVENC = "h264_nvenc"
+    COPY = "copy"
+
+class ScaleMode(Enum):
+    """Scaling mode for video resizing after cropping."""
+    ADAPTIVE = "adaptive"
+    HEIGHT = "height"
+
+
+class CropMode(Enum):
+    """Crop mode for black bar detection."""
+    AUTO = "auto"
+    OFF = "off"
+    MANUAL = "manual"
+    RATIO = "ratio"
+
+@dataclass
+class CropSettings:
+    """Settings for cropping black bars from video."""
+    mode: CropMode = CropMode.AUTO
+    manual_crop: Optional[tuple[int, int, int, int]] = None  # x, y, width, height
+    ratio: Optional[tuple[float, float]] = None # Aspect ratio for RATIO mode
+    check_samples: int = 10  # Number of samples to analyze for auto crop detection
+
+
+class GrainMode(Enum):
+    """Grain analysis and application modes."""
+    OFF = "off"
+    AUTO = "auto"
+    CAT1 = "cat1"
+    CAT2 = "cat2"
+    CAT3 = "cat3"
+
+@dataclass
+class SampleSettings:
+    """Settings for processing a video sample."""
+    enabled: bool = False
+    start_time: Optional[float] = None  # in seconds
+    end_time: Optional[float] = None    # in seconds
+
+class HEVC_NVENC_Preset(Enum):
+    DEFAULT = "default"
+    SLOW = "slow"
+    HQ = "hq"
+    LLHQ = "llhq"
+    LLHP = "llhp"
+
+class x265_x264_Preset(Enum):
+    ULTRAFAST = "ultrafast"
+    SUPERFAST = "superfast"
+    VERYFAST = "veryfast"
+    FASTER = "faster"
+    FAST = "fast"
+    MEDIUM = "medium"
+    SLOW = "slow"
+    SLOWER = "slower"
+    VERYSLOW = "veryslow"
+
+class X265Tune(Enum):
+    ANIMATION = "animation"
+    GRAIN = "grain"
+
+@dataclass
+class Libx265Params:
+    preset: Optional[x265_x264_Preset] = None
+    crf: Optional[int] = None
+    tune: Optional[X265Tune] = None
+
+class X264Tune(Enum):
+    FILM = "film"
+    ANIMATION = "animation"
+    GRAIN = "grain"
+
+@dataclass
+class Libx264Params:
+    preset: Optional[x265_x264_Preset] = None
+    crf: Optional[int] = None
+    tune: Optional[X264Tune] = None
+
+class NvencRcMode(Enum):
+    """NVENC rate control modes."""
+    VBR = "vbr"
+    VBR_HQ = "vbr_hq"
+    CBR = "cbr"
+    CQP = "cqp"
+
+@dataclass
+class NvencParams:
+    """NVENC encoder parameters."""
+    preset: Optional[HEVC_NVENC_Preset] = None
+    cq: Optional[int] = None
+    rc: Optional[NvencRcMode] = None
+
+@dataclass
+class UniversalEncoderParams:
+    """Universal encoder parameters that work across all encoders."""
+    quality: Optional[int] = None  # Maps to CRF/CQ depending on encoder
+    speed: Optional[x265_x264_Preset] = None  # Only for libx265/libx264, not NVENC
+
+class EncoderOverride(Enum):
+    """Encoder override for manual encoder selection."""
+    AUTO = "auto"
+    LIBX265 = "x265"
+    LIBX264 = "x264"
+    HEVC_NVENC = "hevc_nvenc"
+    H264_NVENC = "h264_nvenc"
+
+class HdrForgeEncodingPresets(Enum):
+    AUTO = "auto"
+    FILM = "film"
+    ACTION = "action"
+    ANIMATION = "animation"
+
+class HdrForgeEncodingHardwarePresets(Enum):
+    # Prefixed presets (explicit hardware specification)
+    CPU_BALANCED = "cpu:balanced"
+    CPU_QUALITY = "cpu:quality"
+    GPU_BALANCED = "gpu:balanced"
+    GPU_QUALITY = "gpu:quality"
+    # Prefix-free presets (hardware derived from encoder)
+    BALANCED = "balanced"
+    QUALITY = "quality"
+
+@dataclass
+class HdrForgeEncodingPresetSettings:
+    preset: HdrForgeEncodingPresets = HdrForgeEncodingPresets.AUTO
+    hardware_preset: HdrForgeEncodingHardwarePresets = HdrForgeEncodingHardwarePresets.CPU_BALANCED
+
+@dataclass
+class EncoderSettings:
+    """Container for all video encoding settings.
+
+    This dataclass encapsulates all parameters needed for video encoding,
+    making it easier to pass configuration to the convert_video function.
+
+    Attributes:
+        video_encoder: VideoEncoder enum specifying the encoder to use
+        target_format: Target color format (AUTO, SDR, HDR10, DOLBY_VISION)
+        target_dv_profile: Dolby Vision profile for encoding (AUTO or 8)
+        scale_height: Target height for video scaling (downscaling only)
+        crop: CropSettings object defining cropping behavior
+        encoder_override: Manual encoder selection (overrides hw_preset logic)
+        universal_params: Universal encoding parameters (quality, speed)
+        nvenc_params: NVENC-specific encoding parameters
+    """
+    video_codec: VideoCodec = VideoCodec.X265
+    hdr_forge_encoding_preset: HdrForgeEncodingPresetSettings = field(
+        default_factory=lambda: HdrForgeEncodingPresetSettings()
+    )
+    enable_gpu_acceleration: bool = False
+    hdr_sdr_format: HdrSdrFormat = HdrSdrFormat.AUTO
+    hdr_metadata: HdrMetadata = field(default_factory=HdrMetadata)
+    target_dv_profile: DolbyVisionProfileEncodingMode = DolbyVisionProfileEncodingMode.AUTO
+
+    # Encoder-specific parameters
+    libx265_params: Libx265Params = field(default_factory=Libx265Params)
+    libx264_params: Libx264Params = field(default_factory=Libx264Params)
+    nvenc_params: NvencParams = field(default_factory=NvencParams)
+
+    # Universal parameters and encoder override
+    universal_params: UniversalEncoderParams = field(default_factory=UniversalEncoderParams)
+    encoder_override: EncoderOverride = EncoderOverride.AUTO
+
+    crop: CropSettings = field(default_factory=lambda: CropSettings(mode=CropMode.AUTO))
+    grain: GrainMode = GrainMode.OFF
+
+    scale_height: Optional[int] = None
+    scale_mode: ScaleMode = ScaleMode.HEIGHT
+    sample: SampleSettings = field(default_factory=lambda: SampleSettings(enabled=False))
