@@ -94,7 +94,7 @@ hdr_forge inject-hdr-metadata -i video.mkv -o output.mkv \
 
 **For HDR Metadata Injection:**
 
--   **[hevc_hdr_editor](https://github.com/JanKremser/hevc-hdr-editor)** - HDR metadata injection tool
+-   **[hevc_hdr_editor](https://github.com/quietvoid/hevc_hdr_editor)** - HDR metadata injection tool
     -   Download from releases and place in PATH or project root
 
 **For Container Operations:**
