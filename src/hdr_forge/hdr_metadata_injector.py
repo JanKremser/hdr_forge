@@ -2,7 +2,6 @@
 
 from pathlib import Path
 
-from hdr_forge.cli.cli_output import print_err
 from hdr_forge.tools import mkvmerge
 from hdr_forge.tools import hevc_hdr_editor
 from hdr_forge.typedefs.video_typing import HdrMetadata
