@@ -4,7 +4,54 @@
 
 HDR Forge (Easy HDR Video Converter) is a Python-based command-line tool for converting video files with intelligent HDR metadata preservation, automatic quality optimization, hardware acceleration support, and advanced encoding features including grain analysis and flexible cropping.
 
-**Current Version:** Python v0.4.0 (Rust code has been removed)
+**Current Version:** Python v0.6.0
+
+## Documentation Structure
+
+**IMPORTANT:** When updating user-facing documentation, always consider the modular documentation structure:
+
+### Main README.md
+- **Purpose:** User-friendly overview and quick start guide
+- **Content:** Basic usage, installation, common examples, quick reference
+- **Target Length:** ~600 lines (keep it concise!)
+- **Rule:** Technical details should be moved to `documentation/` files
+
+### documentation/ Directory
+
+**When to update documentation files:**
+
+1. **encoders.md** - Update when:
+   - Adding new encoder support
+   - Changing encoder selection logic
+   - Updating hardware requirements
+   - Adding encoder-specific features
+   - Modifying performance characteristics
+
+2. **advanced-examples.md** - Update when:
+   - Adding new CLI parameters
+   - Creating new feature combinations
+   - Adding complex workflows
+   - Providing use-case-specific examples
+
+3. **technical-details.md** - Update when:
+   - Changing internal algorithms
+   - Modifying parameter priority systems
+   - Updating auto-calculation logic
+   - Changing filter chains or processing workflows
+   - Adding technical implementation details
+
+4. **troubleshooting.md** - Update when:
+   - Discovering new common issues
+   - Adding error message explanations
+   - Creating solutions for known problems
+   - Updating dependency requirements
+
+**Best Practices:**
+- Keep README.md high-level and user-friendly
+- Move technical details to appropriate documentation files
+- Add cross-references between documentation files
+- Update all affected files when making changes
+- Ensure consistency across all documentation
 
 ## Technology Stack
 
@@ -22,6 +69,12 @@ HDR Forge (Easy HDR Video Converter) is a Python-based command-line tool for con
 
 ```
 hdr_forge/
+├── documentation/                            # User documentation (modular structure)
+│   ├── README.md                             # Documentation overview and navigation
+│   ├── encoders.md                           # Encoder guide and comparisons
+│   ├── advanced-examples.md                  # Complex encoding workflows
+│   ├── technical-details.md                  # In-depth technical information
+│   └── troubleshooting.md                    # Common issues and solutions
 ├── src/hdr_forge/
 │   ├── __init__.py                           # Package initialization with version info
 │   ├── main.py                               # CLI entry point with argparse (272 lines)
