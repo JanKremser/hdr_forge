@@ -53,6 +53,10 @@ hdr_forge inject-hdr-metadata -i video.mkv -o output.mkv \
 
 ## Version History
 
+**Current: v0.6.0**
+
+-   Master-display support for gpu encoded videos
+
 **Current: v0.4.0** (Complete rewrite in Python)
 
 -   Previous Rust version removed from main branch
