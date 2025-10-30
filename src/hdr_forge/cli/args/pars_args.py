@@ -109,11 +109,11 @@ Examples:
 
     convert_parser.add_argument(
         '-v', '--video-codec',
-        choices=['x265', 'x264', 'copy'],
-        default='x265',
+        choices=['h265', 'h264', 'copy'],
+        default='h265',
         help="""Video codec to use for encoding.
-[x265]  : x265 encoding for HDR/DolbyVision and SDR outputs.
-[x264]  : x264 encoding for SDR outputs. Not recommended for HDR content.
+[h265]  : h265 encoding for HDR/DolbyVision and SDR outputs.
+[h264]  : h264 encoding for SDR outputs. Not recommended for HDR content.
 [copy]  : Copy stream without re-encoding\n
 """
     )

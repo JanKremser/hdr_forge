@@ -91,15 +91,15 @@ def _get_video_codec_from_string(codec_str: str | None) -> VideoCodec:
         Corresponding VideoEncoder enum value
     """
     if codec_str is None:
-        return VideoCodec.X265
+        return VideoCodec.H265
 
     codec_str = codec_str.lower()
     if codec_str == 'copy':
         return VideoCodec.COPY
-    elif codec_str == 'x264':
-        return VideoCodec.X264
+    elif codec_str == 'h264':
+        return VideoCodec.H264
 
-    return VideoCodec.X265
+    return VideoCodec.H265
 
 
 def _get_crop_settings_from_string(crop_str: str | None) -> CropSettings:

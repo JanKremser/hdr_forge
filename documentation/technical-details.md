@@ -38,7 +38,7 @@ def _get_video_codec_lib_instance():
         → _get_codec_from_override()
 
     Priority 2: video_codec + enable_gpu_acceleration
-        If video_codec == X265:
+        If video_codec == H265:
             If enable_gpu_acceleration:
                 → HevcNvencCodec (if available)
             Else:

@@ -126,7 +126,7 @@ class Encoder:
             return self._get_codec_from_override(encoder_settings, video, scale_tuple)
 
         # Priority 2: Automatic selection based on video_codec and GPU acceleration
-        if encoder_settings.video_codec == VideoCodec.X265:
+        if encoder_settings.video_codec == VideoCodec.H265:
             if encoder_settings.enable_gpu_acceleration:
                 test: list[VideoEncoderLibrary] = self.get_available_hw_encoders()
                 if VideoEncoderLibrary.HEVC_NVENC in test:
@@ -136,7 +136,7 @@ class Encoder:
                     sys.exit(1)
             else:
                 return Libx265Codec(encoder_settings=encoder_settings, video=video, scale=scale_tuple)
-        elif encoder_settings.video_codec == VideoCodec.X264:
+        elif encoder_settings.video_codec == VideoCodec.H264:
             if encoder_settings.enable_gpu_acceleration:
                 test: list[VideoEncoderLibrary] = self.get_available_hw_encoders()
                 if VideoEncoderLibrary.H264_NVENC in test:

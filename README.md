@@ -419,7 +419,7 @@ Required Arguments:
   -o, --output OUTPUT       Output video file or folder
 
 Encoder Selection:
-  -v, --video-codec CODEC   Video codec: x265, x264, copy (default: x265)
+  -v, --video-codec CODEC   Video codec: h265, h264, copy (default: h265)
   --encoder CODEC           Force specific encoder: auto, libx265, libx264,
                             hevc_nvenc, h264_nvenc (default: auto)
 
@@ -442,7 +442,7 @@ Cropping & Scaling:
   --scale-mode MODE         Scale mode: height, adaptive (default: height)
 
 Content Analysis:
-  --grain MODE              Grain analysis: off, auto, cat1, cat2, cat3
+  --grain MODE              Grain analysis: off, auto, cat1, cat2, cat3 (default: off)
   --sample TIME             Process sample: auto or start:end in seconds
 
 Format Conversion:

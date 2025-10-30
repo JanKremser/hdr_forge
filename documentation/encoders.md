@@ -103,8 +103,8 @@ HDR Forge supports multiple encoders for different use cases:
 HDR Forge automatically selects the best encoder based on:
 
 1. **`--video-codec` parameter:**
-   - `x265` → libx265 (default)
-   - `x264` → libx264
+   - `h265` → libx265 (default), hevc_nvenc
+   - `h264` → libx264, h264_nvenc
    - `copy` → Stream copy mode
 
 2. **`--hw-preset` parameter:**

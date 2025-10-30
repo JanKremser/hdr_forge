@@ -146,7 +146,7 @@ hdr_forge/
 -   Batch folder processing
 -   Auto-detection of video format (SDR/HDR10/Dolby Vision)
 -   Format conversion: Dolby Vision → HDR10 → SDR (downgrades only)
--   Multiple video codec support (x265, x264, HEVC NVENC, H.264 NVENC, copy)
+-   Multiple video codec support (h265, h264, copy)
 -   Hardware acceleration (NVIDIA NVENC)
 -   Resolution scaling with multiple modes (height, adaptive)
 -   Flexible cropping (auto, manual, aspect ratio presets, off)

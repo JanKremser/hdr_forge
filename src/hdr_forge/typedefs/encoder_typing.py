@@ -46,8 +46,8 @@ class HdrSdrFormat(Enum):
 
 class VideoCodec(Enum):
     """Video encoder mode."""
-    X265 = "x265"
-    X264 = "x264"
+    H265 = "h265"
+    H264 = "h264"
     COPY = "copy"
 
 
@@ -201,7 +201,7 @@ class EncoderSettings:
         universal_params: Universal encoding parameters (quality, speed)
         nvenc_params: NVENC-specific encoding parameters
     """
-    video_codec: VideoCodec = VideoCodec.X265
+    video_codec: VideoCodec = VideoCodec.H265
     hdr_forge_encoding_preset: HdrForgeEncodingPresetSettings = field(
         default_factory=lambda: HdrForgeEncodingPresetSettings()
     )
