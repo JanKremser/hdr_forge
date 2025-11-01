@@ -195,6 +195,7 @@ class EncoderSettings:
 
     # Video filter settings
     vfilter: Optional[str] = None
+    dar_ratio: Optional[tuple[int, int]] = None  # Display Aspect Ratio (width, height)
 
     # General encoding settings
     hdr_forge_encoding_preset: HdrForgeEncodingPresetSettings = field(

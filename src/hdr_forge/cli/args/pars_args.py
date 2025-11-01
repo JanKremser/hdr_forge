@@ -193,6 +193,17 @@ Note: This parameter is NOT compatible with NVENC encoders. Use --encoder-params
     )
 
     convert_parser.add_argument(
+        '--grain',
+        help="""Analyze grain in the input video and optimize encoding settings accordingly.
+[off]              : Default: Do not analyze grain
+[auto]             : Automatically detect grain and adjust encoding settings
+[cat1]             : Apply light grain settings
+[cat2]             : Apply medium grain settings
+[cat3]             : Apply strong grain settings\n
+"""
+    )
+
+    convert_parser.add_argument(
         '--crop',
         help="""Crop black bars from video. Not supported for Dolby Vision encoding.
 [off]              : Default: No cropping
@@ -203,17 +214,6 @@ Note: This parameter is NOT compatible with NVENC encoders. Use --encoder-params
 [us-widescreen]    : US Widescreen 1.85:1 ratio
 [cinema]           : CinemaScope Classic 2.35:1 ratio
 [cinema-modern]    : CinemaScope Modern 2.39:1 ratio\n
-"""
-    )
-
-    convert_parser.add_argument(
-        '--grain',
-        help="""Analyze grain in the input video and optimize encoding settings accordingly.
-[off]              : Default: Do not analyze grain
-[auto]             : Automatically detect grain and adjust encoding settings
-[cat1]             : Apply light grain settings
-[cat2]             : Apply medium grain settings
-[cat3]             : Apply strong grain settings\n
 """
     )
 
@@ -241,6 +241,23 @@ Note: This parameter is NOT compatible with NVENC encoders. Use --encoder-params
 [adaptive] : Scales the video dynamically to fit optimally within the target resolution,
              without exceeding the specified width or height. Maintains the aspect ratio
              and avoids unnecessary upscaling.\n
+"""
+    )
+
+    convert_parser.add_argument(
+        '--dar-ratio',
+        help="""Set custom Display Aspect Ratio (DAR) for the output video.
+This only changes the display, not the pixel ratio.
+Format:
+    [width:height] : Specify aspect ratio (e.g., 16:9, 4:3, 1.85:1)
+    [european]         : European Widescreen 1.66:1 ratio
+    [us-widescreen]    : US Widescreen 1.85:1 ratio
+    [cinema]           : CinemaScope Classic 2.35:1 ratio
+    [cinema-modern]    : CinemaScope Modern 2.39:1 ratio
+Example:
+    --dar-ratio 16:9
+    --dar-ratio cinema
+    --dar-ratio 1.4:1\n
 """
     )
 
@@ -340,6 +357,17 @@ hevc_nvenc/h264_nvenc:
 
     NVENC Presets: default, slow, hq, llhq, llhp
     RC Modes: vbr, vbr_hq, cbr, cqp\n
+"""
+    )
+
+    convert_parser.add_argument(
+        '--ffmpeg-params',
+        help="""Expert Option:
+Additional FFmpeg command-line parameters to append to the encoding command.
+Format:
+    param1:param2:param3
+Example:
+    --ffmpeg-params "-aspect 166:100:movflags +faststart"
 """
     )
 

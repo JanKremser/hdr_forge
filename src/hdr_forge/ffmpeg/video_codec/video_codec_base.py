@@ -73,6 +73,10 @@ class VideoCodecBase(ABC):
             "vf": self._get_default_video_filter(),
         }
 
+        if self._encoder_settings.dar_ratio is not None:
+            dar_w, dar_h = self._encoder_settings.dar_ratio
+            output_options["aspect"] = f"{dar_w}:{dar_h}"
+
         encoding_hdr_sdr_format: HdrSdrFormat = self.get_encoding_hdr_sdr_format()
         if encoding_hdr_sdr_format == HdrSdrFormat.SDR and self._video.is_hdr_video():
             # Set correct metadata for SDR output
