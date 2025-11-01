@@ -102,10 +102,6 @@ class VideoCodecBase(ABC):
                     ],
                 })
 
-                # Neu: 'zscale=t=linear:npl=100,format=gbrpf32le,tonemap=tonemap=hable:desat=0,zscale=t=bt709:m=bt709:p=bt709:r=tv,format=yuv420p'
-                # alt: 'zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,tonemap=tonemap=hable:desat=0,zscale=t=bt709:m=bt709:r=tv,format=yuv420p'
-
-                # alternativ, aber nicht so ganu und macht kein tonmapping: -vf colorspace=all=bt709
         return output_options
 
     @abstractmethod
@@ -121,6 +117,23 @@ class VideoCodecBase(ABC):
             HdrMetadata or None if not applicable
         """
         pass
+
+    @abstractmethod
+    def get_pix_format_for_encoding(self) -> str:
+        return self._video.get_pix_fmt()
+
+    @abstractmethod
+    def get_bit_depth_for_encoding(self) -> int:
+        encoding_hdr_sdr_format: HdrSdrFormat = self.get_encoding_hdr_sdr_format()
+
+        if encoding_hdr_sdr_format in [HdrSdrFormat.HDR10, HdrSdrFormat.DOLBY_VISION]:
+            return 10
+        elif encoding_hdr_sdr_format == HdrSdrFormat.SDR:
+            if self._video.is_hdr_video():
+                return 8
+
+        # keep original bit depth for SDR source videos
+        return self._video.get_bit_depth()
 
     def get_name(self) -> str:
         return self.lib.value

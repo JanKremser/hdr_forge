@@ -18,7 +18,8 @@ class Libx264Codec(VideoCodecBase):
         'colormatrix=bt709',
     ]
 
-    SDR_PIXEL_FORMAT = 'yuv420p'
+    PIXEL_FORMAT_10BIT = 'yuv420p10le'
+    PIXEL_FORMAT_8BIT = 'yuv420p'
 
     SDR_PROFILE = 'high'
 
@@ -39,7 +40,7 @@ class Libx264Codec(VideoCodecBase):
         output_options: dict = super().get_ffmpeg_params()
         output_options.update({
             "profile:v": self.SDR_PROFILE,
-            "pix_fmt": self.SDR_PIXEL_FORMAT,
+            "pix_fmt": self.get_pix_format_for_encoding(),
             "preset": self._preset.value,
             "crf": str(self._crf),
         })
@@ -51,6 +52,17 @@ class Libx264Codec(VideoCodecBase):
         output_options['x264-params'] = ':'.join(x264_params)
 
         return output_options
+
+    def get_pix_format_for_encoding(self) -> str:
+        bit_depth = self.get_bit_depth_for_encoding()
+        if bit_depth == 10:
+            return self.PIXEL_FORMAT_10BIT
+        elif bit_depth == 8:
+            return self.PIXEL_FORMAT_8BIT
+        return self._video.get_pix_fmt()  # fallback
+
+    def get_bit_depth_for_encoding(self) -> int:
+        return super().get_bit_depth_for_encoding()
 
     def get_custom_lib_parameters(self) -> dict:
         return {

@@ -51,6 +51,7 @@ def print_encoding_params(encoder: Encoder) -> None:
         aspect_ratio: str = create_aspect_ratio_str(resolution_w, resolution_h)
         print(f"  Resolution: {color_str(f"{resolution_w}x{resolution_h}", color)}")
         print(f"  Aspect Ratio: {color_str(aspect_ratio, color)}")
+        print(f"  Bit Depth: {color_str(video_codec_lib.get_bit_depth_for_encoding(), color)}-bit")
         print(f"  HDR/SDR: {color_str(encoder.get_encoding_hdr_sdr_format().value.upper(), color)}")
         if video_codec_lib.is_hdr_encoding():
             masterdisplay: str | None = v_param.get("master-display", None)

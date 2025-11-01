@@ -14,8 +14,8 @@ class HevcNvencCodec(VideoCodecBase):
         HdrSdrFormat.DOLBY_VISION,
     ]
 
-    HDR_PIXEL_FORMAT = 'p010le' # 'yuv420p10le'
-    SDR_PIXEL_FORMAT = 'yuv420p'
+    PIXEL_FORMAT_10BIT = 'p010le' # 'yuv420p10le'
+    PIXEL_FORMAT_8BIT = 'yuv420p'
 
     HDR_PROFILE = 'main10'
     SDR_PROFILE = 'main'
@@ -37,13 +37,13 @@ class HevcNvencCodec(VideoCodecBase):
         output_options.update({
             "rc": "vbr_hq", # variable bitrate with high quality (NVENC-specific)
             "preset": self._preset.value,
-            "cq": str(self._cq)
+            "cq": str(self._cq),
+            "pix_fmt": self.get_pix_format_for_encoding(),
         })
 
         encoding_hdr_sdr_format: HdrSdrFormat = self.get_encoding_hdr_sdr_format()
 
         if encoding_hdr_sdr_format in [HdrSdrFormat.HDR10, HdrSdrFormat.DOLBY_VISION]:
-            output_options['pix_fmt'] = self.HDR_PIXEL_FORMAT
             output_options['profile:v'] = self.HDR_PROFILE
 
             master_display: MasterDisplayMetadata | None = self._get_master_display_for_encoding()
@@ -58,12 +58,22 @@ class HevcNvencCodec(VideoCodecBase):
             if encoding_hdr_sdr_format in [HdrSdrFormat.DOLBY_VISION]:
                 print_warn("HEVC_NVENC HDR Metadata for Dolby Vision encoding is not yet supported;")
         elif encoding_hdr_sdr_format == HdrSdrFormat.SDR:
-            output_options['pix_fmt'] = self.SDR_PIXEL_FORMAT
             output_options['profile:v'] = self.SDR_PROFILE
             if self._video.is_hdr_video():
                 print_warn("HEVC_NVENC-SDR encoding does not support HDR metadata removal;")
 
         return output_options
+
+    def get_pix_format_for_encoding(self) -> str:
+        bit_depth = self.get_bit_depth_for_encoding()
+        if bit_depth == 10:
+            return self.PIXEL_FORMAT_10BIT
+        elif bit_depth == 8:
+            return self.PIXEL_FORMAT_8BIT
+        return self._video.get_pix_fmt()  # fallback
+
+    def get_bit_depth_for_encoding(self) -> int:
+        return super().get_bit_depth_for_encoding()
 
     def get_custom_lib_parameters(self) -> dict:
         masterdisplay: MasterDisplayMetadata | None = self._get_master_display_for_encoding()
