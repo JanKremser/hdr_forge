@@ -2,7 +2,7 @@ from typing import Optional, Tuple
 from hdr_forge.cli.cli_output import print_warn
 from hdr_forge.ffmpeg.video_codec.service.presets import Hdr_Forge_HEVC_H264_NVENC_Preset
 from hdr_forge.ffmpeg.video_codec.video_codec_base import VideoCodecBase
-from hdr_forge.typedefs.encoder_typing import EncoderSettings, HEVC_NVENC_Preset, HdrForgeEncodingPresets, HdrSdrFormat, VideoEncoderLibrary
+from hdr_forge.typedefs.encoder_typing import EncoderSettings, HEVC_NVENC_Preset, HdrForgeEncodingPresets, HdrSdrFormat, NvencParams, NvencRcMode, VideoEncoderLibrary
 from hdr_forge.typedefs.video_typing import ContentLightLevelMetadata, HdrMetadata, MasterDisplayMetadata, build_master_display_string, build_max_cll_string
 from hdr_forge.video import Video
 
@@ -31,11 +31,12 @@ class HevcNvencCodec(VideoCodecBase):
         hw_preset: Hdr_Forge_HEVC_H264_NVENC_Preset = self.calc_hw_preset_settings(Hdr_Forge_HEVC_H264_NVENC_Preset)
         self._cq: int = self._get_auto_cq(hw_preset)
         self._preset: HEVC_NVENC_Preset = self._get_auto_preset(hw_preset)
+        self._nvenc_rc: NvencRcMode = self._get_nvenc_rc()
 
     def get_ffmpeg_params(self) -> dict:
         output_options: dict = super().get_ffmpeg_params()
         output_options.update({
-            "rc": "vbr_hq", # variable bitrate with high quality (NVENC-specific)
+            "rc": self._nvenc_rc.value,
             "preset": self._preset.value,
             "cq": str(self._cq),
             "pix_fmt": self.get_pix_format_for_encoding(),
@@ -111,6 +112,18 @@ class HevcNvencCodec(VideoCodecBase):
             encoder_max_cll = self._video.get_content_light_level_metadata()
 
         return encoder_max_cll
+
+    def _get_nvenc_rc(self) -> NvencRcMode:
+        """Get the rate control mode for NVENC encoding.
+
+        Returns:
+            Rate control mode as string
+        """
+        nvenc_params: NvencParams = self._encoder_settings.nvenc_params
+        if nvenc_params.rc is not None:
+            return nvenc_params.rc
+
+        return NvencRcMode.VBR_HQ  # default to variable bitrate with high quality
 
     def _get_auto_preset(self, hw_preset: Hdr_Forge_HEVC_H264_NVENC_Preset) -> HEVC_NVENC_Preset:
         """Select optimal encoding preset based on resolution and parameter priority.

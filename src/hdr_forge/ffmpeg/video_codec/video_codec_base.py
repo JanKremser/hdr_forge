@@ -69,38 +69,20 @@ class VideoCodecBase(ABC):
     def get_ffmpeg_params(self) -> dict:
         """Get FFmpeg parameters for this codec."""
         output_options: dict = {
-            "c:v": self.lib.value
+            "c:v": self.lib.value,
+            "vf": self._get_default_video_filter(),
         }
+
         encoding_hdr_sdr_format: HdrSdrFormat = self.get_encoding_hdr_sdr_format()
-
-        # Add video filters (crop and scale), Only for SDR/HDR10 encoding
-        if encoding_hdr_sdr_format != HdrSdrFormat.DOLBY_VISION:
-            crop_filter: str | None = self._get_crop_filter()
-            if crop_filter:
-                output_options['vf'] = crop_filter
-
-            scale_filter: str | None = self._get_scale_filter()
-            if scale_filter:
-                if 'vf' in output_options:
-                    output_options['vf'] += f',{scale_filter}'
-                else:
-                    output_options['vf'] = scale_filter
-
-        if encoding_hdr_sdr_format == HdrSdrFormat.SDR:
-            if self._video.is_hdr_video():
-                # Tone mapping for HDR to SDR conversion
-                output_options['vf'] = (
-                    (output_options.get('vf', '') + ',') if 'vf' in output_options else ''
-                ) + 'zscale=t=linear:npl=100,format=gbrpf32le,tonemap=tonemap=hable:desat=0,zscale=t=bt709:m=bt709:p=bt709:r=tv,format=yuv420p'
-
-                # Set correct metadata for SDR output
-                output_options.update({
-                    "metadata:s:v": [
-                        "colour_primaries=bt709",
-                        "colour_transfer=bt709",
-                        "colour_space=bt709"
-                    ],
-                })
+        if encoding_hdr_sdr_format == HdrSdrFormat.SDR and self._video.is_hdr_video():
+            # Set correct metadata for SDR output
+            output_options.update({
+                "metadata:s:v": [
+                    "colour_primaries=bt709",
+                    "colour_transfer=bt709",
+                    "colour_space=bt709"
+                ],
+            })
 
         return output_options
 
@@ -137,6 +119,38 @@ class VideoCodecBase(ABC):
 
     def get_name(self) -> str:
         return self.lib.value
+
+    def _get_default_video_filter(self) -> str:
+        """Get default video filter string for ffmpeg (crop and scale).
+
+        Returns:
+            Video filter string
+        """
+        filters: list[str] = []
+        encoding_hdr_sdr_format: HdrSdrFormat = self.get_encoding_hdr_sdr_format()
+
+        # Add video filters (crop and scale), Only for SDR/HDR10 encoding
+        if encoding_hdr_sdr_format != HdrSdrFormat.DOLBY_VISION:
+            crop_filter: str | None = self._get_crop_filter()
+            if crop_filter:
+                filters.append(crop_filter)
+
+            scale_filter: str | None = self._get_scale_filter()
+            if scale_filter:
+                filters.append(scale_filter)
+
+        if encoding_hdr_sdr_format == HdrSdrFormat.SDR:
+            if self._video.is_hdr_video():
+                # Tone mapping for HDR to SDR conversion
+                filters.extend([
+                    'zscale=t=linear:npl=100',
+                    'format=gbrpf32le',
+                    'tonemap=tonemap=hable:desat=0',
+                    'zscale=t=bt709:m=bt709:p=bt709:r=tv',
+                    'format=yuv420p'
+                ])
+                
+        return ','.join(filters)
 
     def get_encoding_hdr_sdr_format(self) -> HdrSdrFormat:
         """Get the effective color format used for encoding.
