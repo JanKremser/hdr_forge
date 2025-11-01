@@ -119,6 +119,10 @@ def _get_crop_settings_from_string(crop_str: str | None) -> CropSettings:
         crop_str = '2.35:1'
     elif crop_str.lower() == 'cinema-modern':
         crop_str = '2.39:1'
+    elif crop_str.lower() == 'european':
+        crop_str = '1.66:1'
+    elif crop_str.lower() == 'us-widescreen':
+        crop_str = '1.85:1'
 
     if crop_str.lower() == 'auto':
         return CropSettings(mode=CropMode.AUTO)
@@ -564,6 +568,7 @@ def create_encoder_settings_from_args(args) -> EncoderSettings:
 
     return EncoderSettings(
         video_codec=_get_video_codec_from_string(codec_str=args.video_codec),
+        vfilter=getattr(args, 'vfilter', None),
         hdr_forge_encoding_preset=hdr_forge_preset_settings,
         hdr_sdr_format=_get_hdr_sdr_format_from_string(format_str=args.hdr_sdr_format),
         enable_gpu_acceleration=hdr_forge_preset_settings.hardware_preset.value.startswith('gpu:'),

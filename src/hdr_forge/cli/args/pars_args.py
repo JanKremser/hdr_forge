@@ -199,6 +199,8 @@ Note: This parameter is NOT compatible with NVENC encoders. Use --encoder-params
 [auto]             : Automatically detect and crop black bars
 [width:height:x:y] : Manually specify crop dimensions. The basis for the calculation is the original video, not the target resolution.
 [16:9] or [1.77:1] : 16:9, 21:9 etc. to crop to specific aspect ratio
+[european]         : European Widescreen 1.66:1 ratio
+[us-widescreen]    : US Widescreen 1.85:1 ratio
 [cinema]           : CinemaScope Classic 2.35:1 ratio
 [cinema-modern]    : CinemaScope Modern 2.39:1 ratio\n
 """
@@ -269,8 +271,23 @@ Note: This parameter is NOT compatible with NVENC encoders. Use --encoder-params
     )
 
     convert_parser.add_argument(
+        '--vfilter',
+        help="""Expert Option:
+Add custom FFmpeg video filters.
+If you want to overwrite settings, avoid using these arguments.
+    --crop, --scale, --scale-mode, --hdr-sdr-format
+Otherwise, your filter will be placed at the beginning of the filter chain.
+
+Format:
+    filter1,filter2,filter3
+Example:
+    --vfilter "eq=contrast=1.2:brightness=0.05"
+"""
+    )
+
+    convert_parser.add_argument(
         '--master-display',
-        help="""Expert function:
+        help="""Expert Option:
 Set custom Master Display metadata for HDR10 videos. Format:
 G(x,y)B(x,y)R(x,y)WP(x,y)L(max,min)
 
@@ -283,7 +300,7 @@ Input Video Master Display metadata will be used if not specified.
 
     convert_parser.add_argument(
         '--max-cll',
-        help="""Expert function:
+        help="""Expert Option:
 Set custom MaxCLL and MaxFALL values for HDR10 videos. Format:
 
 Example:
@@ -297,7 +314,7 @@ Input Video MaxCLL and MaxFALL values will be used if not specified.
         '--encoder',
         choices=['auto', 'libx265', 'libx264', 'hevc_nvenc', 'h264_nvenc'],
         default='auto',
-        help="""Expert function:
+        help="""Expert Option:
 Encoder selection override. By default, encoder is automatically selected based on --hw-preset.
 [auto]         : Automatic encoder selection (default)
 [libx265]      : Force libx265 encoder
@@ -309,7 +326,7 @@ Encoder selection override. By default, encoder is automatically selected based 
 
     convert_parser.add_argument(
         '--encoder-params',
-        help="""Expert function:
+        help="""Expert Option:
 Encoder-specific parameters. Requires --encoder to be set (not 'auto').
 Format depends on selected encoder:
 

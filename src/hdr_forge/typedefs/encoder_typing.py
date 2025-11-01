@@ -190,18 +190,13 @@ class EncoderSettings:
 
     This dataclass encapsulates all parameters needed for video encoding,
     making it easier to pass configuration to the convert_video function.
-
-    Attributes:
-        video_encoder: VideoEncoder enum specifying the encoder to use
-        target_format: Target color format (AUTO, SDR, HDR10, DOLBY_VISION)
-        target_dv_profile: Dolby Vision profile for encoding (AUTO or 8)
-        scale_height: Target height for video scaling (downscaling only)
-        crop: CropSettings object defining cropping behavior
-        encoder_override: Manual encoder selection (overrides hw_preset logic)
-        universal_params: Universal encoding parameters (quality, speed)
-        nvenc_params: NVENC-specific encoding parameters
     """
     video_codec: VideoCodec = VideoCodec.H265
+
+    # Video filter settings
+    vfilter: Optional[str] = None
+
+    # General encoding settings
     hdr_forge_encoding_preset: HdrForgeEncodingPresetSettings = field(
         default_factory=lambda: HdrForgeEncodingPresetSettings()
     )

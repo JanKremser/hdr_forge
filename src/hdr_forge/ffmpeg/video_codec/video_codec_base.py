@@ -127,6 +127,11 @@ class VideoCodecBase(ABC):
             Video filter string
         """
         filters: list[str] = []
+        vf: str | None = self._encoder_settings.vfilter
+        if vf is not None:
+            _filter: list[str] = vf.split(',')
+            filters.extend(_filter)
+
         encoding_hdr_sdr_format: HdrSdrFormat = self.get_encoding_hdr_sdr_format()
 
         # Add video filters (crop and scale), Only for SDR/HDR10 encoding
@@ -149,7 +154,7 @@ class VideoCodecBase(ABC):
                     'zscale=t=bt709:m=bt709:p=bt709:r=tv',
                     'format=yuv420p'
                 ])
-                
+
         return ','.join(filters)
 
     def get_encoding_hdr_sdr_format(self) -> HdrSdrFormat:
