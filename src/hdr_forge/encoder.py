@@ -422,7 +422,7 @@ class Encoder:
 
             # Debug output
             debug_ffmpeg: str = build_ffmpeg_cmd_dict_to_str(output_options)
-            print_debug(f"Run command: ffmpeg -y -i {input_file} {debug_ffmpeg} {target_file}")
+            print_debug(f'Run command: ffmpeg -y -i "{input_file}" {debug_ffmpeg} "{target_file}"')
 
             # Execute FFmpeg with progress tracking
             success: bool = run_ffmpeg(

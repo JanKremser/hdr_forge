@@ -298,7 +298,7 @@ Otherwise, your filter will be placed at the beginning of the filter chain.
 Format:
     filter1,filter2,filter3
 Example:
-    --vfilter "eq=contrast=1.2:brightness=0.05"
+    --vfilter "eq=contrast=1.2:brightness=0.05:saturation=1.25:gamma=1.15,crop=1920:800:0:140"
 """
     )
 
@@ -357,17 +357,6 @@ hevc_nvenc/h264_nvenc:
 
     NVENC Presets: default, slow, hq, llhq, llhp
     RC Modes: vbr, vbr_hq, cbr, cqp\n
-"""
-    )
-
-    convert_parser.add_argument(
-        '--ffmpeg-params',
-        help="""Expert Option:
-Additional FFmpeg command-line parameters to append to the encoding command.
-Format:
-    param1:param2:param3
-Example:
-    --ffmpeg-params "-aspect 166:100:movflags +faststart"
 """
     )
 
