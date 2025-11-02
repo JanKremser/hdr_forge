@@ -85,7 +85,7 @@ class Libx265Codec(VideoCodecBase):
 
         encoding_hdr_sdr_format: HdrSdrFormat = self.get_encoding_hdr_sdr_format()
 
-        if encoding_hdr_sdr_format in [HdrSdrFormat.HDR10, HdrSdrFormat.DOLBY_VISION]:
+        if encoding_hdr_sdr_format in [HdrSdrFormat.HDR, HdrSdrFormat.HDR10, HdrSdrFormat.DOLBY_VISION]:
             x265_params: list[str] = self._build_hdr_x265_params()
             output_options['x265-params'] = ':'.join(x265_params)
         elif encoding_hdr_sdr_format == HdrSdrFormat.SDR:

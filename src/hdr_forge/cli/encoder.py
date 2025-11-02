@@ -9,6 +9,19 @@ from hdr_forge.typedefs.encoder_typing import EncoderSettings, VideoCodec
 from hdr_forge.encoder import Encoder
 
 
+def _print_hdr10_metadata(video_codec_lib: VideoCodecBase) -> None:
+    """Print HDR10 metadata information.
+
+    Args:
+        video: VideoCodecBase object with metadata
+    """
+    color = ANSI_BLUE
+    v_param: dict = video_codec_lib.get_custom_lib_parameters()
+    masterdisplay: str | None = v_param.get("master-display", None)
+    print(f"    HDR10 MasterDisplay: {color_str(masterdisplay or '-', color)}")
+    maxcll: str | None = v_param.get("max-cll", None)
+    print(f"    HDR10 MaxCLL/MaxFALL: {color_str(maxcll or '-', color)}")
+
 def print_encoding_params(encoder: Encoder) -> None:
     """Print encoding parameters.
 
@@ -26,7 +39,7 @@ def print_encoding_params(encoder: Encoder) -> None:
     print(f"  Video Codec: {color_str(video_codec.value, color)}")
     video_codec_lib: VideoCodecBase | None = encoder.get_video_codec_lib()
     if video_codec_lib:
-         # Print warnings for incompatible parameters
+        # Print warnings for incompatible parameters
         encoder_settings: EncoderSettings = encoder.get_encoder_settings()
         print_parameter_warnings(encoder_settings=encoder_settings, active_encoder_lib=video_codec_lib.lib)
 
@@ -34,12 +47,16 @@ def print_encoding_params(encoder: Encoder) -> None:
         print(f"  Video Encoder Library: {color_str(video_codec_lib.lib.value, color)}")
         crf: int | None = v_param.get("crf", None) or None
         if crf is not None:
-            print(f"    CRF: {color_str(crf, color)}")
+            print(f"    Quality: crf={color_str(crf, color)}")
+            print(f"    Speed:   preset={color_str(v_param.get('preset') or '-', color)}")
+            print(f"    Other Library-Setting: ")
+            print(f"        tune={color_str(v_param.get('tune') or '', color)}")
         cq: int | None = v_param.get("cq", None) or None
         if cq is not None:
-            print(f"    CQ: {color_str(cq, color)}")
-        print(f"    Preset: {color_str(v_param.get('preset') or '-', color)}")
-        print(f"    Tune: {color_str(v_param.get('tune') or '-', color)}")
+            print(f"    Quality: cq={color_str(cq, color)}")
+            print(f"    Other Library-Setting: ")
+            print(f"        preset={color_str(v_param.get('preset') or '', color)}")
+            print(f"        rc={color_str(v_param.get('rc') or '', color)}")
 
         crop: CropResult = video_codec_lib.get_crop()
         if crop.is_valid:
@@ -51,13 +68,10 @@ def print_encoding_params(encoder: Encoder) -> None:
         aspect_ratio: str = create_aspect_ratio_str(resolution_w, resolution_h)
         print(f"  Resolution: {color_str(f"{resolution_w}x{resolution_h}", color)}")
         print(f"  Aspect Ratio: {color_str(aspect_ratio, color)}")
-        print(f"  Bit Depth: {color_str(video_codec_lib.get_bit_depth_for_encoding(), color)}-bit")
+        print(f"  Bit Depth: {color_str(video_codec_lib.get_bit_depth_for_encoding(), color)}")
         print(f"  HDR/SDR: {color_str(encoder.get_encoding_hdr_sdr_format().value.upper(), color)}")
-        if video_codec_lib.is_hdr_encoding():
-            masterdisplay: str | None = v_param.get("master-display", None)
-            print(f"    MasterDisplay: {color_str(masterdisplay or '-', color)}")
-            maxcll: str | None = v_param.get("max-cll", None)
-            print(f"    MaxCLL/MaxFALL: {color_str(maxcll or '-', color)}")
+        if video_codec_lib.is_hdr10_encoding():
+            _print_hdr10_metadata(video_codec_lib=video_codec_lib)
     if encoder.is_dolby_vision_encoding():
         dv_profile: DolbyVisionProfile | None = encoder.get_encoding_dolby_vision_profile()
         assert dv_profile is not None
@@ -71,5 +85,8 @@ def print_encoding_params(encoder: Encoder) -> None:
 
         dv_el_str: str | None = dv_el.value if dv_el else None
         print(f"    Enhancement Layer (EL): {color_str(dv_el_str or '-', color)}")
+        if video_codec_lib:
+            _print_hdr10_metadata(video_codec_lib=video_codec_lib)
+
     print(f"{color_str('_', color)}" * 70)
     print()

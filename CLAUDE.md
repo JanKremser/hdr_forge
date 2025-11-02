@@ -511,7 +511,7 @@ dovi_tool remove - -o output_BL.hevc
 -   `--speed` - Encoding speed preset (ultrafast to veryslow, libx265/libx264 only)
 -   `--crop` - Crop mode (off, auto, manual, aspect ratio)
 -   `--grain` - Grain analysis (off, auto, cat1, cat2, cat3)
--   `--scale` - Target resolution (8K, UHD, QHD, FHD, HD, SD, or height)
+-   `--scale` - Target resolution (FUHD, UHD, WQHD, FHD, HD, SD, or height)
 -   `--scale-mode` - Scale mode (height, adaptive)
 -   `--hdr-sdr-format` - Target format (auto, hdr10, sdr)
 -   `--dv-profile` - Dolby Vision profile (auto, 8)
@@ -877,9 +877,9 @@ def _calculate_crf_adjustment_weight(current_crf, crf_delta):
 
 **Named Resolutions:**
 
--   `8K` - 4320p (7680x4320)
+-   `FUHD` - 4320p (7680x4320)
 -   `UHD` - 2160p (3840x2160)
--   `QHD` - 1440p (2560x1440)
+-   `WQHD` - 1440p (2560x1440)
 -   `FHD` - 1080p (1920x1080)
 -   `HD` - 720p (1280x720)
 -   `SD` - 480p (640x480)

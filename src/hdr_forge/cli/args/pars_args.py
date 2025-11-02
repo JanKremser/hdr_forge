@@ -6,26 +6,25 @@ from hdr_forge import __version__
 from hdr_forge.cli.cli_output import rainbow_text
 
 
-def _add_version_arg(parser: argparse.ArgumentParser) -> None:
-    """Add version argument to the parser.
-
-    Args:
-        parser: Argument parser to add the version argument to
-    """
-    logo = """
+HDR_FORGE_LOGO = rainbow_text("""
 ░ ▒█▒    ▒█▒ ░ ▒███████▒ ░  ▒███████▒ ░       ░ ▒████████▒ ░ ▒██████▒ ░  ▒███████▒ ░ ░ ▒██████▒ ░  ▒████████▒ ░
 ░ ▒█▒    ▒█▒ ░ ▒█▒    ▒█▒ ░ ▒█▒    ▒█▒ ░      ░ ▒█▒ ░     ░ ▒█▒    ▒█▒ ░ ▒█▒    ▒█▒ ░ ▒█▒    ▒█▒ ░ ▒█▒ ░
 ░ ▒█▒    ▒█▒ ░ ▒█▒    ▒█▒ ░ ▒█▒    ▒█▒ ░      ░ ▒█▒ ░     ░ ▒█▒    ▒█▒ ░ ▒█▒    ▒█▒ ░ ▒█▒ ░      ░ ▒█▒ ░
 ░ ▒████████▒ ░ ▒█▒    ▒█▒ ░ ▒███████▒ ░       ░ ▒██████▒    ▒█▒    ▒█▒ ░ ▒███████▒    ▒█▒  ▒███▒ ░ ▒██████▒ ░
 ░ ▒█▒    ▒█▒ ░ ▒█▒    ▒█▒ ░ ▒█▒    ▒█▒ ░      ░ ▒█▒ ░     ░ ▒█▒    ▒█▒ ░ ▒█▒    ▒█▒ ░ ▒█▒    ▒█▒ ░ ▒█▒ ░
 ░ ▒█▒    ▒█▒ ░ ▒█▒    ▒█▒ ░ ▒█▒    ▒█▒ ░      ░ ▒█▒ ░     ░ ▒█▒    ▒█▒ ░ ▒█▒    ▒█▒ ░ ▒█▒    ▒█▒ ░ ▒█▒ ░
-░ ▒█▒    ▒█▒ ░ ▒███████▒ ░  ▒█▒    ▒█▒ ░      ░ ▒█▒ ░      ░ ▒██████▒ ░  ▒█▒    ▒█▒    ▒██████▒ ░  ▒████████▒ ░"""
+░ ▒█▒    ▒█▒ ░ ▒███████▒ ░  ▒█▒    ▒█▒ ░      ░ ▒█▒ ░      ░ ▒██████▒ ░  ▒█▒    ▒█▒    ▒██████▒ ░  ▒████████▒ ░""")
+
+def _add_version_arg(parser: argparse.ArgumentParser) -> None:
+    """Add version argument to the parser.
+
+    Args:
+        parser: Argument parser to add the version argument to
+    """
     parser.add_argument(
         '--version',
         action='version',
-        version=f"""{rainbow_text(logo)}
-                                              HDR forge {__version__} - © JanKremser
-"""
+        version=f"""                                              HDR forge {__version__} - © JanKremser"""
     )
 
 
@@ -220,11 +219,13 @@ Note: This parameter is NOT compatible with NVENC encoders. Use --encoder-params
     convert_parser.add_argument(
         '--scale',
         help="""Scale video to specified resolution. Default is original resolution.
-[8K]       : 4320p
-[UHD]      : 2160p
-[QHD]      : 1440p
-[FHD]      : 1080p
-[HD]       : 720p
+[FUHD]     : 4320p (8K)
+[UHD]      : 2160p (4K)
+[QHD+]     : 1800p
+[WQHD]     : 1440p
+[FHD]      : 1080p (Full HD)
+[HD]       : 720p  (HD ready)
+[QHD]      : 540p
 [SD]       : 480p
 [<height>] : Specify target height in pixels (e.g., 1440 for 2560x1440). Width is calculated based on aspect ratio.
              If not specified, original resolution is maintained.\n
@@ -423,6 +424,7 @@ def parse_args():
     Returns:
         Parsed arguments namespace
     """
+    print(HDR_FORGE_LOGO + "\n")
     parser = argparse.ArgumentParser(
         description='HDR Forge - HDR Video Converter',
         formatter_class=argparse.RawDescriptionHelpFormatter,

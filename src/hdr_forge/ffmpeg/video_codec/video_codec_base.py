@@ -15,14 +15,6 @@ T = TypeVar("T")
 
 class VideoCodecBase(ABC):
 
-    PIXEL_RESOLUTIONS: dict[str, int] = {
-        'UHD': 3840*2160,
-        'QHD': 2560*1440,
-        'FHD': 1920*1080,
-        'HD': 1280*720,
-        'SD': 854*480
-    }
-
     def __init__(
         self,
         lib: VideoEncoderLibrary,
@@ -70,8 +62,11 @@ class VideoCodecBase(ABC):
         """Get FFmpeg parameters for this codec."""
         output_options: dict = {
             "c:v": self.lib.value,
-            "vf": self._get_default_video_filter(),
         }
+
+        vf: str | None = self._get_default_video_filter()
+        if vf:
+            output_options["vf"] = vf
 
         if self._encoder_settings.dar_ratio is not None:
             dar_w, dar_h = self._encoder_settings.dar_ratio
@@ -112,7 +107,7 @@ class VideoCodecBase(ABC):
     def get_bit_depth_for_encoding(self) -> int:
         encoding_hdr_sdr_format: HdrSdrFormat = self.get_encoding_hdr_sdr_format()
 
-        if encoding_hdr_sdr_format in [HdrSdrFormat.HDR10, HdrSdrFormat.DOLBY_VISION]:
+        if encoding_hdr_sdr_format in [HdrSdrFormat.HDR, HdrSdrFormat.HDR10, HdrSdrFormat.DOLBY_VISION]:
             return 10
         elif encoding_hdr_sdr_format == HdrSdrFormat.SDR:
             if self._video.is_hdr_video():
@@ -124,7 +119,7 @@ class VideoCodecBase(ABC):
     def get_name(self) -> str:
         return self.lib.value
 
-    def _get_default_video_filter(self) -> str:
+    def _get_default_video_filter(self) -> str | None:
         """Get default video filter string for ffmpeg (crop and scale).
 
         Returns:
@@ -158,7 +153,8 @@ class VideoCodecBase(ABC):
                     'zscale=t=bt709:m=bt709:p=bt709:r=tv',
                     'format=yuv420p'
                 ])
-
+        if len(filters) == 0:
+            return None
         return ','.join(filters)
 
     def get_encoding_hdr_sdr_format(self) -> HdrSdrFormat:
@@ -175,7 +171,15 @@ class VideoCodecBase(ABC):
         Returns:
             True if encoding is HDR, False otherwise
         """
-        return self._hdr_sdr_format_for_encoding in [HdrSdrFormat.HDR10, HdrSdrFormat.DOLBY_VISION]
+        return self._hdr_sdr_format_for_encoding in [HdrSdrFormat.HDR, HdrSdrFormat.HDR10, HdrSdrFormat.DOLBY_VISION]
+
+    def is_hdr10_encoding(self) -> bool:
+        """Check if encoding is HDR (HDR10 or Dolby Vision).
+
+        Returns:
+            True if encoding is HDR, False otherwise
+        """
+        return self._hdr_sdr_format_for_encoding in [HdrSdrFormat.HDR10]
 
     def get_crop(self) -> CropResult:
         """Get ffmpeg crop filter string if cropping is needed.

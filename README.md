@@ -268,7 +268,7 @@ hdr_forge convert -i input.mkv -o output.mkv --scale 1080 --scale-mode height   
 hdr_forge convert -i input.mkv -o output.mkv --scale 1920 --scale-mode adaptive  # Fit within bounds
 ```
 
-**Available resolutions:** 8K, UHD (4K), QHD (1440p), FHD (1080p), HD (720p), SD (480p)
+**Available resolutions:** FUHD (8K), UHD (4K), WQHD (1440p), FHD (1080p), HD (720p), SD (480p)
 
 **Note:** Only downscaling is supported. Not compatible with Dolby Vision preservation.
 
@@ -437,7 +437,7 @@ Quality Settings:
 Cropping & Scaling:
   --crop MODE               Crop mode: off, auto, width:height:x:y,
                             16:9, 21:9, cinema, cinema-modern (default: off)
-  --scale RESOLUTION        Target resolution: 8K, UHD, QHD, FHD, HD, SD,
+  --scale RESOLUTION        Target resolution: FUHD, UHD, WQHD, FHD, HD, SD,
                             or numeric height
   --scale-mode MODE         Scale mode: height, adaptive (default: height)
 

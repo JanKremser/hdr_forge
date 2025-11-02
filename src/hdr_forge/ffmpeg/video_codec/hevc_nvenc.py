@@ -44,7 +44,7 @@ class HevcNvencCodec(VideoCodecBase):
 
         encoding_hdr_sdr_format: HdrSdrFormat = self.get_encoding_hdr_sdr_format()
 
-        if encoding_hdr_sdr_format in [HdrSdrFormat.HDR10, HdrSdrFormat.DOLBY_VISION]:
+        if encoding_hdr_sdr_format in [HdrSdrFormat.HDR, HdrSdrFormat.HDR10, HdrSdrFormat.DOLBY_VISION]:
             output_options['profile:v'] = self.HDR_PROFILE
 
             master_display: MasterDisplayMetadata | None = self._get_master_display_for_encoding()
@@ -83,6 +83,7 @@ class HevcNvencCodec(VideoCodecBase):
         return {
             "cq": self._cq,
             "preset": self._preset.value,
+            "rc": self._nvenc_rc.value,
             "master-display": build_master_display_string(masterdisplay) if masterdisplay else None,
             "max-cll": build_max_cll_string(max_cll_max_fll) if max_cll_max_fll else None,
         }

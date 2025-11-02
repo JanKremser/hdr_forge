@@ -13,11 +13,13 @@ from hdr_forge.typedefs.video_typing import ContentLightLevelMetadata, HdrMetada
 
 # Resolution constants
 RESOLUTIONS: dict = {
-    '8K': 4320,
+    'FUHD': 4320,
     'UHD': 2160,
-    'QHD': 1440,
+    'QHD+': 1800,
+    'WQHD': 1440,
     'FHD': 1080,
     'HD': 720,
+    'QHD': 540,
     'SD': 480
 }
 
