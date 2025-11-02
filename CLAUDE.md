@@ -4,7 +4,54 @@
 
 HDR Forge (Easy HDR Video Converter) is a Python-based command-line tool for converting video files with intelligent HDR metadata preservation, automatic quality optimization, hardware acceleration support, and advanced encoding features including grain analysis and flexible cropping.
 
-**Current Version:** Python v0.4.0 (Rust code has been removed)
+**Current Version:** Python v0.6.0
+
+## Documentation Structure
+
+**IMPORTANT:** When updating user-facing documentation, always consider the modular documentation structure:
+
+### Main README.md
+- **Purpose:** User-friendly overview and quick start guide
+- **Content:** Basic usage, installation, common examples, quick reference
+- **Target Length:** ~600 lines (keep it concise!)
+- **Rule:** Technical details should be moved to `documentation/` files
+
+### documentation/ Directory
+
+**When to update documentation files:**
+
+1. **encoders.md** - Update when:
+   - Adding new encoder support
+   - Changing encoder selection logic
+   - Updating hardware requirements
+   - Adding encoder-specific features
+   - Modifying performance characteristics
+
+2. **advanced-examples.md** - Update when:
+   - Adding new CLI parameters
+   - Creating new feature combinations
+   - Adding complex workflows
+   - Providing use-case-specific examples
+
+3. **technical-details.md** - Update when:
+   - Changing internal algorithms
+   - Modifying parameter priority systems
+   - Updating auto-calculation logic
+   - Changing filter chains or processing workflows
+   - Adding technical implementation details
+
+4. **troubleshooting.md** - Update when:
+   - Discovering new common issues
+   - Adding error message explanations
+   - Creating solutions for known problems
+   - Updating dependency requirements
+
+**Best Practices:**
+- Keep README.md high-level and user-friendly
+- Move technical details to appropriate documentation files
+- Add cross-references between documentation files
+- Update all affected files when making changes
+- Ensure consistency across all documentation
 
 ## Technology Stack
 
@@ -22,6 +69,12 @@ HDR Forge (Easy HDR Video Converter) is a Python-based command-line tool for con
 
 ```
 hdr_forge/
+├── documentation/                            # User documentation (modular structure)
+│   ├── README.md                             # Documentation overview and navigation
+│   ├── encoders.md                           # Encoder guide and comparisons
+│   ├── advanced-examples.md                  # Complex encoding workflows
+│   ├── technical-details.md                  # In-depth technical information
+│   └── troubleshooting.md                    # Common issues and solutions
 ├── src/hdr_forge/
 │   ├── __init__.py                           # Package initialization with version info
 │   ├── main.py                               # CLI entry point with argparse (272 lines)
@@ -93,7 +146,7 @@ hdr_forge/
 -   Batch folder processing
 -   Auto-detection of video format (SDR/HDR10/Dolby Vision)
 -   Format conversion: Dolby Vision → HDR10 → SDR (downgrades only)
--   Multiple video codec support (x265, x264, HEVC NVENC, H.264 NVENC, copy)
+-   Multiple video codec support (h265, h264, copy)
 -   Hardware acceleration (NVIDIA NVENC)
 -   Resolution scaling with multiple modes (height, adaptive)
 -   Flexible cropping (auto, manual, aspect ratio presets, off)
@@ -458,7 +511,7 @@ dovi_tool remove - -o output_BL.hevc
 -   `--speed` - Encoding speed preset (ultrafast to veryslow, libx265/libx264 only)
 -   `--crop` - Crop mode (off, auto, manual, aspect ratio)
 -   `--grain` - Grain analysis (off, auto, cat1, cat2, cat3)
--   `--scale` - Target resolution (8K, UHD, QHD, FHD, HD, SD, or height)
+-   `--scale` - Target resolution (FUHD, UHD, WQHD, FHD, HD, SD, or height)
 -   `--scale-mode` - Scale mode (height, adaptive)
 -   `--hdr-sdr-format` - Target format (auto, hdr10, sdr)
 -   `--dv-profile` - Dolby Vision profile (auto, 8)
@@ -824,9 +877,9 @@ def _calculate_crf_adjustment_weight(current_crf, crf_delta):
 
 **Named Resolutions:**
 
--   `8K` - 4320p (7680x4320)
+-   `FUHD` - 4320p (7680x4320)
 -   `UHD` - 2160p (3840x2160)
--   `QHD` - 1440p (2560x1440)
+-   `WQHD` - 1440p (2560x1440)
 -   `FHD` - 1080p (1920x1080)
 -   `HD` - 720p (1280x720)
 -   `SD` - 480p (640x480)

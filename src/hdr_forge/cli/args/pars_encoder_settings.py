@@ -1,6 +1,9 @@
 """Parse encoder settings from command-line arguments."""
 
 import sys
+from typing import Tuple
+
+from ffmpeg.types import T
 
 from hdr_forge import __version__
 from hdr_forge.cli.cli_output import print_err, print_warn
@@ -10,11 +13,13 @@ from hdr_forge.typedefs.video_typing import ContentLightLevelMetadata, HdrMetada
 
 # Resolution constants
 RESOLUTIONS: dict = {
-    '8K': 4320,
+    'FUHD': 4320,
     'UHD': 2160,
-    'QHD': 1440,
+    'QHD+': 1800,
+    'WQHD': 1440,
     'FHD': 1080,
     'HD': 720,
+    'QHD': 540,
     'SD': 480
 }
 
@@ -55,6 +60,8 @@ def _get_hdr_sdr_format_from_string(format_str: str | None) -> HdrSdrFormat:
     format_str = format_str.lower()
     if format_str == 'sdr':
         return HdrSdrFormat.SDR
+    elif format_str == 'hdr':
+        return HdrSdrFormat.HDR
     elif format_str == 'hdr10':
         return HdrSdrFormat.HDR10
     elif format_str == 'dolby_vision':
@@ -91,15 +98,15 @@ def _get_video_codec_from_string(codec_str: str | None) -> VideoCodec:
         Corresponding VideoEncoder enum value
     """
     if codec_str is None:
-        return VideoCodec.X265
+        return VideoCodec.H265
 
     codec_str = codec_str.lower()
     if codec_str == 'copy':
         return VideoCodec.COPY
-    elif codec_str == 'x264':
-        return VideoCodec.X264
+    elif codec_str == 'h264':
+        return VideoCodec.H264
 
-    return VideoCodec.X265
+    return VideoCodec.H265
 
 
 def _get_crop_settings_from_string(crop_str: str | None) -> CropSettings:
@@ -114,11 +121,15 @@ def _get_crop_settings_from_string(crop_str: str | None) -> CropSettings:
     if crop_str is None or crop_str.lower() == 'off':
         return CropSettings(mode=CropMode.OFF)
 
-    # Preset for cinema aspect ratios
+    # Preset for aspect ratios
     if crop_str.lower() == 'cinema':
         crop_str = '2.35:1'
     elif crop_str.lower() == 'cinema-modern':
         crop_str = '2.39:1'
+    elif crop_str.lower() == 'european':
+        crop_str = '1.66:1'
+    elif crop_str.lower() == 'us-widescreen':
+        crop_str = '1.85:1'
 
     if crop_str.lower() == 'auto':
         return CropSettings(mode=CropMode.AUTO)
@@ -137,6 +148,38 @@ def _get_crop_settings_from_string(crop_str: str | None) -> CropSettings:
             except ValueError:
                 pass
     print_err(f"Invalid crop value '{crop_str}', using automatic cropping")
+    sys.exit(1)
+
+def _get_dar_ratio_settings_from_string(ratio_str: str | None) -> Tuple[int, int] | None:
+    """Convert crop argument string to CropSettings object.
+
+    Args:
+        crop_str: Crop argument string
+
+    Returns:
+        CropSettings object
+    """
+    if ratio_str is None or ratio_str.lower() == 'off':
+        return None
+
+    # Preset for aspect ratios
+    if ratio_str.lower() == 'cinema':
+        ratio_str = '2.35:1'
+    elif ratio_str.lower() == 'cinema-modern':
+        ratio_str = '2.39:1'
+    elif ratio_str.lower() == 'european':
+        ratio_str = '1.66:1'
+    elif ratio_str.lower() == 'us-widescreen':
+        ratio_str = '1.85:1'
+
+    parts = ratio_str.split(':')
+    if len(parts) == 2:
+        try:
+            ar_w, ar_h = map(float, parts)
+            return (int(ar_w*100), int(ar_h*100))
+        except ValueError:
+            pass
+    print_err(f"Invalid dar ratio value '{ratio_str}'")
     sys.exit(1)
 
 def _get_grain_settings_from_string(grain_str: str | None) -> GrainMode:
@@ -564,6 +607,8 @@ def create_encoder_settings_from_args(args) -> EncoderSettings:
 
     return EncoderSettings(
         video_codec=_get_video_codec_from_string(codec_str=args.video_codec),
+        vfilter=getattr(args, 'vfilter', None),
+        dar_ratio=_get_dar_ratio_settings_from_string(getattr(args, 'dar_ratio', None)),
         hdr_forge_encoding_preset=hdr_forge_preset_settings,
         hdr_sdr_format=_get_hdr_sdr_format_from_string(format_str=args.hdr_sdr_format),
         enable_gpu_acceleration=hdr_forge_preset_settings.hardware_preset.value.startswith('gpu:'),

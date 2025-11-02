@@ -8,13 +8,14 @@ from hdr_forge.video import Video
 class Libx265Codec(VideoCodecBase):
 
     HDR_SDR_SUPPORT: list[HdrSdrFormat] = [
+        HdrSdrFormat.HDR,
         HdrSdrFormat.HDR10,
         HdrSdrFormat.SDR,
         HdrSdrFormat.DOLBY_VISION,
     ]
 
     # HDR x265 parameters for HDR10 encoding
-    HDR_X265_PARAMS: list[str] = [
+    HDR10_X265_PARAMS: list[str] = [
         'profile=main10',
         'hdr-opt=1',
         'hdr10=1',
@@ -44,6 +45,16 @@ class Libx265Codec(VideoCodecBase):
         'colormatrix=bt2020nc',
     ]
 
+    HDR_X265_PARAMS: list[str] = [
+        'profile=main10',
+        'hdr-opt=0',
+        'hdr10=0',
+        'no-hdr10-opt=1',
+        'colorprim=bt2020',
+        'transfer=smpte2084',
+        'colormatrix=bt2020nc',
+    ]
+
     # SDR x265 parameters
     SDR_X265_PARAMS: list[str] = [
         'profile=main',
@@ -56,8 +67,8 @@ class Libx265Codec(VideoCodecBase):
         'colormatrix=bt709',
     ]
 
-    HDR_PIXEL_FORMAT = 'yuv420p10le'
-    SDR_PIXEL_FORMAT = 'yuv420p'
+    PIXEL_FORMAT_10BIT = 'yuv420p10le'
+    PIXEL_FORMAT_8BIT = 'yuv420p'
 
     def __init__(self, encoder_settings: EncoderSettings, video: Video, scale: Tuple[int, int]):
         super().__init__(
@@ -76,7 +87,8 @@ class Libx265Codec(VideoCodecBase):
         output_options: dict = super().get_ffmpeg_params()
         output_options.update({
             "preset": self._preset.value,
-            "crf": str(self._crf)
+            "crf": str(self._crf),
+            "pix_fmt": self.get_pix_format_for_encoding(),
         })
 
         if self._tune is not None:
@@ -84,16 +96,25 @@ class Libx265Codec(VideoCodecBase):
 
         encoding_hdr_sdr_format: HdrSdrFormat = self.get_encoding_hdr_sdr_format()
 
-        if encoding_hdr_sdr_format in [HdrSdrFormat.HDR10, HdrSdrFormat.DOLBY_VISION]:
+        if encoding_hdr_sdr_format in [HdrSdrFormat.HDR, HdrSdrFormat.HDR10, HdrSdrFormat.DOLBY_VISION]:
             x265_params: list[str] = self._build_hdr_x265_params()
-            output_options['pix_fmt'] = self.HDR_PIXEL_FORMAT
             output_options['x265-params'] = ':'.join(x265_params)
         elif encoding_hdr_sdr_format == HdrSdrFormat.SDR:
             x265_params: list[str] = self._build_sdr_x265_params()
-            output_options['pix_fmt'] = self.SDR_PIXEL_FORMAT
             output_options['x265-params'] = ':'.join(x265_params)
 
         return output_options
+
+    def get_pix_format_for_encoding(self) -> str:
+        bit_depth = self.get_bit_depth_for_encoding()
+        if bit_depth == 10:
+            return self.PIXEL_FORMAT_10BIT
+        elif bit_depth == 8:
+            return self.PIXEL_FORMAT_8BIT
+        return self._video.get_pix_fmt()  # fallback
+
+    def get_bit_depth_for_encoding(self) -> int:
+        return super().get_bit_depth_for_encoding()
 
     def get_custom_lib_parameters(self) -> dict:
         masterdisplay: MasterDisplayMetadata | None = self._get_master_display_for_encoding()
@@ -139,7 +160,18 @@ class Libx265Codec(VideoCodecBase):
         Returns:
             list of x265 parameter strings
         """
-        params: list[str] = self.HDR_X265_PARAMS.copy()
+
+        params: list[str] = []
+
+        encoding_hdr_sdr_format: HdrSdrFormat = self.get_encoding_hdr_sdr_format()
+        if encoding_hdr_sdr_format == HdrSdrFormat.HDR:
+            params = self.HDR_X265_PARAMS.copy()
+            # remove HDR10 metadata if present
+            params.append('master-display=G(0,0)B(0,0)R(0,0)WP(0,0)L(0,0)')
+            params.append('max-cll=0,0')
+            return params
+
+        params: list[str] = self.HDR10_X265_PARAMS.copy()
 
         master_display: MasterDisplayMetadata | None = self._get_master_display_for_encoding()
         if master_display:

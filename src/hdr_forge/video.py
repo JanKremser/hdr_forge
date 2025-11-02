@@ -412,9 +412,35 @@ class Video:
         """Check if video is HDR by detecting 10-bit pixel format.
 
         Returns:
-            True if video is HDR (10-bit), False otherwise
+            True if video is HDR (10-bit) and bt2020, False otherwise
         """
-        return '10le' in self.get_pix_fmt()
+        hdr_colors: bool = "bt2020" in self.get_color_primaries()
+        hdr_bit: bool = "10le" in self.get_pix_fmt()
+
+        return hdr_colors and hdr_bit
+
+    def is_hdr10_video(self) -> bool:
+        """Check if video is HDR10.
+
+        Returns:
+            True if video is HDR10, False otherwise
+        """
+        master_display: MasterDisplayMetadata | None = self.get_master_display()
+        if not master_display:
+            return False
+        return self.is_hdr_video() and not self.is_dolby_vision_video()
+
+    def get_bit_depth(self) -> int:
+        """Get the bit depth of the video.
+
+        Returns:
+            Bit depth as integer (e.g., 8, 10, 12)
+        """
+        pix_fmt: str = self.get_pix_fmt()
+        match = re.search(r'(\d+)le', pix_fmt)
+        if match:
+            return int(match.group(1))
+        return 8
 
     def is_dolby_vision_video(self) -> bool:
         """Check if video contains Dolby Vision metadata.
@@ -433,8 +459,10 @@ class Video:
         """
         if self.is_dolby_vision_video():
             return HdrSdrFormat.DOLBY_VISION
-        elif self.is_hdr_video():
+        elif self.is_hdr10_video():
             return HdrSdrFormat.HDR10
+        elif self.is_hdr_video():
+            return HdrSdrFormat.HDR
         else:
             return HdrSdrFormat.SDR
 

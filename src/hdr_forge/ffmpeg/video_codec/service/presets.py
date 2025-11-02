@@ -20,11 +20,13 @@ HEVC_NVENC_PRESET_SCALE: list[str] = ["default", "slow", "hq"] #, "llhq", "llhp"
 
 class RESOLUTION_PRESETS(Enum):
     """Vordefinierte Auflösungen für die Skalierung."""
-    _8K = 7680 * 4320
+    FUHD = 7680 * 4320
     UHD = 3840 * 2160
-    QHD = 2560 * 1440
+    QHD_PLUS = 3200 * 1800
+    WQHD = 2560 * 1440
     FHD = 1920 * 1080
     HD = 1280 * 720
+    QHD = 960 * 540
     SD = 854 * 480
     NONE = 0
 
@@ -49,13 +51,25 @@ HW_PRESET: dict = {
         },
         {
             "from_pixel": RESOLUTION_PRESETS.FHD.value + 1,
-            "to_pixel": RESOLUTION_PRESETS.UHD.value,
-            VideoEncoderLibrary.LIBX265: {"from_CRF": 19, "to_CRF": 15, "from_preset": "medium", "to_preset": "fast"},
-            VideoEncoderLibrary.LIBX264: {"from_CRF": 17, "to_CRF": 14, "from_preset": "medium", "to_preset": "fast"},
+            "to_pixel": RESOLUTION_PRESETS.WQHD.value,
+            VideoEncoderLibrary.LIBX265: {"from_CRF": 19, "to_CRF": 19, "from_preset": "medium", "to_preset": "medium"},
+            VideoEncoderLibrary.LIBX264: {"from_CRF": 17, "to_CRF": 17, "from_preset": "medium", "to_preset": "medium"},
         },
         {
+            "from_pixel": RESOLUTION_PRESETS.WQHD.value + 1,
+            "to_pixel": RESOLUTION_PRESETS.UHD.value,
+            VideoEncoderLibrary.LIBX265: {"from_CRF": 18, "to_CRF": 15, "from_preset": "fast", "to_preset": "fast"},
+            VideoEncoderLibrary.LIBX264: {"from_CRF": 16, "to_CRF": 14, "from_preset": "fast", "to_preset": "fast"},
+        },
+        # { OLD Preset
+        #     "from_pixel": RESOLUTION_PRESETS.FHD.value + 1,
+        #     "to_pixel": RESOLUTION_PRESETS.UHD.value,
+        #     VideoEncoderLibrary.LIBX265: {"from_CRF": 19, "to_CRF": 15, "from_preset": "medium", "to_preset": "fast"},
+        #     VideoEncoderLibrary.LIBX264: {"from_CRF": 17, "to_CRF": 14, "from_preset": "medium", "to_preset": "fast"},
+        # },
+        {
             "from_pixel": RESOLUTION_PRESETS.UHD.value + 1,
-            "to_pixel": RESOLUTION_PRESETS._8K.value,
+            "to_pixel": RESOLUTION_PRESETS.FUHD.value,
             VideoEncoderLibrary.LIBX265: {"from_CRF": 15, "to_CRF": 13, "from_preset": "faster", "to_preset": "ultrafast"},
             VideoEncoderLibrary.LIBX264: {"from_CRF": 14, "to_CRF": 12, "from_preset": "faster", "to_preset": "ultrafast"},
         },
@@ -81,7 +95,7 @@ HW_PRESET: dict = {
         },
         {
             "from_pixel": RESOLUTION_PRESETS.UHD.value + 1,
-            "to_pixel": RESOLUTION_PRESETS._8K.value,
+            "to_pixel": RESOLUTION_PRESETS.FUHD.value,
             VideoEncoderLibrary.LIBX265: {"from_CRF": 14, "to_CRF": 11, "from_preset": "slower", "to_preset": "veryslow"},
             VideoEncoderLibrary.LIBX264: {"from_CRF": 13, "to_CRF": 11, "from_preset": "slower", "to_preset": "veryslow"}
         },
@@ -107,7 +121,7 @@ HW_PRESET: dict = {
         },
         {
             "from_pixel": RESOLUTION_PRESETS.UHD.value + 1,
-            "to_pixel": RESOLUTION_PRESETS._8K.value,
+            "to_pixel": RESOLUTION_PRESETS.FUHD.value,
             VideoEncoderLibrary.HEVC_NVENC: {"from_CQ": 15, "to_CQ": 13, "preset": "slow"},
             VideoEncoderLibrary.H264_NVENC: {"from_CQ": 14, "to_CQ": 12, "preset": "slow"},
         },
@@ -133,7 +147,7 @@ HW_PRESET: dict = {
         },
         {
             "from_pixel": RESOLUTION_PRESETS.UHD.value + 1,
-            "to_pixel": RESOLUTION_PRESETS._8K.value,
+            "to_pixel": RESOLUTION_PRESETS.FUHD.value,
             VideoEncoderLibrary.HEVC_NVENC: {"from_CQ": 15, "to_CQ": 13, "preset": "hq"},
             VideoEncoderLibrary.H264_NVENC: {"from_CQ": 14, "to_CQ": 12, "preset": "hq"},
         },

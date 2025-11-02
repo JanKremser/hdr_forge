@@ -10,20 +10,24 @@ from hdr_forge.typedefs.video_typing import HdrMetadata
 
 class RESOLUTION_PRESETS(Enum):
     """Vordefinierte Auflösungen für die Skalierung."""
-    K8 = "8K"
+    FUHD = "FUHD"
     UHD = "UHD"
-    QHD = "QHD"
+    QHD_PLUS = "QHD+"
+    WQHD = "WQHD"
     FHD = "FHD"
     HD = "HD"
+    QHD = "QHD"
     SD = "SD"
 
 
 RESOLUTION_PRESETS_VALUES: dict[RESOLUTION_PRESETS, tuple[int, int]] = {
-    RESOLUTION_PRESETS.K8: (7680, 4320),
+    RESOLUTION_PRESETS.FUHD: (7680, 4320),
     RESOLUTION_PRESETS.UHD: (3840, 2160),
-    RESOLUTION_PRESETS.QHD: (2560, 1440),
+    RESOLUTION_PRESETS.QHD_PLUS: (3200, 1800),
+    RESOLUTION_PRESETS.WQHD: (2560, 1440),
     RESOLUTION_PRESETS.FHD: (1920, 1080),
     RESOLUTION_PRESETS.HD: (1280, 720),
+    RESOLUTION_PRESETS.QHD: (960, 540),
     RESOLUTION_PRESETS.SD: (854, 480),
 }
 
@@ -40,14 +44,15 @@ class HdrSdrFormat(Enum):
     """Target color format for video encoding."""
     AUTO = "auto"
     SDR = "sdr"
+    HDR = "hdr"
     HDR10 = "hdr10"
     DOLBY_VISION = "dolby_vision"
 
 
 class VideoCodec(Enum):
     """Video encoder mode."""
-    X265 = "x265"
-    X264 = "x264"
+    H265 = "h265"
+    H264 = "h264"
     COPY = "copy"
 
 
@@ -190,18 +195,14 @@ class EncoderSettings:
 
     This dataclass encapsulates all parameters needed for video encoding,
     making it easier to pass configuration to the convert_video function.
-
-    Attributes:
-        video_encoder: VideoEncoder enum specifying the encoder to use
-        target_format: Target color format (AUTO, SDR, HDR10, DOLBY_VISION)
-        target_dv_profile: Dolby Vision profile for encoding (AUTO or 8)
-        scale_height: Target height for video scaling (downscaling only)
-        crop: CropSettings object defining cropping behavior
-        encoder_override: Manual encoder selection (overrides hw_preset logic)
-        universal_params: Universal encoding parameters (quality, speed)
-        nvenc_params: NVENC-specific encoding parameters
     """
-    video_codec: VideoCodec = VideoCodec.X265
+    video_codec: VideoCodec = VideoCodec.H265
+
+    # Video filter settings
+    vfilter: Optional[str] = None
+    dar_ratio: Optional[tuple[int, int]] = None  # Display Aspect Ratio (width, height)
+
+    # General encoding settings
     hdr_forge_encoding_preset: HdrForgeEncodingPresetSettings = field(
         default_factory=lambda: HdrForgeEncodingPresetSettings()
     )

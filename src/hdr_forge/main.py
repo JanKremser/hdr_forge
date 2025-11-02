@@ -8,6 +8,7 @@ from hdr_forge.cli.cli_output import print_conversion_summary, print_debug, prin
 from hdr_forge.cli.encoder import print_encoding_params
 from hdr_forge.cli.video import print_video_infos
 from hdr_forge.core import config
+from hdr_forge.core.service import shutdown_system
 from hdr_forge.hdr_metadata_injector import HdrMetadataInjector
 from hdr_forge.typedefs.encoder_typing import EncoderSettings
 from hdr_forge.encoder import Encoder
@@ -261,6 +262,10 @@ def main() -> None:
     else:
         print_err(f"Unknown command: {args.command}")
         code = 1
+
+    shutdown: bool = getattr(args, 'shutdown', False) or False
+    if shutdown:
+        shutdown_system()
 
     if config.debug_mode and code != 0:
         print_debug("skipping sys.exit()")

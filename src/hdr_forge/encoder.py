@@ -6,6 +6,7 @@ import sys
 import time
 from typing import Dict, Optional, Tuple
 
+from hdr_forge import hdr_metadata_injector
 from hdr_forge.cli.cli_output import create_progress_handler, print_debug, print_err
 from hdr_forge.core.service import build_ffmpeg_cmd_dict_to_str
 from hdr_forge.tools import mkvmerge
@@ -126,7 +127,7 @@ class Encoder:
             return self._get_codec_from_override(encoder_settings, video, scale_tuple)
 
         # Priority 2: Automatic selection based on video_codec and GPU acceleration
-        if encoder_settings.video_codec == VideoCodec.X265:
+        if encoder_settings.video_codec == VideoCodec.H265:
             if encoder_settings.enable_gpu_acceleration:
                 test: list[VideoEncoderLibrary] = self.get_available_hw_encoders()
                 if VideoEncoderLibrary.HEVC_NVENC in test:
@@ -136,7 +137,7 @@ class Encoder:
                     sys.exit(1)
             else:
                 return Libx265Codec(encoder_settings=encoder_settings, video=video, scale=scale_tuple)
-        elif encoder_settings.video_codec == VideoCodec.X264:
+        elif encoder_settings.video_codec == VideoCodec.H264:
             if encoder_settings.enable_gpu_acceleration:
                 test: list[VideoEncoderLibrary] = self.get_available_hw_encoders()
                 if VideoEncoderLibrary.H264_NVENC in test:
@@ -422,7 +423,7 @@ class Encoder:
 
             # Debug output
             debug_ffmpeg: str = build_ffmpeg_cmd_dict_to_str(output_options)
-            print_debug(f"Run command: ffmpeg -y -i {input_file} {debug_ffmpeg} {target_file}")
+            print_debug(f'Run command: ffmpeg -y -i "{input_file}" {debug_ffmpeg} "{target_file}"')
 
             # Execute FFmpeg with progress tracking
             success: bool = run_ffmpeg(

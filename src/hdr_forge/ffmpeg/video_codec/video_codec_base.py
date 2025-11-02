@@ -15,14 +15,6 @@ T = TypeVar("T")
 
 class VideoCodecBase(ABC):
 
-    PIXEL_RESOLUTIONS: dict[str, int] = {
-        'UHD': 3840*2160,
-        'QHD': 2560*1440,
-        'FHD': 1920*1080,
-        'HD': 1280*720,
-        'SD': 854*480
-    }
-
     def __init__(
         self,
         lib: VideoEncoderLibrary,
@@ -30,6 +22,7 @@ class VideoCodecBase(ABC):
         video: Video,
         scale: Tuple[int, int],
         supported_hdr_sdr_formats: list[HdrSdrFormat] = [],
+        gpu_encoding: bool = False,
     ):
         self.lib: VideoEncoderLibrary = lib
         self._video = video
@@ -63,49 +56,42 @@ class VideoCodecBase(ABC):
             scale_mode=encoder_settings.scale_mode,
             new_height=encoder_settings.scale_height,
         )
+        self._gpu_encoding: bool = gpu_encoding
 
+    def is_gpu_encoding(self) -> bool:
+        """Check if the codec uses GPU encoding.
+
+        Returns:
+            True if GPU encoding is used, False otherwise
+        """
+        return self._gpu_encoding
 
     @abstractmethod
     def get_ffmpeg_params(self) -> dict:
         """Get FFmpeg parameters for this codec."""
         output_options: dict = {
-            "c:v": self.lib.value
+            "c:v": self.lib.value,
         }
+
+        vf: str | None = self._get_default_video_filter()
+        if vf:
+            output_options["vf"] = vf
+
+        if self._encoder_settings.dar_ratio is not None:
+            dar_w, dar_h = self._encoder_settings.dar_ratio
+            output_options["aspect"] = f"{dar_w}:{dar_h}"
+
         encoding_hdr_sdr_format: HdrSdrFormat = self.get_encoding_hdr_sdr_format()
+        if encoding_hdr_sdr_format == HdrSdrFormat.SDR and self._video.is_hdr_video():
+            # Set correct metadata for SDR output
+            output_options.update({
+                "metadata:s:v": [
+                    "colour_primaries=bt709",
+                    "colour_transfer=bt709",
+                    "colour_space=bt709"
+                ],
+            })
 
-        # Add video filters (crop and scale), Only for SDR/HDR10 encoding
-        if encoding_hdr_sdr_format != HdrSdrFormat.DOLBY_VISION:
-            crop_filter: str | None = self._get_crop_filter()
-            if crop_filter:
-                output_options['vf'] = crop_filter
-
-            scale_filter: str | None = self._get_scale_filter()
-            if scale_filter:
-                if 'vf' in output_options:
-                    output_options['vf'] += f',{scale_filter}'
-                else:
-                    output_options['vf'] = scale_filter
-
-        if encoding_hdr_sdr_format == HdrSdrFormat.SDR:
-            if self._video.is_hdr_video():
-                # Tone mapping for HDR to SDR conversion
-                output_options['vf'] = (
-                    (output_options.get('vf', '') + ',') if 'vf' in output_options else ''
-                ) + 'zscale=t=linear:npl=100,format=gbrpf32le,tonemap=tonemap=hable:desat=0,zscale=t=bt709:m=bt709:p=bt709:r=tv,format=yuv420p'
-
-                # Set correct metadata for SDR output
-                output_options.update({
-                    "metadata:s:v": [
-                        "colour_primaries=bt709",
-                        "colour_transfer=bt709",
-                        "colour_space=bt709"
-                    ],
-                })
-
-                # Neu: 'zscale=t=linear:npl=100,format=gbrpf32le,tonemap=tonemap=hable:desat=0,zscale=t=bt709:m=bt709:p=bt709:r=tv,format=yuv420p'
-                # alt: 'zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,tonemap=tonemap=hable:desat=0,zscale=t=bt709:m=bt709:r=tv,format=yuv420p'
-
-                # alternativ, aber nicht so ganu und macht kein tonmapping: -vf colorspace=all=bt709
         return output_options
 
     @abstractmethod
@@ -122,8 +108,63 @@ class VideoCodecBase(ABC):
         """
         pass
 
+    @abstractmethod
+    def get_pix_format_for_encoding(self) -> str:
+        return self._video.get_pix_fmt()
+
+    @abstractmethod
+    def get_bit_depth_for_encoding(self) -> int:
+        encoding_hdr_sdr_format: HdrSdrFormat = self.get_encoding_hdr_sdr_format()
+
+        if encoding_hdr_sdr_format in [HdrSdrFormat.HDR, HdrSdrFormat.HDR10, HdrSdrFormat.DOLBY_VISION]:
+            return 10
+        elif encoding_hdr_sdr_format == HdrSdrFormat.SDR:
+            if self._video.is_hdr_video():
+                return 8
+
+        # keep original bit depth for SDR source videos
+        return self._video.get_bit_depth()
+
     def get_name(self) -> str:
         return self.lib.value
+
+    def _get_default_video_filter(self) -> str | None:
+        """Get default video filter string for ffmpeg (crop and scale).
+
+        Returns:
+            Video filter string
+        """
+        filters: list[str] = []
+        vf: str | None = self._encoder_settings.vfilter
+        if vf is not None:
+            _filter: list[str] = vf.split(',')
+            filters.extend(_filter)
+
+        encoding_hdr_sdr_format: HdrSdrFormat = self.get_encoding_hdr_sdr_format()
+
+        # Add video filters (crop and scale), Only for SDR/HDR10 encoding
+        if encoding_hdr_sdr_format != HdrSdrFormat.DOLBY_VISION:
+            crop_filter: str | None = self._get_crop_filter()
+            if crop_filter:
+                filters.append(crop_filter)
+
+            scale_filter: str | None = self._get_scale_filter()
+            if scale_filter:
+                filters.append(scale_filter)
+
+        if encoding_hdr_sdr_format == HdrSdrFormat.SDR:
+            if self._video.is_hdr_video():
+                # Tone mapping for HDR to SDR conversion
+                filters.extend([
+                    'zscale=t=linear:npl=100',
+                    'format=gbrpf32le',
+                    'tonemap=tonemap=hable:desat=0',
+                    'zscale=t=bt709:m=bt709:p=bt709:r=tv',
+                    'format=yuv420p'
+                ])
+        if len(filters) == 0:
+            return None
+        return ','.join(filters)
 
     def get_encoding_hdr_sdr_format(self) -> HdrSdrFormat:
         """Get the effective color format used for encoding.
@@ -139,7 +180,15 @@ class VideoCodecBase(ABC):
         Returns:
             True if encoding is HDR, False otherwise
         """
-        return self._hdr_sdr_format_for_encoding in [HdrSdrFormat.HDR10, HdrSdrFormat.DOLBY_VISION]
+        return self._hdr_sdr_format_for_encoding in [HdrSdrFormat.HDR, HdrSdrFormat.HDR10, HdrSdrFormat.DOLBY_VISION]
+
+    def is_hdr10_encoding(self) -> bool:
+        """Check if encoding is HDR (HDR10 or Dolby Vision).
+
+        Returns:
+            True if encoding is HDR, False otherwise
+        """
+        return self._hdr_sdr_format_for_encoding in [HdrSdrFormat.HDR10]
 
     def get_crop(self) -> CropResult:
         """Get ffmpeg crop filter string if cropping is needed.
@@ -221,8 +270,9 @@ class VideoCodecBase(ABC):
             return source_format
 
         # Check if conversion is valid (only downgrades allowed)
-        format_hierarchy = {
+        format_hierarchy: dict[HdrSdrFormat, int] = {
             HdrSdrFormat.SDR: 0,
+            HdrSdrFormat.HDR: 1,
             HdrSdrFormat.HDR10: 1,
             HdrSdrFormat.DOLBY_VISION: 2
         }
