@@ -1,3 +1,8 @@
+import platform
+import subprocess
+
+from hdr_forge.cli.cli_output import print_warn
+
 def build_cmd_array_to_str(cmd: list[str]) -> str:
     """Convert a command array to a single string for logging or display.
     Args:
@@ -31,3 +36,19 @@ def build_ffmpeg_cmd_dict_to_str(cmd: dict[str, list[str] | str]) -> str:
             value_str = f'"{value}"' if ' ' in value else value
         parts.append(f'-{key} {value_str}')
     return ' '.join(parts)
+
+def shutdown_system() -> None:
+    """Shutdown the system after a delay."""
+    system: str = platform.system()
+
+    try:
+        if system == "Linux":
+            print_warn("Shutting down the system in 1 minute...")
+            subprocess.run(["shutdown", "-h", "+1"])
+        elif system == "Windows":
+            print_warn("Shutting down the system in 1 minute...")
+            subprocess.run(["shutdown", "/s", "/t", "60"])
+        else:
+            print("Unbekanntes Betriebssystem")
+    except Exception as e:
+        print(f"Fehler: {e}")

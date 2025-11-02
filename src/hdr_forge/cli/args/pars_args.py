@@ -390,6 +390,14 @@ hevc_nvenc/h264_nvenc:
     )
 
     convert_parser.add_argument(
+        '-s', '--shutdown',
+        action='store_true',
+        help=f"""{sdr_dot} {hdr_dot} {dolby_vision_dot}
+Shutdown the system after conversion is complete.\n
+"""
+    )
+
+    convert_parser.add_argument(
         '-d', '--debug',
         action='store_true',
         help=f"""{expert_dot}

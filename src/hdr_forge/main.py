@@ -8,6 +8,7 @@ from hdr_forge.cli.cli_output import print_conversion_summary, print_debug, prin
 from hdr_forge.cli.encoder import print_encoding_params
 from hdr_forge.cli.video import print_video_infos
 from hdr_forge.core import config
+from hdr_forge.core.service import shutdown_system
 from hdr_forge.hdr_metadata_injector import HdrMetadataInjector
 from hdr_forge.typedefs.encoder_typing import EncoderSettings
 from hdr_forge.encoder import Encoder
@@ -245,22 +246,26 @@ def main() -> None:
         print_debug("Debug mode enabled")
 
     code: int = 0
-    # Execute the corresponding subcommand
-    if args.command == 'info':
-        code = process_info_command(args)
-    elif args.command == 'convert':
-        code = process_convert_command(args)
-    elif args.command == 'inject-hdr-metadata':
-        code = process_inject_hdr_metadata_command(args)
-    elif args.command == 'calc_maxcll':
-        input_path = Path(args.input)
-        if not input_path.exists():
-            print_err(f"Input path does not exist: {input_path}")
-            sys.exit(1)
-        calc_maxcll(video_path=str(input_path))
-    else:
-        print_err(f"Unknown command: {args.command}")
-        code = 1
+    # # Execute the corresponding subcommand
+    # if args.command == 'info':
+    #     code = process_info_command(args)
+    # elif args.command == 'convert':
+    #     code = process_convert_command(args)
+    # elif args.command == 'inject-hdr-metadata':
+    #     code = process_inject_hdr_metadata_command(args)
+    # elif args.command == 'calc_maxcll':
+    #     input_path = Path(args.input)
+    #     if not input_path.exists():
+    #         print_err(f"Input path does not exist: {input_path}")
+    #         sys.exit(1)
+    #     calc_maxcll(video_path=str(input_path))
+    # else:
+    #     print_err(f"Unknown command: {args.command}")
+    #     code = 1
+
+    shutdown: bool = getattr(args, 'shutdown', False) or False
+    if shutdown:
+        shutdown_system()
 
     if config.debug_mode and code != 0:
         print_debug("skipping sys.exit()")
