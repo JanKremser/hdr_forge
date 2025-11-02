@@ -246,22 +246,22 @@ def main() -> None:
         print_debug("Debug mode enabled")
 
     code: int = 0
-    # # Execute the corresponding subcommand
-    # if args.command == 'info':
-    #     code = process_info_command(args)
-    # elif args.command == 'convert':
-    #     code = process_convert_command(args)
-    # elif args.command == 'inject-hdr-metadata':
-    #     code = process_inject_hdr_metadata_command(args)
-    # elif args.command == 'calc_maxcll':
-    #     input_path = Path(args.input)
-    #     if not input_path.exists():
-    #         print_err(f"Input path does not exist: {input_path}")
-    #         sys.exit(1)
-    #     calc_maxcll(video_path=str(input_path))
-    # else:
-    #     print_err(f"Unknown command: {args.command}")
-    #     code = 1
+    # Execute the corresponding subcommand
+    if args.command == 'info':
+        code = process_info_command(args)
+    elif args.command == 'convert':
+        code = process_convert_command(args)
+    elif args.command == 'inject-hdr-metadata':
+        code = process_inject_hdr_metadata_command(args)
+    elif args.command == 'calc_maxcll':
+        input_path = Path(args.input)
+        if not input_path.exists():
+            print_err(f"Input path does not exist: {input_path}")
+            sys.exit(1)
+        calc_maxcll(video_path=str(input_path))
+    else:
+        print_err(f"Unknown command: {args.command}")
+        code = 1
 
     shutdown: bool = getattr(args, 'shutdown', False) or False
     if shutdown:

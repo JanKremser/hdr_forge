@@ -60,6 +60,8 @@ def _get_hdr_sdr_format_from_string(format_str: str | None) -> HdrSdrFormat:
     format_str = format_str.lower()
     if format_str == 'sdr':
         return HdrSdrFormat.SDR
+    elif format_str == 'hdr':
+        return HdrSdrFormat.HDR
     elif format_str == 'hdr10':
         return HdrSdrFormat.HDR10
     elif format_str == 'dolby_vision':

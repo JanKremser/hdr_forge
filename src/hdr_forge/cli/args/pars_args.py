@@ -284,12 +284,13 @@ Example:
 
     convert_parser.add_argument(
         '--hdr-sdr-format',
-        choices=['auto', 'hdr10', 'sdr'],
+        choices=['auto', 'hdr10', 'hdr', 'sdr'],
         default='auto',
         help=f"""{sdr_dot} {hdr_dot} {dolby_vision_dot}
 User-specified target color format for the output video.
 [auto]   : Automatically determine target color format based on input video
 [hdr10]  : Convert to HDR10 format
+[hdr]    : Convert to HDR format, without HDR10 metadata
 [sdr]    : Convert to SDR format\n
 """
     )
@@ -330,9 +331,10 @@ Example:
 
     convert_parser.add_argument(
         '--master-display',
-        help=f"""{hdr_dot} {dolby_vision_dot} {expert_dot}
+        help=f"""{hdr_dot} {expert_dot}
 Expert Option:
     Set custom Master Display metadata for HDR10 videos.
+    Not supported for GPU encoding.
 
 Example:
     --master-display "G(13250,34500)B(7500,30000)R(34000,16000)WP(15635,16450)L(1000,0.05)"
@@ -343,9 +345,10 @@ Input Video Master Display metadata will be used if not specified.
 
     convert_parser.add_argument(
         '--max-cll',
-        help=f"""{hdr_dot} {dolby_vision_dot} {expert_dot}
+        help=f"""{hdr_dot} {expert_dot}
 Expert Option:
     Set custom MaxCLL and MaxFALL values for HDR10 videos.
+    Not supported for GPU encoding.
 
 Example:
     --max-cll "1000,400"
@@ -412,7 +415,10 @@ def _add_inject_hdr_metadata_subcommand(parser: argparse._SubParsersAction) -> N
         parser: Argument parser to add arguments to
     """
     inject_parser: argparse.ArgumentParser = parser.add_parser('inject-hdr-metadata',
-        description='Inject HDR metadata into an existing HEVC video stream, without re-encoding',
+        description="""Inject HDR metadata into an existing HEVC video stream, without re-encoding.
+NVENC GPU-encoded videos cannot be retroactively assigned HDR metadata using this function.
+Only CPU-encoded videos can be retroactively assigned HDR metadata.
+""",
         help='Inject HDR metadata'
     )
 

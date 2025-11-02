@@ -55,12 +55,19 @@ class HdrMetadataInjector:
             hdr_metadata=self._hdr_metadata,
             output_json=temp_hdr_metadata,
         )
+
+        return_hevc_file: bool = self._target_file.suffix.lower() == ".hevc"
         temp_hevc_output = self._get_temp_directory() / "temp_hdr_injected.hevc"
+
         hevc_hdr_editor.inject_hdr_metadata(
             input_path=self._input_file,
             config_json=temp_hdr_metadata,
-            output_hevc=temp_hevc_output,
+            output_hevc=self._target_file if return_hevc_file else temp_hevc_output,
         )
+
+        if return_hevc_file:
+            self._cleanup_temp_directory()
+            return True
 
         mkvmerge.mux_hevc_to_mkv(
             input_hevc_path=temp_hevc_output,

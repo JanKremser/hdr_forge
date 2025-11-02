@@ -22,6 +22,7 @@ class VideoCodecBase(ABC):
         video: Video,
         scale: Tuple[int, int],
         supported_hdr_sdr_formats: list[HdrSdrFormat] = [],
+        gpu_encoding: bool = False,
     ):
         self.lib: VideoEncoderLibrary = lib
         self._video = video
@@ -55,7 +56,15 @@ class VideoCodecBase(ABC):
             scale_mode=encoder_settings.scale_mode,
             new_height=encoder_settings.scale_height,
         )
+        self._gpu_encoding: bool = gpu_encoding
 
+    def is_gpu_encoding(self) -> bool:
+        """Check if the codec uses GPU encoding.
+
+        Returns:
+            True if GPU encoding is used, False otherwise
+        """
+        return self._gpu_encoding
 
     @abstractmethod
     def get_ffmpeg_params(self) -> dict:
@@ -261,8 +270,9 @@ class VideoCodecBase(ABC):
             return source_format
 
         # Check if conversion is valid (only downgrades allowed)
-        format_hierarchy = {
+        format_hierarchy: dict[HdrSdrFormat, int] = {
             HdrSdrFormat.SDR: 0,
+            HdrSdrFormat.HDR: 1,
             HdrSdrFormat.HDR10: 1,
             HdrSdrFormat.DOLBY_VISION: 2
         }

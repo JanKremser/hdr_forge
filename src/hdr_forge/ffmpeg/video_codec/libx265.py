@@ -8,13 +8,14 @@ from hdr_forge.video import Video
 class Libx265Codec(VideoCodecBase):
 
     HDR_SDR_SUPPORT: list[HdrSdrFormat] = [
+        HdrSdrFormat.HDR,
         HdrSdrFormat.HDR10,
         HdrSdrFormat.SDR,
         HdrSdrFormat.DOLBY_VISION,
     ]
 
     # HDR x265 parameters for HDR10 encoding
-    HDR_X265_PARAMS: list[str] = [
+    HDR10_X265_PARAMS: list[str] = [
         'profile=main10',
         'hdr-opt=1',
         'hdr10=1',
@@ -39,6 +40,16 @@ class Libx265Codec(VideoCodecBase):
 # | **2160p60 (4K UHD)**  | 45 000–60 000            | 90 000–120 000
 # | **4320p (8K)**        | 100 000–160 000          | 200 000–300 000
         # //
+        'colorprim=bt2020',
+        'transfer=smpte2084',
+        'colormatrix=bt2020nc',
+    ]
+
+    HDR_X265_PARAMS: list[str] = [
+        'profile=main10',
+        'hdr-opt=0',
+        'hdr10=0',
+        'no-hdr10-opt=1',
         'colorprim=bt2020',
         'transfer=smpte2084',
         'colormatrix=bt2020nc',
@@ -149,7 +160,18 @@ class Libx265Codec(VideoCodecBase):
         Returns:
             list of x265 parameter strings
         """
-        params: list[str] = self.HDR_X265_PARAMS.copy()
+
+        params: list[str] = []
+
+        encoding_hdr_sdr_format: HdrSdrFormat = self.get_encoding_hdr_sdr_format()
+        if encoding_hdr_sdr_format == HdrSdrFormat.HDR:
+            params = self.HDR_X265_PARAMS.copy()
+            # remove HDR10 metadata if present
+            params.append('master-display=G(0,0)B(0,0)R(0,0)WP(0,0)L(0,0)')
+            params.append('max-cll=0,0')
+            return params
+
+        params: list[str] = self.HDR10_X265_PARAMS.copy()
 
         master_display: MasterDisplayMetadata | None = self._get_master_display_for_encoding()
         if master_display:

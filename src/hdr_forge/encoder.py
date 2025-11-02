@@ -6,6 +6,7 @@ import sys
 import time
 from typing import Dict, Optional, Tuple
 
+from hdr_forge import hdr_metadata_injector
 from hdr_forge.cli.cli_output import create_progress_handler, print_debug, print_err
 from hdr_forge.core.service import build_ffmpeg_cmd_dict_to_str
 from hdr_forge.tools import mkvmerge

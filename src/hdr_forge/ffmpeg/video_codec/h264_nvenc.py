@@ -23,6 +23,7 @@ class H264NvencCodec(VideoCodecBase):
             video=video,
             scale=scale,
             supported_hdr_sdr_formats=self.HDR_SDR_SUPPORT,
+            gpu_encoding=True,
         )
         hw_preset: Hdr_Forge_HEVC_H264_NVENC_Preset = self.calc_hw_preset_settings(Hdr_Forge_HEVC_H264_NVENC_Preset)
         self._cq: int = self._get_auto_cq(hw_preset)

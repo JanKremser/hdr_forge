@@ -10,6 +10,7 @@ class HevcNvencCodec(VideoCodecBase):
 
     HDR_SDR_SUPPORT: list[HdrSdrFormat] = [
         HdrSdrFormat.HDR10,
+        HdrSdrFormat.HDR,
         HdrSdrFormat.SDR,
         HdrSdrFormat.DOLBY_VISION,
     ]
@@ -27,6 +28,7 @@ class HevcNvencCodec(VideoCodecBase):
             video=video,
             scale=scale,
             supported_hdr_sdr_formats=self.HDR_SDR_SUPPORT,
+            gpu_encoding=True,
         )
         hw_preset: Hdr_Forge_HEVC_H264_NVENC_Preset = self.calc_hw_preset_settings(Hdr_Forge_HEVC_H264_NVENC_Preset)
         self._cq: int = self._get_auto_cq(hw_preset)
@@ -46,22 +48,11 @@ class HevcNvencCodec(VideoCodecBase):
 
         if encoding_hdr_sdr_format in [HdrSdrFormat.HDR, HdrSdrFormat.HDR10, HdrSdrFormat.DOLBY_VISION]:
             output_options['profile:v'] = self.HDR_PROFILE
-
-            master_display: MasterDisplayMetadata | None = self._get_master_display_for_encoding()
-            if master_display:
-                metadata: list = output_options.get('metadata:s:v', []) or []
-                metadata.append(f'master-display={build_master_display_string(master_display)}')
-                max_cll_max_fll: ContentLightLevelMetadata | None = self._get_max_cll_for_encoding()
-                if max_cll_max_fll:
-                    metadata.append(f'max-cll={build_max_cll_string(max_cll_max_fll)}')
-                output_options['metadata:s:v'] = metadata
-
-            if encoding_hdr_sdr_format in [HdrSdrFormat.DOLBY_VISION]:
-                print_warn("HEVC_NVENC HDR Metadata for Dolby Vision encoding is not yet supported;")
+            print_warn("HEVC_NVENC HDR Metadata for HDR/HDR10/Dolby Vision encoding is not yet supported;")
         elif encoding_hdr_sdr_format == HdrSdrFormat.SDR:
             output_options['profile:v'] = self.SDR_PROFILE
             if self._video.is_hdr_video():
-                print_warn("HEVC_NVENC-SDR encoding does not support HDR metadata removal;")
+                print_warn(msg="HEVC_NVENC-SDR encoding does not support HDR metadata removal;")
 
         return output_options
 
@@ -101,16 +92,12 @@ class HevcNvencCodec(VideoCodecBase):
         )
 
     def _get_master_display_for_encoding(self) -> Optional[MasterDisplayMetadata]:
-        master_display: MasterDisplayMetadata | None = self._encoder_settings.hdr_metadata.mastering_display_metadata
-        if master_display is None:
-            master_display: MasterDisplayMetadata | None = self._video.get_master_display()
+        master_display: MasterDisplayMetadata | None = self._video.get_master_display()
 
         return master_display
 
     def _get_max_cll_for_encoding(self) -> Optional[ContentLightLevelMetadata]:
-        encoder_max_cll: ContentLightLevelMetadata | None = self._encoder_settings.hdr_metadata.content_light_level_metadata
-        if encoder_max_cll is None:
-            encoder_max_cll = self._video.get_content_light_level_metadata()
+        encoder_max_cll: ContentLightLevelMetadata | None = self._video.get_content_light_level_metadata()
 
         return encoder_max_cll
 
