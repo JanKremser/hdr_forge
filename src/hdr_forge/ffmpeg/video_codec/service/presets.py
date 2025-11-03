@@ -14,6 +14,11 @@ class Hdr_Forge_HEVC_H264_NVENC_Preset:
     cq: float
     preset: str
 
+@dataclass
+class Hdr_Forge_AV1_Preset:
+    crf: float
+    preset: int
+
 X265_X264_PRESET_SCALE: list[str] = ["ultrafast", "superfast", "veryfast", "faster", "fast", "medium", "slow", "slower", "veryslow"]
 
 HEVC_NVENC_PRESET_SCALE: list[str] = ["default", "slow", "hq"] #, "llhq", "llhp"
@@ -42,24 +47,28 @@ HW_PRESET: dict = {
             "to_pixel": RESOLUTION_PRESETS.HD.value,
             VideoEncoderLibrary.LIBX265: {"from_CRF": 22, "to_CRF": 20, "from_preset": "fast", "to_preset": "medium"},
             VideoEncoderLibrary.LIBX264: {"from_CRF": 20, "to_CRF": 18, "from_preset": "fast", "to_preset": "medium"},
+            VideoEncoderLibrary.LIBSVTAV1: {"from_CRF": 25, "to_CRF": 23, "from_preset": 5, "to_preset": 5},
         },
         {
             "from_pixel": RESOLUTION_PRESETS.HD.value + 1,
             "to_pixel": RESOLUTION_PRESETS.FHD.value,
             VideoEncoderLibrary.LIBX265: {"from_CRF": 20, "to_CRF": 19, "from_preset": "medium", "to_preset": "medium"},
             VideoEncoderLibrary.LIBX264: {"from_CRF": 18, "to_CRF": 17, "from_preset": "medium", "to_preset": "medium"},
+            VideoEncoderLibrary.LIBSVTAV1: {"from_CRF": 23, "to_CRF": 22, "from_preset": 4, "to_preset": 4},
         },
         {
             "from_pixel": RESOLUTION_PRESETS.FHD.value + 1,
             "to_pixel": RESOLUTION_PRESETS.WQHD.value,
             VideoEncoderLibrary.LIBX265: {"from_CRF": 19, "to_CRF": 19, "from_preset": "medium", "to_preset": "medium"},
             VideoEncoderLibrary.LIBX264: {"from_CRF": 17, "to_CRF": 17, "from_preset": "medium", "to_preset": "medium"},
+            VideoEncoderLibrary.LIBSVTAV1: {"from_CRF": 23, "to_CRF": 23, "from_preset": 6, "to_preset": 6},
         },
         {
             "from_pixel": RESOLUTION_PRESETS.WQHD.value + 1,
             "to_pixel": RESOLUTION_PRESETS.UHD.value,
             VideoEncoderLibrary.LIBX265: {"from_CRF": 18, "to_CRF": 15, "from_preset": "fast", "to_preset": "fast"},
             VideoEncoderLibrary.LIBX264: {"from_CRF": 16, "to_CRF": 14, "from_preset": "fast", "to_preset": "fast"},
+            VideoEncoderLibrary.LIBSVTAV1: {"from_CRF": 21, "to_CRF": 18, "from_preset": 6, "to_preset": 6},
         },
         # { OLD Preset
         #     "from_pixel": RESOLUTION_PRESETS.FHD.value + 1,
@@ -72,6 +81,7 @@ HW_PRESET: dict = {
             "to_pixel": RESOLUTION_PRESETS.FUHD.value,
             VideoEncoderLibrary.LIBX265: {"from_CRF": 15, "to_CRF": 13, "from_preset": "faster", "to_preset": "ultrafast"},
             VideoEncoderLibrary.LIBX264: {"from_CRF": 14, "to_CRF": 12, "from_preset": "faster", "to_preset": "ultrafast"},
+            VideoEncoderLibrary.LIBSVTAV1: {"from_CRF": 18, "to_CRF": 16, "from_preset": 6, "to_preset": 6},
         },
     ],
     HdrForgeEncodingHardwarePresets.CPU_QUALITY: [
@@ -181,8 +191,7 @@ def calc_hw_prest_params(
         if r["from_pixel"] <= pixels <= r["to_pixel"]:
             params: dict = {}
 
-            x265_or_x264 = r[lib].get("from_CRF", None) or None
-            if x265_or_x264:
+            if lib in [VideoEncoderLibrary.LIBX265, VideoEncoderLibrary.LIBX264]:
                 from_crf = r[lib]["from_CRF"]
                 to_crf = r[lib]["to_CRF"]
                 crf = round(interpolate(
@@ -199,8 +208,27 @@ def calc_hw_prest_params(
                 )
                 params["preset"] = preset
 
-            nvenc  = r[lib].get("from_CQ", None) or None
-            if nvenc:
+            if lib == VideoEncoderLibrary.LIBSVTAV1:
+                from_crf = r[lib]["from_CRF"]
+                to_crf = r[lib]["to_CRF"]
+                crf = round(interpolate(
+                    pixels,
+                    r["from_pixel"],
+                    r["to_pixel"],
+                    from_crf,
+                    to_crf
+                ), 2)
+                params["crf"] = crf
+                preset = round(interpolate(
+                    pixels,
+                    r["from_pixel"],
+                    r["to_pixel"],
+                    r[lib]["from_preset"],
+                    r[lib]["to_preset"]
+                ))
+                params["preset"] = preset
+
+            if lib in [VideoEncoderLibrary.HEVC_NVENC, VideoEncoderLibrary.H264_NVENC]:
                 from_cq = r[lib]["from_CQ"]
                 to_cq = r[lib]["to_CQ"]
                 cq = round(interpolate(

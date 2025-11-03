@@ -376,6 +376,8 @@ def _get_encoder_override_from_string(encoder_str: str | None) -> EncoderOverrid
         return EncoderOverride.LIBX265
     elif encoder_str == 'libx264':
         return EncoderOverride.LIBX264
+    elif encoder_str == 'libsvtav1':
+        return EncoderOverride.LIBSVTAV1
     elif encoder_str == 'hevc_nvenc':
         return EncoderOverride.HEVC_NVENC
     elif encoder_str == 'h264_nvenc':

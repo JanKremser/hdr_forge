@@ -60,6 +60,7 @@ class VideoEncoderLibrary(Enum):
     """Video encoder library for FFmpeg."""
     LIBX265 = "libx265"
     LIBX264 = "libx264"
+    LIBSVTAV1 = "libsvtav1"
     HEVC_NVENC = "hevc_nvenc"
     H264_NVENC = "h264_nvenc"
     COPY = "copy"
@@ -165,6 +166,7 @@ class EncoderOverride(Enum):
     AUTO = "auto"
     LIBX265 = "x265"
     LIBX264 = "x264"
+    LIBSVTAV1 = "libsvtav1"
     HEVC_NVENC = "hevc_nvenc"
     H264_NVENC = "h264_nvenc"
 

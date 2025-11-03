@@ -16,6 +16,7 @@ from hdr_forge.ffmpeg.video_codec.hevc_nvenc import HevcNvencCodec
 from hdr_forge.ffmpeg.video_codec.video_codec_base import VideoCodecBase
 from hdr_forge.ffmpeg.video_codec.libx264 import Libx264Codec
 from hdr_forge.ffmpeg.video_codec.libx265 import Libx265Codec
+from hdr_forge.ffmpeg.video_codec.libsvtav1 import LibSvtAV1Codec
 from hdr_forge.tools import dovi_tool
 from hdr_forge.typedefs.encoder_typing import EncoderOverride, HdrSdrFormat, EncoderSettings, SampleSettings, VideoCodec, VideoEncoderLibrary
 from hdr_forge.typedefs.dolby_vision_typing import DolbyVisionEnhancementLayer, DolbyVisionProfile, DolbyVisionProfileEncodingMode
@@ -189,6 +190,9 @@ class Encoder:
             else:
                 print_err("Error: H264 NVENC encoder not available on this system.")
                 sys.exit(1)
+
+        elif override == EncoderOverride.LIBSVTAV1:
+            return LibSvtAV1Codec(encoder_settings=encoder_settings, video=video, scale=scale_tuple)
 
         return None
 

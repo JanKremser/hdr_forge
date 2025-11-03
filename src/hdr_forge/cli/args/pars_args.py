@@ -359,7 +359,7 @@ Input Video MaxCLL and MaxFALL values will be used if not specified.
 
     convert_parser.add_argument(
         '--encoder',
-        choices=['auto', 'libx265', 'libx264', 'hevc_nvenc', 'h264_nvenc'],
+        choices=['auto', 'libx265', 'libx264', 'libsvtav1', 'hevc_nvenc', 'h264_nvenc'],
         default='auto',
         help=f"""{sdr_dot} {hdr_dot} {dolby_vision_dot} {expert_dot}
 Expert Option:
@@ -367,6 +367,7 @@ Expert Option:
 [auto]         : Automatic encoder selection (default)
 [libx265]      : Force libx265 encoder
 [libx264]      : Force libx264 encoder
+[libsvtav1]    : Force libsvtav1 encoder
 [hevc_nvenc]   : Force NVIDIA NVENC HEVC encoder
 [h264_nvenc]   : Force NVIDIA NVENC H.264 encoder\n
 """
