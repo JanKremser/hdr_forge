@@ -5,7 +5,7 @@ import subprocess
 from typing import Callable, Optional
 
 from hdr_forge.core import config
-from hdr_forge.typedefs.ffmpeg_typing import ProgressInfo
+from hdr_forge.typedefs.ffmpeg_typing import FfmpegProgressInfo, DoviProgressInfo
 
 
 # Constants
@@ -305,8 +305,42 @@ Final size    : {color_str(estimated_size_kb_str, ANSI_GREEN)} KB ~> {color_str(
     print(clear_lines(13) if first_update is False else "", end="")
     print(info_line, end="", flush=True)
 
+def print_progress_info_minimal(process_name: str, first_update: bool, current_frame: int, total_frames: int, duration_seconds: float, process_time_seconds: float, fps: float, time_seconds: float | None) -> None:
+    # Calculate percentage
+    percent: float = (current_frame / total_frames * 100) if total_frames > 0 else 0.0
 
-def create_progress_handler(duration: float, total_frames: int, process_start_time: float) -> Callable[[ProgressInfo], None]:
+    # Calculate ETA
+    eta: str = calculate_eta(fps=fps, current_frame=current_frame, total_frames=total_frames)
+
+    # Create progress bar
+    progress_bar: str = create_progress_bar_with_percent(percent=percent)
+
+    if time_seconds is None or (time_seconds == 0 and current_frame > 0):
+        time_seconds = calculate_time_seconds_backup(
+            current_frame=current_frame,
+            total_frames=total_frames,
+            duration_seconds=duration_seconds,
+        )
+
+    process_time_str: str = format_time(seconds=process_time_seconds)
+
+    bar_len = 70
+    bar_len: int = bar_len - (len(process_name) + 4)
+    # Format for multi-line output
+    info_line: str = f"""
+{color_str(f"-- {process_name} " + ("-" * bar_len), ANSI_GREEN)}
+Frame         : {color_str(current_frame, ANSI_GREEN)}/{total_frames}
+ETA           : {color_str(eta, ANSI_GREEN)}
+Process Time  : {color_str(process_time_str, ANSI_GREEN)}
+{progress_bar}
+{color_str("-" * 70, ANSI_GREEN)}\n"""
+
+    # For the first output, we only need to print both lines
+    print(clear_lines(13) if first_update is False else "", end="")
+    print(info_line, end="", flush=True)
+
+
+def create_ffmpeg_progress_handler(duration: float, total_frames: int, process_start_time: float) -> Callable[[FfmpegProgressInfo], None]:
     """Create a progress handler for ffmpeg encoding.
 
     Args:
@@ -317,7 +351,7 @@ def create_progress_handler(duration: float, total_frames: int, process_start_ti
     """
     first_update = True
 
-    def on_progress(progress: ProgressInfo) -> None:
+    def on_progress(progress: FfmpegProgressInfo) -> None:
         """Handle progress updates from ffmpeg."""
         nonlocal first_update
 
@@ -343,6 +377,51 @@ def create_progress_handler(duration: float, total_frames: int, process_start_ti
             time_seconds=time_seconds,
             bitrate_kbs=progress.bitrate,
             size_bytes=progress.size,
+        )
+        if first_update:
+            first_update = False
+
+    return on_progress
+
+
+def create_ffmpeg_minimal_progress_handler(total_frames: int, duration: float, process_start_time: float, process_name: str) -> Callable[[DoviProgressInfo], None]:
+    """Create a progress handler for dovi_tool operations.
+
+    Args:
+        total_frames: Total number of frames to process
+        duration: Total video duration in seconds
+        process_start_time: Start time of the process
+
+    Returns:
+        Progress handler function that accepts DoviProgressInfo
+    """
+    first_update = True
+
+    def on_progress(progress: DoviProgressInfo) -> None:
+        """Handle progress updates from dovi_tool FFmpeg pipeline."""
+        nonlocal first_update
+
+        current_frame: int = progress.frame
+        fps: float = progress.fps if progress.fps else 0.0
+
+        process_time_seconds: float = _calc_process_time_seconds(
+            process_start_time=process_start_time
+        )
+
+        # Calculate time_seconds based on frame progress
+        time_seconds: float | None = None
+        if total_frames > 0 and duration > 0 and current_frame >= 0:
+            time_seconds = (current_frame / total_frames) * duration
+
+        print_progress_info_minimal(
+            process_name=process_name,
+            first_update=first_update,
+            current_frame=current_frame,
+            total_frames=total_frames,
+            duration_seconds=duration,
+            process_time_seconds=process_time_seconds,
+            fps=fps,
+            time_seconds=time_seconds,
         )
         if first_update:
             first_update = False

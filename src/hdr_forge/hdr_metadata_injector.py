@@ -5,12 +5,14 @@ from pathlib import Path
 from hdr_forge.tools import mkvmerge
 from hdr_forge.tools import hevc_hdr_editor
 from hdr_forge.typedefs.video_typing import HdrMetadata
+from hdr_forge.video import Video
 
 
 class HdrMetadataInjector:
 
-    def __init__(self, input_file: Path, target_file: Path, metadata: HdrMetadata):
-        self._input_file: Path = input_file
+    def __init__(self, video: Video, target_file: Path, metadata: HdrMetadata):
+        self._input_file: Path = video.get_filepath()
+        self._video: Video = video
         self._target_file: Path = target_file
         self._hdr_metadata: HdrMetadata = metadata
 
@@ -63,6 +65,8 @@ class HdrMetadataInjector:
             input_path=self._input_file,
             config_json=temp_hdr_metadata,
             output_hevc=self._target_file if return_hevc_file else temp_hevc_output,
+            total_frames=self._video.get_total_frames(),
+            duration=self._video.get_duration_seconds(),
         )
 
         if return_hevc_file:

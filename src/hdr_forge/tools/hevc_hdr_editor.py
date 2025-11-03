@@ -1,11 +1,9 @@
-import subprocess
-import threading
 from pathlib import Path
 from typing import Optional
 
-from hdr_forge.cli.cli_output import monitor_process_progress, print_debug
+from hdr_forge.cli.cli_output import print_debug
 from hdr_forge.core.config import PROJECT_ROOT
-from hdr_forge.core.service import build_cmd_pipe_str
+from hdr_forge.tools.helper import run_ffmpeg_tool_pipeline
 from hdr_forge.typedefs.video_typing import ContentLightLevelMetadata, HdrMetadata, MasterDisplayMetadata
 
 def get_hevc_hdr_editor_path() -> str:
@@ -23,13 +21,24 @@ def get_hevc_hdr_editor_path() -> str:
     else:
         return "hevc_hdr_editor"
 
-def inject_hdr_metadata(input_path: Path, config_json: Path, output_hevc: Optional[Path] = None) -> Path:
+def inject_hdr_metadata(
+    input_path: Path,
+    config_json: Path,
+    output_hevc: Optional[Path] = None,
+    total_frames: Optional[int] = None,
+    duration: Optional[float] = None
+) -> Path:
     """Inject HDR metadata into an HEVC bitstream using hevc_hdr_editor.
+
     Args:
-        input_path (Path): Path to the input HEVC bitstream file.
-        output_hevc (Optional[Path]): Path to the output HEVC file. If None, appends '.hevc' to input_path.
+        input_path: Path to the input video file
+        config_json: Path to hevc_hdr_editor JSON config file
+        output_hevc: Path to the output HEVC file. If None, appends '.hevc' to input_path
+        total_frames: Total number of frames in the video (for progress tracking)
+        duration: Total duration of the video in seconds (for progress tracking)
+
     Returns:
-        Path to the HEVC file with injected HDR metadata.
+        Path to the HEVC file with injected HDR metadata
     """
     if output_hevc is None:
         output_hevc = input_path.with_suffix('.hevc')
@@ -37,16 +46,7 @@ def inject_hdr_metadata(input_path: Path, config_json: Path, output_hevc: Option
     hevc_hdr_editor_exec = get_hevc_hdr_editor_path()
 
     try:
-        # Extract HEVC bitstream from video file and pipe to hevc_hdr_editor
-        ffmpeg_cmd: list[str] = [
-            'ffmpeg',
-            '-i', str(input_path),
-            '-c:v', 'copy',
-            '-bsf:v', 'hevc_mp4toannexb',
-            '-f', 'hevc',
-            '-'
-        ]
-
+        # Build hevc_hdr_editor command
         hevc_hdr_editor_cmd: list[str] = [
             hevc_hdr_editor_exec,
             '--config', str(config_json),
@@ -54,49 +54,21 @@ def inject_hdr_metadata(input_path: Path, config_json: Path, output_hevc: Option
             '-o', str(output_hevc)
         ]
 
-        print_debug(build_cmd_pipe_str([ffmpeg_cmd, hevc_hdr_editor_cmd]))
-
-        # Create pipeline: ffmpeg | hevc_hdr_editor
-        ffmpeg_process = subprocess.Popen(
-            ffmpeg_cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL
+        # Execute pipeline using helper function
+        returncode, stderr = run_ffmpeg_tool_pipeline(
+            input_path=input_path,
+            tool_cmd=hevc_hdr_editor_cmd,
+            process_name="Injecting HDR metadata:",
+            total_frames=total_frames,
+            duration=duration
         )
 
-        hdr_hevc_hdr_process = subprocess.Popen(
-            hevc_hdr_editor_cmd,
-            stdin=ffmpeg_process.stdout,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
-        )
-
-        # Close ffmpeg stdout in parent to allow SIGPIPE to be sent
-        if ffmpeg_process.stdout:
-            ffmpeg_process.stdout.close()
-
-        # Start a thread to monitor and show progress
-        monitor_thread = threading.Thread(
-            target=monitor_process_progress,
-            args=(hdr_hevc_hdr_process, "Inject HDR metadata:"),
-            daemon=True
-        )
-        monitor_thread.start()
-
-        # Wait for hevc_hdr_editor to complete
-        _stdout, stderr = hdr_hevc_hdr_process.communicate()
-
-        # Wait for the monitor thread to finish
-        monitor_thread.join(timeout=1.0)
-
-        if hdr_hevc_hdr_process.returncode != 0:
+        if returncode != 0:
             error_msg = stderr.decode('utf-8', errors='ignore')
             raise RuntimeError(f"hevc_hdr_editor inject HDR metadata failed: {error_msg}")
 
-        # Wait for ffmpeg to complete
-        ffmpeg_process.wait()
-
         if not output_hevc.exists():
-            raise RuntimeError("HADR10 Base Layer file was not created")
+            raise RuntimeError("HDR metadata injection output file was not created")
 
         print_debug(f"- Inject HDR metadata successfully: {str(output_hevc)}")
         return output_hevc

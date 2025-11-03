@@ -7,7 +7,8 @@ from pathlib import Path
 from typing import Optional
 
 from hdr_forge.cli.cli_output import monitor_process_progress, print_debug
-from hdr_forge.core.service import build_cmd_array_to_str, build_cmd_pipe_str
+from hdr_forge.core.service import build_cmd_array_to_str
+from hdr_forge.tools.helper import run_ffmpeg_tool_pipeline
 from hdr_forge.typedefs.dolby_vision_typing import DolbyVisionProfile, DolbyVisionRpuInfo
 
 
@@ -30,13 +31,20 @@ def get_dovi_tool_path() -> str:
         return "dovi_tool"
 
 
-def extract_base_layer(input_path: Path, output_hevc: Optional[Path] = None) -> Path:
+def extract_base_layer(
+    input_path: Path,
+    output_hevc: Optional[Path] = None,
+    total_frames: Optional[int] = None,
+    duration: Optional[float] = None
+) -> Path:
     """Extract Dolby Vision base layer (HEVC without RPU).
 
     Args:
         input_path: Path to input video file
         output_hevc: Optional path for HEVC output file. If None, generates
                     filename based on input (input.mkv -> input.hevc)
+        total_frames: Total number of frames in the video (for progress tracking)
+        duration: Total duration of the video in seconds (for progress tracking)
 
     Returns:
         Path to the extracted base layer HEVC file
@@ -50,16 +58,7 @@ def extract_base_layer(input_path: Path, output_hevc: Optional[Path] = None) -> 
     dovi_tool_exec = get_dovi_tool_path()
 
     try:
-        # Extract HEVC bitstream from video file and pipe to dovi_tool
-        ffmpeg_cmd: list[str] = [
-            'ffmpeg',
-            '-i', str(input_path),
-            '-c:v', 'copy',
-            '-bsf:v', 'hevc_mp4toannexb',
-            '-f', 'hevc',
-            '-'
-        ]
-
+        # Build dovi_tool command
         dovi_cmd: list[str] = [
             dovi_tool_exec,
             'remove',
@@ -67,49 +66,21 @@ def extract_base_layer(input_path: Path, output_hevc: Optional[Path] = None) -> 
             '-o', str(output_hevc)
         ]
 
-        print_debug(build_cmd_pipe_str([ffmpeg_cmd, dovi_cmd]))
-
-        # Create pipeline: ffmpeg | dovi_tool
-        ffmpeg_process = subprocess.Popen(
-            ffmpeg_cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL
+        # Execute pipeline using helper function
+        returncode, stderr = run_ffmpeg_tool_pipeline(
+            input_path=input_path,
+            tool_cmd=dovi_cmd,
+            process_name="Extracting HDR10 Base Layer:",
+            total_frames=total_frames,
+            duration=duration
         )
 
-        dovi_process = subprocess.Popen(
-            dovi_cmd,
-            stdin=ffmpeg_process.stdout,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
-        )
-
-        # Close ffmpeg stdout in parent to allow SIGPIPE to be sent
-        if ffmpeg_process.stdout:
-            ffmpeg_process.stdout.close()
-
-        # Start a thread to monitor and show progress
-        monitor_thread = threading.Thread(
-            target=monitor_process_progress,
-            args=(dovi_process, "Extracting HDR10 Base Layer:"),
-            daemon=True
-        )
-        monitor_thread.start()
-
-        # Wait for dovi_tool to complete
-        _stdout, stderr = dovi_process.communicate()
-
-        # Wait for the monitor thread to finish
-        monitor_thread.join(timeout=1.0)
-
-        if dovi_process.returncode != 0:
+        if returncode != 0:
             error_msg = stderr.decode('utf-8', errors='ignore')
             raise RuntimeError(f"dovi_tool Base Layer extraction failed: {error_msg}")
 
-        # Wait for ffmpeg to complete
-        ffmpeg_process.wait()
-
         if not output_hevc.exists():
-            raise RuntimeError("HADR10 Base Layer file was not created")
+            raise RuntimeError("HDR10 Base Layer file was not created")
 
         print_debug(f"- HDR10 Base Layer extracted successfully: {str(output_hevc)}")
         return output_hevc
@@ -189,13 +160,24 @@ def inject_rpu(input_path: Path, input_rpu: Path, output_hevc: Optional[Path] = 
         raise RuntimeError(f"Failed to inject RPU: {e}")
 
 
-def extract_rpu(input_path: Path, output_rpu: Optional[Path] = None, dv_profile_source: Optional[DolbyVisionProfile] = None, dv_profile_encoding: Optional[DolbyVisionProfile] = None) -> Path:
+def extract_rpu(
+    input_path: Path,
+    output_rpu: Optional[Path] = None,
+    dv_profile_source: Optional[DolbyVisionProfile] = None,
+    dv_profile_encoding: Optional[DolbyVisionProfile] = None,
+    total_frames: Optional[int] = None,
+    duration: Optional[float] = None
+) -> Path:
     """Extract Dolby Vision RPU (Reference Processing Unit) metadata.
 
     Args:
-        video: Video object with metadata
+        input_path: Path to input video file
         output_rpu: Optional path for RPU output file. If None, generates
                    filename based on input (input.mkv -> input.rpu)
+        dv_profile_source: Source Dolby Vision profile
+        dv_profile_encoding: Target Dolby Vision profile for encoding
+        total_frames: Total number of frames in the video (for progress tracking)
+        duration: Total duration of the video in seconds (for progress tracking)
 
     Returns:
         Path to the extracted RPU file
@@ -215,19 +197,8 @@ def extract_rpu(input_path: Path, output_rpu: Optional[Path] = None, dv_profile_
     }
 
     try:
-        # Extract HEVC bitstream from video file and pipe to dovi_tool
-        ffmpeg_cmd: list[str] = [
-            'ffmpeg',
-            '-i', str(input_path),
-            '-c:v', 'copy',
-            '-bsf:v', 'hevc_mp4toannexb',
-            '-f', 'hevc',
-            '-'
-        ]
-
-        dovi_cmd: list[str] = [
-            dovi_tool_exec,
-        ]
+        # Build dovi_tool command with optional profile conversion
+        dovi_cmd: list[str] = [dovi_tool_exec]
 
         if dv_profile_source and dv_profile_encoding and dv_profile_source != dv_profile_encoding:
             if dv_profile_encoding == DolbyVisionProfile._8:
@@ -240,46 +211,18 @@ def extract_rpu(input_path: Path, output_rpu: Optional[Path] = None, dv_profile_
             '-o', str(output_rpu)
         ])
 
-        print_debug(build_cmd_pipe_str([ffmpeg_cmd, dovi_cmd]))
-
-        # Create pipeline: ffmpeg | dovi_tool
-        ffmpeg_process = subprocess.Popen(
-            ffmpeg_cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL
+        # Execute pipeline using helper function
+        returncode, stderr = run_ffmpeg_tool_pipeline(
+            input_path=input_path,
+            tool_cmd=dovi_cmd,
+            process_name="Extracting RPU metadata:",
+            total_frames=total_frames,
+            duration=duration
         )
 
-        dovi_process = subprocess.Popen(
-            dovi_cmd,
-            stdin=ffmpeg_process.stdout,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
-        )
-
-        # Close ffmpeg stdout in parent to allow SIGPIPE to be sent
-        if ffmpeg_process.stdout:
-            ffmpeg_process.stdout.close()
-
-        # Start a thread to monitor and show progress
-        monitor_thread = threading.Thread(
-            target=monitor_process_progress,
-            args=(dovi_process, "Extracting RPU metadata:"),
-            daemon=True
-        )
-        monitor_thread.start()
-
-        # Wait for dovi_tool to complete
-        _stdout, stderr = dovi_process.communicate()
-
-        # Wait for the monitor thread to finish
-        monitor_thread.join(timeout=1.0)
-
-        if dovi_process.returncode != 0:
+        if returncode != 0:
             error_msg = stderr.decode('utf-8', errors='ignore')
             raise RuntimeError(f"dovi_tool failed: {error_msg}")
-
-        # Wait for ffmpeg to complete
-        ffmpeg_process.wait()
 
         if not output_rpu.exists():
             raise RuntimeError("RPU file was not created")
@@ -366,13 +309,20 @@ def inject_dolby_vision_layers(bl_path: Path, el_path: Path, output_bl_el: Optio
         raise RuntimeError(f"Failed to multiplex Dolby Vision layers: {e}")
 
 
-def extract_enhancement_layer(input_file: Path, output_el: Optional[Path] = None) -> Path:
+def extract_enhancement_layer(
+    input_file: Path,
+    output_el: Optional[Path] = None,
+    total_frames: Optional[int] = None,
+    duration: Optional[float] = None
+) -> Path:
     """Extract Dolby Vision Enhancement Layer (EL).
 
     Args:
         input_file: Path to input video file
         output_el: Optional path for EL output file. If None, generates
                    filename based on input (input.mkv -> input_EL.hevc)
+        total_frames: Total number of frames in the video (for progress tracking)
+        duration: Total duration of the video in seconds (for progress tracking)
 
     Returns:
         Path to the extracted Enhancement Layer file
@@ -386,16 +336,7 @@ def extract_enhancement_layer(input_file: Path, output_el: Optional[Path] = None
     dovi_tool_exec = get_dovi_tool_path()
 
     try:
-        # Extract HEVC bitstream from video file and pipe to dovi_tool
-        ffmpeg_cmd: list[str] = [
-            'ffmpeg',
-            '-i', str(input_file),
-            '-c:v', 'copy',
-            '-bsf:v', 'hevc_mp4toannexb',
-            '-f', 'hevc',
-            '-'
-        ]
-
+        # Build dovi_tool command
         dovi_cmd: list[str] = [
             dovi_tool_exec,
             'demux',
@@ -404,46 +345,18 @@ def extract_enhancement_layer(input_file: Path, output_el: Optional[Path] = None
             '--el-out', str(output_el)
         ]
 
-        print_debug(build_cmd_pipe_str([ffmpeg_cmd, dovi_cmd]))
-
-        # Create pipeline: ffmpeg | dovi_tool
-        ffmpeg_process = subprocess.Popen(
-            ffmpeg_cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL
+        # Execute pipeline using helper function
+        returncode, stderr = run_ffmpeg_tool_pipeline(
+            input_path=input_file,
+            tool_cmd=dovi_cmd,
+            process_name="Extracting Enhancement Layer:",
+            total_frames=total_frames,
+            duration=duration
         )
 
-        dovi_process = subprocess.Popen(
-            dovi_cmd,
-            stdin=ffmpeg_process.stdout,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
-        )
-
-        # Close ffmpeg stdout in parent to allow SIGPIPE to be sent
-        if ffmpeg_process.stdout:
-            ffmpeg_process.stdout.close()
-
-        # Start a thread to monitor and show progress
-        monitor_thread = threading.Thread(
-            target=monitor_process_progress,
-            args=(dovi_process, "Extracting Enhancement Layer:"),
-            daemon=True
-        )
-        monitor_thread.start()
-
-        # Wait for dovi_tool to complete
-        _stdout, stderr = dovi_process.communicate()
-
-        # Wait for the monitor thread to finish
-        monitor_thread.join(timeout=1.0)
-
-        if dovi_process.returncode != 0:
+        if returncode != 0:
             error_msg = stderr.decode('utf-8', errors='ignore')
             raise RuntimeError(f"dovi_tool Enhancement Layer extraction failed: {error_msg}")
-
-        # Wait for ffmpeg to complete
-        ffmpeg_process.wait()
 
         if not output_el.exists():
             raise RuntimeError("Enhancement Layer file was not created")

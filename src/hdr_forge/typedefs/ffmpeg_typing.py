@@ -5,7 +5,7 @@ from typing import Optional
 
 
 @dataclass
-class ProgressInfo:
+class FfmpegProgressInfo:
     """Progress information from FFmpeg encoding.
 
     Attributes:
@@ -22,3 +22,17 @@ class ProgressInfo:
     time: Optional[float] = None
     bitrate: Optional[float] = None
     size: Optional[int] = None
+
+
+@dataclass
+class DoviProgressInfo:
+    """Progress information for dovi_tool operations using FFmpeg pipeline.
+
+    Attributes:
+        frame: Current frame number
+        fps: Frames per second
+        total_frames: Total number of frames to process
+    """
+    frame: int = 0
+    fps: float = 0.0
+    total_frames: int = 0

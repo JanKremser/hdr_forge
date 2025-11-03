@@ -225,10 +225,12 @@ def process_inject_hdr_metadata_command(args) -> int:
     if output_path is None:
         output_path = input_path.with_suffix('.mkv')
 
+    video = Video(filepath=input_path)
+
     hdr_metadata: pars_encoder_settings.HdrMetadata = pars_encoder_settings.get_hdr_metadata_from_args(args)
 
     injector = HdrMetadataInjector(
-        input_file=input_path,
+        video=video,
         target_file=output_path,
         metadata=hdr_metadata,
     )

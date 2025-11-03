@@ -6,8 +6,7 @@ import sys
 import time
 from typing import Dict, Optional, Tuple
 
-from hdr_forge import hdr_metadata_injector
-from hdr_forge.cli.cli_output import create_progress_handler, print_debug, print_err
+from hdr_forge.cli.cli_output import create_ffmpeg_progress_handler, print_debug, print_err
 from hdr_forge.core.service import build_ffmpeg_cmd_dict_to_str
 from hdr_forge.tools import mkvmerge
 from hdr_forge.ffmpeg.ffmpeg_wrapper import run_ffmpeg
@@ -415,7 +414,7 @@ class Encoder:
         process_start_time: float = time.time()
 
         if duration > 0:
-            progress_callback = create_progress_handler(
+            progress_callback = create_ffmpeg_progress_handler(
                 duration=duration,
                 total_frames=total_frames,
                 process_start_time=process_start_time,
@@ -468,6 +467,8 @@ class Encoder:
         self,
     ) -> bool:
         input_file: Path = self._video.get_filepath()
+        total_frames: int = self._video.get_total_frames()
+        duration: int = self._video.get_total_frames()
 
         # Create temporary directory for all intermediate files
         temp_dir: Path = self._get_temp_directory()
@@ -475,7 +476,9 @@ class Encoder:
         # Step 1: Extract base layer (HEVC without EL+RPU) from original video
         base_layer_hevc_path: Path = dovi_tool.extract_base_layer(
             input_path=input_file,
-            output_hevc=temp_dir / f"video_BL.hevc"
+            output_hevc=temp_dir / f"video_BL.hevc",
+            total_frames=total_frames,
+            duration=duration,
         )
 
         # Step 2: Mux base layer HEVC with original audio/subtitles into final MKV
@@ -498,6 +501,8 @@ class Encoder:
         target_dv_profile: DolbyVisionProfile | None,
     ) -> Path:
         temp_dir: Path = self._get_temp_directory()
+        total_frames: int = self._video.get_total_frames()
+        duration: int = self._video.get_total_frames()
 
         # Step 1: Extract RPU metadata from original Dolby Vision video
         rpu_file_path: Path = dovi_tool.extract_rpu(
@@ -505,6 +510,8 @@ class Encoder:
             output_rpu=temp_dir / f"RPU.rpu",
             dv_profile_source=source_dv_profile,
             dv_profile_encoding=target_dv_profile,
+            total_frames=total_frames,
+            duration=duration,
         )
 
         hevc: Path = hevc_bl
@@ -514,6 +521,8 @@ class Encoder:
             el_path: Path = dovi_tool.extract_enhancement_layer(
                 input_file=input_file,
                 output_el=temp_dir / f"video_EL.hevc",
+                total_frames=total_frames,
+                duration=duration,
             )
             bl_el_hevc: Path = dovi_tool.inject_dolby_vision_layers(
                 bl_path=hevc_bl,
@@ -536,6 +545,8 @@ class Encoder:
         self,
     ) -> bool:
         input_file: Path = self._video.get_filepath()
+        total_frames: int = self._video.get_total_frames()
+        duration: int = self._video.get_total_frames()
 
         # Create temporary directory for all intermediate files
         temp_dir: Path = self._get_temp_directory()
@@ -544,6 +555,8 @@ class Encoder:
         base_layer_hevc_path: Path = dovi_tool.extract_base_layer(
             input_path=input_file,
             output_hevc=temp_dir / f"video_BL.hevc",
+            total_frames=total_frames,
+            duration=duration,
         )
 
         # Step 2: Convert Dolby Vision profile by injecting RPU into base layer HEVC
@@ -594,6 +607,8 @@ class Encoder:
         only_hdr10_or_sdr_encoding: bool = not self.is_dolby_vision_encoding()
 
         input_file: Path = self._video.get_filepath()
+        total_frames: int = self._video.get_total_frames()
+        duration: int = self._video.get_total_frames()
 
         # Create temporary directory for all intermediate files
         temp_dir: Path = self._get_temp_directory()
@@ -602,6 +617,8 @@ class Encoder:
         base_layer_hevc_path: Path = dovi_tool.extract_base_layer(
             input_path=input_file,
             output_hevc=temp_dir / f"video_BL.hevc",
+            total_frames=total_frames,
+            duration=duration,
         )
 
         # Step 2: Mux base layer HEVC with original audio/subtitles into temporary MKV

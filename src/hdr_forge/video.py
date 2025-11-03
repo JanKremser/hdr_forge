@@ -52,6 +52,8 @@ class Video:
             rpu_file_path: Path = dovi_tool.extract_rpu(
                 input_path=self.get_filepath(),
                 dv_profile_source=self.get_dolby_vision_profile(),
+                total_frames=self.get_total_frames(),
+                duration=self.get_duration_seconds(),
             )
             self._dolby_vision_rpu_info = dovi_tool.get_rpu_info(
                 rpu_path=Path(rpu_file_path)

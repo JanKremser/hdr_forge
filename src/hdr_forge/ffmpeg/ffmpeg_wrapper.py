@@ -3,12 +3,11 @@
 import re
 import subprocess
 import threading
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Dict, Optional
 
 from hdr_forge.cli.cli_output import print_err
-from hdr_forge.typedefs.ffmpeg_typing import ProgressInfo
+from hdr_forge.typedefs.ffmpeg_typing import FfmpegProgressInfo
 
 
 def _parse_progress_line(line: str, progress_data: Dict[str, str]) -> None:
@@ -24,7 +23,7 @@ def _parse_progress_line(line: str, progress_data: Dict[str, str]) -> None:
         progress_data[key.strip()] = value.strip()
 
 
-def _create_progress_info(progress_data: Dict[str, str]) -> ProgressInfo:
+def _create_progress_info(progress_data: Dict[str, str]) -> FfmpegProgressInfo:
     """Create ProgressInfo from parsed progress data.
 
     Args:
@@ -84,7 +83,7 @@ def _create_progress_info(progress_data: Dict[str, str]) -> ProgressInfo:
         except ValueError:
             pass
 
-    return ProgressInfo(
+    return FfmpegProgressInfo(
         frame=frame,
         fps=fps,
         speed=speed,
@@ -94,7 +93,7 @@ def _create_progress_info(progress_data: Dict[str, str]) -> ProgressInfo:
     )
 
 
-def _progress_reader_thread(pipe, progress_callback: Callable[[ProgressInfo], None], stderr_buffer: list) -> None:
+def _progress_reader_thread(pipe, progress_callback: Callable[[FfmpegProgressInfo], None], stderr_buffer: list) -> None:
     """Thread function to read and parse FFmpeg progress output.
 
     Args:
@@ -120,7 +119,7 @@ def _progress_reader_thread(pipe, progress_callback: Callable[[ProgressInfo], No
             # When we get "progress=continue" or "progress=end", we have a complete update
             if line.startswith('progress='):
                 if progress_data:
-                    progress_info: ProgressInfo = _create_progress_info(progress_data=progress_data)
+                    progress_info: FfmpegProgressInfo = _create_progress_info(progress_data=progress_data)
                     if progress_callback:
                         progress_callback(progress_info)
 
@@ -139,7 +138,7 @@ def run_ffmpeg(
     input_file: Path,
     output_file: Path,
     output_options: Dict[str, str],
-    progress_callback: Optional[Callable[[ProgressInfo], None]] = None,
+    progress_callback: Optional[Callable[[FfmpegProgressInfo], None]] = None,
     timeout: Optional[float] = None
 ) -> bool:
     """Execute FFmpeg with progress tracking.
