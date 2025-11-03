@@ -12,7 +12,7 @@ from hdr_forge.tools.helper import run_ffmpeg_tool_pipeline
 from hdr_forge.typedefs.dolby_vision_typing import DolbyVisionProfile, DolbyVisionRpuInfo
 
 
-def get_dovi_tool_path() -> str:
+def _get_dovi_tool_path() -> str:
     """Get path to dovi_tool executable.
 
     Looks for dovi_tool in project directory first, then falls back to system path.
@@ -55,7 +55,7 @@ def extract_base_layer(
     if output_hevc is None:
         output_hevc = input_path.with_suffix('.hevc')
 
-    dovi_tool_exec = get_dovi_tool_path()
+    dovi_tool_exec = _get_dovi_tool_path()
 
     try:
         # Build dovi_tool command
@@ -82,7 +82,7 @@ def extract_base_layer(
         if not output_hevc.exists():
             raise RuntimeError("HDR10 Base Layer file was not created")
 
-        print_debug(f"- HDR10 Base Layer extracted successfully: {str(output_hevc)}")
+        print_debug(f"HDR10 Base Layer extracted successfully: {str(output_hevc)}")
         return output_hevc
 
     except FileNotFoundError as e:
@@ -112,7 +112,7 @@ def inject_rpu(input_path: Path, input_rpu: Path, output_hevc: Optional[Path] = 
     if output_hevc is None:
         output_hevc = input_path.with_name(f"{input_path.stem}_BL_RPU.hevc")
 
-    dovi_tool_exec: str = get_dovi_tool_path()
+    dovi_tool_exec: str = _get_dovi_tool_path()
 
     try:
         dovi_cmd: list[str] = [
@@ -148,7 +148,7 @@ def inject_rpu(input_path: Path, input_rpu: Path, output_hevc: Optional[Path] = 
         if not output_hevc.exists():
             raise RuntimeError("HEVC file with RPU was not created")
 
-        print_debug(f"- RPU injected successfully: {str(output_hevc)}")
+        print_debug(f"RPU injected successfully: {str(output_hevc)}")
         return output_hevc
 
     except FileNotFoundError as e:
@@ -185,10 +185,14 @@ def extract_rpu(
     Raises:
         RuntimeError: If RPU extraction fails
     """
+    fallback_path = input_path.with_suffix('.rpu')
+    if fallback_path.exists():
+        return fallback_path
+    
     if output_rpu is None:
-        output_rpu = input_path.with_suffix('.rpu')
+        output_rpu = fallback_path
 
-    dovi_tool_exec = get_dovi_tool_path()
+    dovi_tool_exec = _get_dovi_tool_path()
 
     map_dv_profile8_mode: dict[int, str] = {
         5: '3',
@@ -227,7 +231,7 @@ def extract_rpu(
         if not output_rpu.exists():
             raise RuntimeError("RPU file was not created")
 
-        print_debug(f"- RPU extracted successfully: {str(output_rpu)}")
+        print_debug(f"RPU extracted successfully: {str(output_rpu)}")
         return output_rpu
 
     except FileNotFoundError as e:
@@ -257,7 +261,7 @@ def inject_dolby_vision_layers(bl_path: Path, el_path: Path, output_bl_el: Optio
     if output_bl_el is None:
         output_bl_el = bl_path.with_name(f"{bl_path.stem}_BL_EL.hevc")
 
-    dovi_tool_exec = get_dovi_tool_path()
+    dovi_tool_exec = _get_dovi_tool_path()
 
     try:
         dovi_cmd: list[str] = [
@@ -297,7 +301,7 @@ def inject_dolby_vision_layers(bl_path: Path, el_path: Path, output_bl_el: Optio
         if not output_bl_el.exists():
             raise RuntimeError("Multiplexed file was not created")
 
-        print_debug(f"- Dolby Vision layers multiplexed successfully: {str(output_bl_el)}")
+        print_debug(f"Dolby Vision layers multiplexed successfully: {str(output_bl_el)}")
         return output_bl_el
 
     except FileNotFoundError as e:
@@ -333,7 +337,7 @@ def extract_enhancement_layer(
     if output_el is None:
         output_el = input_file.with_name(f"{input_file.stem}_EL.hevc")
 
-    dovi_tool_exec = get_dovi_tool_path()
+    dovi_tool_exec = _get_dovi_tool_path()
 
     try:
         # Build dovi_tool command
@@ -361,7 +365,7 @@ def extract_enhancement_layer(
         if not output_el.exists():
             raise RuntimeError("Enhancement Layer file was not created")
 
-        print_debug(f"- Enhancement Layer extracted successfully: {str(output_el)}")
+        print_debug(f"Enhancement Layer extracted successfully: {str(output_el)}")
         return output_el
 
     except FileNotFoundError as e:
@@ -497,7 +501,7 @@ def get_rpu_info(rpu_path: Path) -> DolbyVisionRpuInfo:
     if not rpu_path.exists():
         raise FileNotFoundError(f"RPU file not found: {str(rpu_path)}")
 
-    dovi_tool_exec = get_dovi_tool_path()
+    dovi_tool_exec = _get_dovi_tool_path()
 
     try:
         dovi_cmd: list[str] = [

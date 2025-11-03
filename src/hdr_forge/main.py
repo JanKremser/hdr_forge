@@ -80,33 +80,35 @@ def show_video_info(input_file: Path) -> bool:
     except Exception as e:
         print(f"Error processing {input_file.name}: {e}")
         return False
+    finally:
+        video.cleanup_temp_files()
 
 
 def convert_video(
-    video: Video,
+    video_file: Path,
     target_file: Path,
     settings: EncoderSettings,
 ) -> bool:
     """Convert SDR or HDR10 video using ffmpeg with libx265.
 
     Args:
-        video: Video object with metadata
+        video_file: input Video file
         target_file: Target output file path
         settings: Encoder settings containing all encoding parameters
 
     Returns:
         True if conversion succeeded, False otherwise
     """
-    input_file: Path = video.get_filepath()
-
-    # Create encoder with settings
-    encoder = Encoder(
-        video=video,
-        target_file=target_file,
-        settings=settings,
-    )
-
     try:
+        video = Video(filepath=video_file)
+        print_video_infos(video=video)
+
+        # Create encoder with settings
+        encoder = Encoder(
+            video=video,
+            target_file=target_file,
+            settings=settings,
+        )
         print_encoding_params(encoder=encoder)
 
         success: bool = encoder.convert()
@@ -121,8 +123,11 @@ def convert_video(
         print_warn("Encoding cancelled by user.")
         return False
     except Exception as e:
-        print(f"Error processing {input_file.name}: {e}")
+        print(f"Error processing {video.get_filepath().name}: {e}")
         return False
+    finally:
+        video.cleanup_temp_files()
+        encoder.cleanup_temp_directory()
 
 
 def process_convert_command(args) -> int:
@@ -166,11 +171,8 @@ def process_convert_command(args) -> int:
         out_file: Path = determine_output_file(video_file=video_file, output_path=output_path, is_batch=is_batch)
         out_file.parent.mkdir(parents=True, exist_ok=True)
 
-        video = Video(filepath=video_file)
-        print_video_infos(video=video)
-
         success: bool = convert_video(
-            video=video,
+            video_file=video_file,
             target_file=out_file,
             settings=settings,
         )
@@ -225,17 +227,27 @@ def process_inject_hdr_metadata_command(args) -> int:
     if output_path is None:
         output_path = input_path.with_suffix('.mkv')
 
-    video = Video(filepath=input_path)
 
-    hdr_metadata: pars_encoder_settings.HdrMetadata = pars_encoder_settings.get_hdr_metadata_from_args(args)
+    success: bool = False
+    try:
+        video = Video(filepath=input_path)
+        print_video_infos(video=video)
 
-    injector = HdrMetadataInjector(
-        video=video,
-        target_file=output_path,
-        metadata=hdr_metadata,
-    )
+        hdr_metadata: pars_encoder_settings.HdrMetadata = pars_encoder_settings.get_hdr_metadata_from_args(args)
 
-    success: bool = injector.inject_metadata()
+        injector = HdrMetadataInjector(
+            video=video,
+            target_file=output_path,
+            metadata=hdr_metadata,
+        )
+
+        success = injector.inject_metadata()
+    except Exception as e:
+        print_err(f"Error processing {input_path.name}: {e}")
+        return 1
+    finally:
+        video.cleanup_temp_files()
+        injector.cleanup_temp_directory()
 
     return 0 if success else 1
 

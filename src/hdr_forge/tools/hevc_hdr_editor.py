@@ -6,7 +6,7 @@ from hdr_forge.core.config import PROJECT_ROOT
 from hdr_forge.tools.helper import run_ffmpeg_tool_pipeline
 from hdr_forge.typedefs.video_typing import ContentLightLevelMetadata, HdrMetadata, MasterDisplayMetadata
 
-def get_hevc_hdr_editor_path() -> str:
+def _get_hevc_hdr_editor_path() -> str:
     """Get path to hevc_hdr_editor executable.
 
     Looks for hevc_hdr_editor in project directory first, then falls back to system path.
@@ -43,7 +43,7 @@ def inject_hdr_metadata(
     if output_hevc is None:
         output_hevc = input_path.with_suffix('.hevc')
 
-    hevc_hdr_editor_exec = get_hevc_hdr_editor_path()
+    hevc_hdr_editor_exec = _get_hevc_hdr_editor_path()
 
     try:
         # Build hevc_hdr_editor command
@@ -70,7 +70,7 @@ def inject_hdr_metadata(
         if not output_hevc.exists():
             raise RuntimeError("HDR metadata injection output file was not created")
 
-        print_debug(f"- Inject HDR metadata successfully: {str(output_hevc)}")
+        print_debug(f"Inject HDR metadata successfully: {str(output_hevc)}")
         return output_hevc
 
     except FileNotFoundError as e:
@@ -150,5 +150,5 @@ def create_config_json_for_hevc_hdr_editor(hdr_metadata: HdrMetadata, output_jso
         with open(output_json, 'w') as json_file:
             json.dump(config_data, json_file, indent=4)
 
-        print_debug(f"- Created hevc_hdr_editor config JSON: {str(output_json)}")
+        print_debug(f"Created hevc_hdr_editor config JSON: {str(output_json)}")
         return output_json

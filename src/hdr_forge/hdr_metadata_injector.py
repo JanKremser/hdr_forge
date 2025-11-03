@@ -29,7 +29,7 @@ class HdrMetadataInjector:
         temp_dir.mkdir(parents=True, exist_ok=True)
         return temp_dir
 
-    def _cleanup_temp_directory(self) -> None:
+    def cleanup_temp_directory(self) -> None:
         """Remove temporary directory and all its contents.
 
         Deletes the temp directory created by _get_temp_directory().
@@ -70,7 +70,7 @@ class HdrMetadataInjector:
         )
 
         if return_hevc_file:
-            self._cleanup_temp_directory()
+            self.cleanup_temp_directory()
             return True
 
         mkvmerge.mux_hevc_to_mkv(
@@ -79,6 +79,6 @@ class HdrMetadataInjector:
             output_mkv=self._target_file,
         )
 
-        self._cleanup_temp_directory()
+        self.cleanup_temp_directory()
 
         return True

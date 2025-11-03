@@ -456,14 +456,24 @@ class ProgressBarSpinner:
     def start(self) -> None:
         """Start the spinner."""
         self.running = True
-        print(f"{self.description}", flush=True)
+        start_line_len = 70
+        start_line_len: int = start_line_len - (len(self.description) + 4)
+        print(color_str(f"-- {self.description} " + ("-" * start_line_len), ANSI_GREEN), flush=True)
 
     def update(self) -> None:
         """Update the spinner state."""
         if not self.running:
             return
         bar: str = create_progress_bar(percent=(self.index % 20) * 5, text=f"Processing {self.spinner[self.index % 4]}")  # Indeterminate progress
-        status: str = f"{ANSI_CLEAR_LINE}{ANSI_MOVE_TO_START}{bar}"
+        end_line = color_str("-" * 70, ANSI_GREEN)
+
+        clear_lines: str = ""
+        if self.index == 0:
+            clear_lines = f"{ANSI_CLEAR_LINE}{ANSI_MOVE_TO_START}"
+        else:
+            clear_lines = ANSI_CLEAR_TWO_LINES
+
+        status: str = f"{clear_lines}{bar}\n{end_line}"
         print(status, end='', flush=True)
         self.index += 1
 
@@ -471,7 +481,8 @@ class ProgressBarSpinner:
         """Stop the spinner."""
         self.running = False
         bar: str = create_progress_bar(percent=100, text=text or "Processing Done")
-        status: str = f"{ANSI_CLEAR_LINE}{ANSI_MOVE_TO_START}{bar}\n"
+        end_line = color_str("-" * 70, ANSI_GREEN)
+        status: str = f"{ANSI_CLEAR_TWO_LINES}{bar}\n{end_line}\n"
         print(status, end='', flush=True)
 
 def monitor_process_progress(process: subprocess.Popen, description: str) -> None:

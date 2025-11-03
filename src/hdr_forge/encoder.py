@@ -355,7 +355,7 @@ class Encoder:
         temp_dir.mkdir(parents=True, exist_ok=True)
         return temp_dir
 
-    def _cleanup_temp_directory(self) -> None:
+    def cleanup_temp_directory(self) -> None:
         """Remove temporary directory and all its contents.
 
         Deletes the temp directory created by _get_temp_directory().
@@ -489,7 +489,7 @@ class Encoder:
             output_mkv=self._target_file,
         )
 
-        self._cleanup_temp_directory()
+        self.cleanup_temp_directory()
 
         return True
 
@@ -575,7 +575,7 @@ class Encoder:
         )
 
         # Step 4: Clean up temporary directory (should be empty now, but removes it anyway)
-        self._cleanup_temp_directory()
+        self.cleanup_temp_directory()
 
         return True
 
@@ -651,7 +651,7 @@ class Encoder:
 
         # For HDR10 or SDR encoding, we are done here
         if only_hdr10_or_sdr_encoding:
-            self._cleanup_temp_directory()
+            self.cleanup_temp_directory()
             return True
 
         print()
@@ -659,7 +659,9 @@ class Encoder:
         # Step 4: Extract encoded HEVC video stream from MKV
         encoded_hevc_bl_path: Path = mkvmerge.extract_hevc(
             input_path=encoded_base_layer_mkv,
-            output_hevc=temp_dir / f"video_encoded_BL.hevc"
+            output_hevc=temp_dir / f"video_encoded_BL.hevc",
+            total_frames=total_frames,
+            duration=duration,
         )
 
         # Step 5: Convert Dolby Vision profile by injecting RPU into encoded base layer HEVC
@@ -681,7 +683,7 @@ class Encoder:
         )
 
         # Step 7: Clean up temporary directory (should be empty now, but removes it anyway)
-        self._cleanup_temp_directory()
+        self.cleanup_temp_directory()
 
         return True
 
