@@ -6,9 +6,9 @@ import time
 from pathlib import Path
 from typing import Callable, Optional
 
-from hdr_forge.cli.cli_output import monitor_process_progress, print_debug, create_ffmpeg_minimal_progress_handler
+from hdr_forge.cli.cli_output import ProgressBarSpinner, monitor_process_progress, print_debug, create_ffmpeg_minimal_progress_handler
 from hdr_forge.core.service import build_cmd_pipe_str
-from hdr_forge.typedefs.ffmpeg_typing import DoviProgressInfo
+from hdr_forge.typedefs.ffmpeg_typing import FfmpegMiniProgressInfo
 
 
 def _parse_ffmpeg_progress_line(line: str, progress_data: dict) -> None:
@@ -42,7 +42,7 @@ def _parse_ffmpeg_progress_line(line: str, progress_data: dict) -> None:
         progress_data['progress'] = value
 
 
-def _create_ffmpeg_progress_info(progress_data: dict, total_frames: int) -> DoviProgressInfo:
+def _create_ffmpeg_progress_info(progress_data: dict, total_frames: int) -> FfmpegMiniProgressInfo:
     """Create a DoviProgressInfo object from parsed FFmpeg progress data.
 
     Args:
@@ -52,7 +52,7 @@ def _create_ffmpeg_progress_info(progress_data: dict, total_frames: int) -> Dovi
     Returns:
         DoviProgressInfo object with progress information
     """
-    return DoviProgressInfo(
+    return FfmpegMiniProgressInfo(
         frame=progress_data.get('frame', 0),
         fps=progress_data.get('fps', 0.0),
         total_frames=total_frames
@@ -61,7 +61,8 @@ def _create_ffmpeg_progress_info(progress_data: dict, total_frames: int) -> Dovi
 
 def _ffmpeg_progress_reader_thread(
     pipe,
-    progress_callback: Optional[Callable[[DoviProgressInfo], None]],
+    tool_process: subprocess.Popen,
+    progress_callback: Optional[Callable[[FfmpegMiniProgressInfo], None]],
     total_frames: int,
     stderr_buffer: list
 ) -> None:
@@ -106,6 +107,21 @@ def _ffmpeg_progress_reader_thread(
             pipe.close()
         except Exception:
             pass
+
+    if not tool_process:
+        return
+
+    spinner = ProgressBarSpinner(
+        description=None,
+        without_headline=True
+    )
+    spinner.start()
+
+    while tool_process.poll() is None:
+        spinner.update(2)
+        time.sleep(0.1)
+
+    spinner.stop("100.0%")
 
 
 def run_ffmpeg_tool_pipeline(
@@ -189,7 +205,7 @@ def run_ffmpeg_tool_pipeline(
         stderr_buffer: list = []
         reader_thread = threading.Thread(
             target=_ffmpeg_progress_reader_thread,
-            args=(ffmpeg_process.stderr, progress_callback, total_frames, stderr_buffer),
+            args=(ffmpeg_process.stderr, tool_process, progress_callback, total_frames, stderr_buffer),
             daemon=True
         )
         reader_thread.start()

@@ -25,7 +25,7 @@ class FfmpegProgressInfo:
 
 
 @dataclass
-class DoviProgressInfo:
+class FfmpegMiniProgressInfo:
     """Progress information for dovi_tool operations using FFmpeg pipeline.
 
     Attributes:

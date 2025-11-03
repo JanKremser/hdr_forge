@@ -186,9 +186,9 @@ def extract_rpu(
         RuntimeError: If RPU extraction fails
     """
     fallback_path = input_path.with_suffix('.rpu')
-    if fallback_path.exists():
-        return fallback_path
-    
+    # if fallback_path.exists():
+    #     return fallback_path
+
     if output_rpu is None:
         output_rpu = fallback_path
 

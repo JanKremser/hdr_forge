@@ -5,7 +5,7 @@ import subprocess
 from typing import Callable, Optional
 
 from hdr_forge.core import config
-from hdr_forge.typedefs.ffmpeg_typing import FfmpegProgressInfo, DoviProgressInfo
+from hdr_forge.typedefs.ffmpeg_typing import FfmpegProgressInfo, FfmpegMiniProgressInfo
 
 
 # Constants
@@ -57,7 +57,7 @@ def clear_lines(n: int) -> str:
     Returns:
         ANSI escape code string to clear n lines
     """
-    return ''.join(f"{ANSI_CLEAR_LINE}{ANSI_CURSOR_UP_ONE}" for _ in range(n)) + ANSI_CLEAR_LINE + ANSI_MOVE_TO_START
+    return ''.join(f"{ANSI_CLEAR_LINE}{ANSI_CURSOR_UP_ONE}" for _ in range(n-1)) + ANSI_CLEAR_LINE + ANSI_MOVE_TO_START
 
 
 def color_str(value: str | int | float | None, color: str) -> str:
@@ -302,7 +302,7 @@ Final size    : {color_str(estimated_size_kb_str, ANSI_GREEN)} KB ~> {color_str(
 {color_str("-" * 70, ANSI_GREEN)}"""
 
     # For the first output, we only need to print both lines
-    print(clear_lines(13) if first_update is False else "", end="")
+    print(clear_lines(14) if first_update is False else "", end="")
     print(info_line, end="", flush=True)
 
 def print_progress_info_minimal(process_name: str, first_update: bool, current_frame: int, total_frames: int, duration_seconds: float, process_time_seconds: float, fps: float, time_seconds: float | None) -> None:
@@ -333,10 +333,10 @@ Frame         : {color_str(current_frame, ANSI_GREEN)}/{total_frames}
 ETA           : {color_str(eta, ANSI_GREEN)}
 Process Time  : {color_str(process_time_str, ANSI_GREEN)}
 {progress_bar}
-{color_str("-" * 70, ANSI_GREEN)}\n"""
+{color_str("-" * 70, ANSI_GREEN)}"""
 
     # For the first output, we only need to print both lines
-    print(clear_lines(13) if first_update is False else "", end="")
+    print(clear_lines(7) if first_update is False else "", end="")
     print(info_line, end="", flush=True)
 
 
@@ -384,7 +384,7 @@ def create_ffmpeg_progress_handler(duration: float, total_frames: int, process_s
     return on_progress
 
 
-def create_ffmpeg_minimal_progress_handler(total_frames: int, duration: float, process_start_time: float, process_name: str) -> Callable[[DoviProgressInfo], None]:
+def create_ffmpeg_minimal_progress_handler(total_frames: int, duration: float, process_start_time: float, process_name: str) -> Callable[[FfmpegMiniProgressInfo], None]:
     """Create a progress handler for dovi_tool operations.
 
     Args:
@@ -397,7 +397,7 @@ def create_ffmpeg_minimal_progress_handler(total_frames: int, duration: float, p
     """
     first_update = True
 
-    def on_progress(progress: DoviProgressInfo) -> None:
+    def on_progress(progress: FfmpegMiniProgressInfo) -> None:
         """Handle progress updates from dovi_tool FFmpeg pipeline."""
         nonlocal first_update
 
@@ -447,33 +447,40 @@ def print_conversion_summary(success_count: int, fail_count: int) -> None:
 class ProgressBarSpinner:
     """Simple spinner progress indicator for indeterminate tasks."""
 
-    def __init__(self, description: str):
-        self.description = description
+    def __init__(self, description: str | None = None, without_headline: bool = False) -> None:
+        self.description: str = description or "Processing"
         self.spinner = ['|', '/', '-', '\\']
         self.index = 0
         self.running = False
+        self.without_headline: bool = without_headline
 
     def start(self) -> None:
         """Start the spinner."""
         self.running = True
+
+        if self.without_headline:
+            return
         start_line_len = 70
         start_line_len: int = start_line_len - (len(self.description) + 4)
         print(color_str(f"-- {self.description} " + ("-" * start_line_len), ANSI_GREEN), flush=True)
 
-    def update(self) -> None:
+    def update(self, count_clear_lines: int | None = None) -> None:
         """Update the spinner state."""
         if not self.running:
             return
         bar: str = create_progress_bar(percent=(self.index % 20) * 5, text=f"Processing {self.spinner[self.index % 4]}")  # Indeterminate progress
         end_line = color_str("-" * 70, ANSI_GREEN)
 
-        clear_lines: str = ""
-        if self.index == 0:
-            clear_lines = f"{ANSI_CLEAR_LINE}{ANSI_MOVE_TO_START}"
+        clear_lines_str: str = ""
+        if count_clear_lines:
+            clear_lines_str = clear_lines(count_clear_lines)
         else:
-            clear_lines = ANSI_CLEAR_TWO_LINES
+            if self.index == 0:
+                clear_lines_str = clear_lines(1)
+            else:
+                clear_lines_str = clear_lines(2)
 
-        status: str = f"{clear_lines}{bar}\n{end_line}"
+        status: str = f"{clear_lines_str}{bar}\n{end_line}"
         print(status, end='', flush=True)
         self.index += 1
 
