@@ -105,8 +105,8 @@ class LogoDetector:
 
             # Additional filter: Check if region has sufficient brightness
             # (helps filter out false positives from adaptive threshold)
-            roi = gray[y:y+h, x:x+w]
-            mean_brightness = np.mean(roi)
+            roi: np.ndarray = gray[y:y+h, x:x+w]
+            mean_brightness = np.mean(roi.astype(np.float32))
 
             # Require at least moderate brightness (handles semi-transparent)
             if mean_brightness < 100:
