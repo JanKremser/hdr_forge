@@ -4,7 +4,6 @@ from typing import List, Optional, Tuple, Callable
 import numpy as np
 os.environ["OPENCV_FFMPEG_LOGLEVEL"] = "quiet"
 import cv2
-from ultralytics.models import YOLO
 
 from hdr_forge.cli.cli_output import print_warn, print_err, ProgressBarSpinner
 from hdr_forge.video import Video
@@ -18,96 +17,140 @@ class LogoResult:
     height: int = 0
     confidence: float = 0.0
     is_valid: bool = False
+    region: str = ""
+    detection_count: int = 0
 
 
 class LogoDetector:
     def __init__(
         self,
         video: Video,
-        scan_frames: int = 200,
-        model_path: str = "yolov8n.pt",
-        max_logo_area_ratio: float = 0.1
+        scan_frames: int = 100,
+        brightness_threshold: int = 200,
+        min_area: int = 500,
+        max_area: int = 20000,
+        corner_ratio: float = 0.3
     ):
         """
-        Initialize logo detector.
+        Initialize color-based logo detector for bright logos in corners.
 
         Args:
             video: Video object to analyze
             scan_frames: Number of frames to scan for logo detection
-            model_path: Path to YOLO model file
-            max_logo_area_ratio: Maximum area ratio for logo detection (default 0.1 = 10%)
+            brightness_threshold: Grayscale threshold for bright regions (default 200)
+            min_area: Minimum logo area in pixels (default 500)
+            max_area: Maximum logo area in pixels (default 20000)
+            corner_ratio: Ratio defining corner regions (0.3 = 30% from edges)
         """
         self._video: Video = video
         self._scan_frames: int = scan_frames
-        self._model_path: str = model_path
-        self._max_logo_area_ratio: float = max_logo_area_ratio
+        self._brightness_threshold: int = brightness_threshold
+        self._min_area: int = min_area
+        self._max_area: int = max_area
+        self._corner_ratio: float = corner_ratio
 
         self._result: LogoResult = LogoResult()
-        self._model: Optional[YOLO] = None
 
-    def _load_model(self) -> None:
-        """Load YOLO model if not already loaded."""
-        if self._model is None:
-            try:
-                self._model = YOLO(self._model_path)
-            except Exception as e:
-                print_err(f"Failed to load YOLO model: {e}")
-                raise
-
-    def _detect_logo_in_frame(
+    def _find_logo_in_frame(
         self,
-        frame: np.ndarray,
-        frame_area: int
-    ) -> List[Tuple[int, int, int, int, float]]:
+        frame: np.ndarray
+    ) -> List[Tuple[int, int, int, int, str]]:
         """
-        Detect potential logos in a single frame.
+        Find bright, contour-based regions in corners of a frame.
 
         Args:
             frame: Frame to analyze
-            frame_area: Total frame area for ratio calculation
 
         Returns:
-            List of detected boxes: [(x1, y1, x2, y2, confidence), ...]
+            List of detected logo candidates: [(x, y, w, h, region), ...]
         """
-        if self._model is None:
-            return []
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
-        detected_boxes: List[Tuple[int, int, int, int, float]] = []
+        # Strong brightness threshold - logos are almost always white/bright
+        _, thresh = cv2.threshold(gray, self._brightness_threshold, 255, cv2.THRESH_BINARY)
 
-        try:
-            results = self._model(frame, verbose=False)
+        # Remove small noise
+        kernel = np.ones((3, 3), np.uint8)
+        clean = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel, iterations=1)
 
-            for r in results:
-                for box in r.boxes:
-                    conf = float(box.conf[0])
-                    x1, y1, x2, y2 = box.xyxy[0]
-                    x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
+        # Extract contours
+        contours, _ = cv2.findContours(clean, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-                    # Filter logos based on area (small objects at frame edges)
-                    area = (x2 - x1) * (y2 - y1)
+        candidates: List[Tuple[int, int, int, int, str]] = []
 
-                    if area < frame_area * self._max_logo_area_ratio:
-                        detected_boxes.append((x1, y1, x2, y2, conf))
-        except Exception:
-            pass
+        frame_height, frame_width = frame.shape[:2]
 
-        return detected_boxes
+        for cnt in contours:
+            area = cv2.contourArea(cnt)
+            if area < self._min_area or area > self._max_area:
+                continue
+
+            x, y, w, h = cv2.boundingRect(cnt)
+
+            # Determine which corner region this is in
+            region = self._determine_corner_region(x, y, w, h, frame_width, frame_height)
+
+            if region:
+                candidates.append((x, y, w, h, region))
+
+        return candidates
+
+    def _determine_corner_region(
+        self,
+        x: int,
+        y: int,
+        w: int,
+        h: int,
+        frame_width: int,
+        frame_height: int
+    ) -> Optional[str]:
+        """
+        Determine if a bounding box is in a corner region.
+
+        Args:
+            x, y, w, h: Bounding box coordinates
+            frame_width, frame_height: Frame dimensions
+
+        Returns:
+            Region name or None if not in a corner
+        """
+        # Calculate center of bounding box
+        center_x = x + w / 2
+        center_y = y + h / 2
+
+        # Define corner boundaries
+        left_bound = frame_width * self._corner_ratio
+        right_bound = frame_width * (1 - self._corner_ratio)
+        top_bound = frame_height * self._corner_ratio
+        bottom_bound = frame_height * (1 - self._corner_ratio)
+
+        # Check which corner
+        if center_x < left_bound and center_y < top_bound:
+            return "top-left"
+        elif center_x > right_bound and center_y < top_bound:
+            return "top-right"
+        elif center_x < left_bound and center_y > bottom_bound:
+            return "bottom-left"
+        elif center_x > right_bound and center_y > bottom_bound:
+            return "bottom-right"
+
+        return None
 
     def _cluster_detections(
         self,
-        detected_boxes: List[Tuple[int, int, int, int, float]],
+        detected_boxes: List[Tuple[int, int, int, int, str]],
         frame_width: int,
         frame_height: int,
         tolerance_ratio: float = 0.05
-    ) -> List[List[Tuple[int, int, int, int, float]]]:
+    ) -> List[List[Tuple[int, int, int, int, str]]]:
         """
         Cluster detections based on spatial proximity.
 
         Args:
-            detected_boxes: List of detected boxes [(x1, y1, x2, y2, confidence), ...]
+            detected_boxes: List of detected boxes [(x, y, w, h, region), ...]
             frame_width: Frame width for calculating tolerance
             frame_height: Frame height for calculating tolerance
-            tolerance_ratio: Maximum distance ratio for clustering (default 1.5%)
+            tolerance_ratio: Maximum distance ratio for clustering (default 5%)
 
         Returns:
             List of clusters, each cluster is a list of boxes
@@ -119,12 +162,12 @@ class LogoDetector:
         max_dimension = max(frame_width, frame_height)
         distance_threshold = max_dimension * tolerance_ratio
 
-        clusters: List[List[Tuple[int, int, int, int, float]]] = []
+        clusters: List[List[Tuple[int, int, int, int, str]]] = []
 
         for box in detected_boxes:
-            x1, y1, x2, y2, conf = box
-            center_x = (x1 + x2) / 2
-            center_y = (y1 + y2) / 2
+            x, y, w, h, region = box
+            center_x = x + w / 2
+            center_y = y + h / 2
 
             # Find nearest cluster
             best_cluster_idx = -1
@@ -132,8 +175,8 @@ class LogoDetector:
 
             for idx, cluster in enumerate(clusters):
                 # Calculate cluster centroid
-                cluster_centers_x = [(b[0] + b[2]) / 2 for b in cluster]
-                cluster_centers_y = [(b[1] + b[3]) / 2 for b in cluster]
+                cluster_centers_x = [b[0] + b[2] / 2 for b in cluster]
+                cluster_centers_y = [b[1] + b[3] / 2 for b in cluster]
                 centroid_x = sum(cluster_centers_x) / len(cluster_centers_x)
                 centroid_y = sum(cluster_centers_y) / len(cluster_centers_y)
 
@@ -152,18 +195,81 @@ class LogoDetector:
 
         return clusters
 
+    def _merge_nearby_clusters(
+        self,
+        clusters: List[List[Tuple[int, int, int, int, str]]],
+        frame_width: int,
+        frame_height: int,
+        merge_distance_ratio: float = 0.15
+    ) -> List[List[Tuple[int, int, int, int, str]]]:
+        """
+        Merge clusters that are spatially close to each other (likely parts of same logo).
+
+        Args:
+            clusters: List of clusters
+            frame_width: Frame width for calculating distance
+            frame_height: Frame height for calculating distance
+            merge_distance_ratio: Maximum distance ratio for merging (default 15%)
+
+        Returns:
+            List of merged clusters
+        """
+        if len(clusters) <= 1:
+            return clusters
+
+        max_dimension = max(frame_width, frame_height)
+        merge_threshold = max_dimension * merge_distance_ratio
+
+        def get_cluster_centroid(cluster):
+            """Calculate centroid of a cluster."""
+            centers_x = [b[0] + b[2] / 2 for b in cluster]
+            centers_y = [b[1] + b[3] / 2 for b in cluster]
+            return (sum(centers_x) / len(centers_x), sum(centers_y) / len(centers_y))
+
+        # Build distance matrix between clusters
+        merged = [False] * len(clusters)
+        result_clusters = []
+
+        for i, cluster_i in enumerate(clusters):
+            if merged[i]:
+                continue
+
+            # Start new merged cluster
+            merged_cluster = list(cluster_i)
+            merged[i] = True
+            centroid_i = get_cluster_centroid(cluster_i)
+
+            # Find nearby clusters to merge
+            for j, cluster_j in enumerate(clusters):
+                if i >= j or merged[j]:
+                    continue
+
+                centroid_j = get_cluster_centroid(cluster_j)
+                distance = np.sqrt(
+                    (centroid_i[0] - centroid_j[0])**2 +
+                    (centroid_i[1] - centroid_j[1])**2
+                )
+
+                if distance <= merge_threshold:
+                    merged_cluster.extend(cluster_j)
+                    merged[j] = True
+
+            result_clusters.append(merged_cluster)
+
+        return result_clusters
+
     def detect_auto(
         self,
-        callback: Optional[Callable[[int, int], None]] = None
+        callback: Optional[Callable[[int, int], None]] = None,
+        show_debug: bool = False
     ) -> None:
         """
         Automatically detect logo position by analyzing multiple frames.
 
         Args:
             callback: Optional callback function(completed_frames, total_frames)
+            show_debug: Show debug window with detected regions (default False)
         """
-        self._load_model()
-
         cap = cv2.VideoCapture(str(self._video._filepath))
         if not cap.isOpened():
             print_err("Video could not be opened for logo detection.")
@@ -177,9 +283,9 @@ class LogoDetector:
         interval = max(duration_seconds / (self._scan_frames + 1), 1.0)
         positions_seconds = [int(interval * (i + 1)) for i in range(self._scan_frames)]
 
-        detected_boxes: List[Tuple[int, int, int, int, float]] = []
+        detected_boxes: List[Tuple[int, int, int, int, str]] = []
 
-        spinner = ProgressBarSpinner("Detecting logo...")
+        spinner = ProgressBarSpinner("Detecting logo (color-based)...")
         spinner.start()
 
         for idx, pos_seconds in enumerate(positions_seconds):
@@ -193,9 +299,18 @@ class LogoDetector:
             if not ret:
                 continue
 
-            frame_area = frame.shape[0] * frame.shape[1]
-            boxes = self._detect_logo_in_frame(frame, frame_area)
-            detected_boxes.extend(boxes)
+            candidates = self._find_logo_in_frame(frame)
+            detected_boxes.extend(candidates)
+
+            if show_debug and candidates:
+                debug_frame = frame.copy()
+                for x, y, w, h, region in candidates:
+                    cv2.rectangle(debug_frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
+                    cv2.putText(debug_frame, region, (x, y - 5),
+                               cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+                cv2.imshow("Logo Detection", debug_frame)
+                if cv2.waitKey(1) & 0xFF == ord('q'):
+                    break
 
             if callback:
                 callback(idx + 1, len(positions_seconds))
@@ -203,10 +318,12 @@ class LogoDetector:
             spinner.update()
 
         cap.release()
+        if show_debug:
+            cv2.destroyAllWindows()
 
         if not detected_boxes:
             spinner.stop("No logo detected.")
-            print_warn("No logo found. Model might need extension or adjustment.")
+            print_warn("No bright logo found in corner regions.")
             return
 
         # Cluster detections by spatial proximity
@@ -221,34 +338,80 @@ class LogoDetector:
             print_warn("Clustering failed. No valid clusters found.")
             return
 
-        # Find largest cluster (most frequent position)
+        # First: Find largest cluster (most frequent position)
         largest_cluster = max(clusters, key=len)
-        cluster_count = len(clusters)
-        largest_cluster_size = len(largest_cluster)
+        original_cluster_count = len(clusters)
 
-        # Calculate average only from largest cluster
-        boxes_np = np.array(largest_cluster)
-        avg_x1 = int(np.mean(boxes_np[:, 0]))
-        avg_y1 = int(np.mean(boxes_np[:, 1]))
-        avg_x2 = int(np.mean(boxes_np[:, 2]))
-        avg_y2 = int(np.mean(boxes_np[:, 3]))
-        avg_confidence = float(np.mean(boxes_np[:, 4]))
+        # Calculate centroid of largest cluster
+        largest_centers_x = [b[0] + b[2] / 2 for b in largest_cluster]
+        largest_centers_y = [b[1] + b[3] / 2 for b in largest_cluster]
+        main_centroid_x = sum(largest_centers_x) / len(largest_centers_x)
+        main_centroid_y = sum(largest_centers_y) / len(largest_centers_y)
 
-        width = avg_x2 - avg_x1
-        height = avg_y2 - avg_y1
+        # Then: Merge nearby clusters that are close to the main cluster
+        max_dimension = max(self._video.width, self._video.height)
+        merge_threshold = max_dimension * 0.15  # 15% distance
+
+        merged_cluster = list(largest_cluster)
+        merged_count = 0
+
+        for cluster in clusters:
+            if cluster is largest_cluster:
+                continue
+
+            # Calculate centroid of this cluster
+            centers_x = [b[0] + b[2] / 2 for b in cluster]
+            centers_y = [b[1] + b[3] / 2 for b in cluster]
+            centroid_x = sum(centers_x) / len(centers_x)
+            centroid_y = sum(centers_y) / len(centers_y)
+
+            # Check distance to main cluster
+            distance = np.sqrt(
+                (main_centroid_x - centroid_x)**2 +
+                (main_centroid_y - centroid_y)**2
+            )
+
+            if distance <= merge_threshold:
+                merged_cluster.extend(cluster)
+                merged_count += 1
+
+        largest_cluster_size = len(merged_cluster)
+        cluster_count = original_cluster_count
+
+        # Calculate position and size from merged cluster
+        boxes_np = np.array([(b[0], b[1], b[2], b[3]) for b in merged_cluster])
+
+        # Use median for position (more robust against outliers)
+        avg_x = int(np.median(boxes_np[:, 0]))
+        avg_y = int(np.median(boxes_np[:, 1]))
+
+        # Use 95th percentile for width/height to capture full logo size
+        # (some detections might be partial, we want the largest consistent size)
+        avg_w = int(np.percentile(boxes_np[:, 2], 95))
+        avg_h = int(np.percentile(boxes_np[:, 3], 95))
+
+        # Determine most common region in merged cluster
+        from collections import Counter
+        region_counter = Counter([b[4] for b in merged_cluster])
+        most_common_region = region_counter.most_common(1)[0][0]
+
+        # Calculate confidence based on detection consistency
+        confidence = largest_cluster_size / len(detected_boxes) if detected_boxes else 0.0
 
         self._result = LogoResult(
-            x=avg_x1,
-            y=avg_y1,
-            width=width,
-            height=height,
-            confidence=avg_confidence,
-            is_valid=True
+            x=avg_x,
+            y=avg_y,
+            width=avg_w,
+            height=avg_h,
+            confidence=confidence,
+            is_valid=True,
+            region=most_common_region,
+            detection_count=largest_cluster_size
         )
 
         spinner.stop(
-            f"Logo detected at x={avg_x1}, y={avg_y1}, w={width}, h={height} "
-            f"({largest_cluster_size} hits in {cluster_count} clusters)"
+            f"Logo detected in '{most_common_region}': x={avg_x}, y={avg_y}, w={avg_w}, h={avg_h} "
+            f"({largest_cluster_size}/{len(detected_boxes)} detections, {cluster_count} clusters, {merged_count} merged)"
         )
 
     def get_result(self) -> LogoResult:
