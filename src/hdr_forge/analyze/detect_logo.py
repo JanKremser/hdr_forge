@@ -24,7 +24,7 @@ class LogoDetector:
     def __init__(
         self,
         video: Video,
-        scan_frames: int = 40,
+        scan_frames: int = 200,
         model_path: str = "yolov8n.pt",
         max_logo_area_ratio: float = 0.1
     ):
@@ -93,6 +93,65 @@ class LogoDetector:
 
         return detected_boxes
 
+    def _cluster_detections(
+        self,
+        detected_boxes: List[Tuple[int, int, int, int, float]],
+        frame_width: int,
+        frame_height: int,
+        tolerance_ratio: float = 0.05
+    ) -> List[List[Tuple[int, int, int, int, float]]]:
+        """
+        Cluster detections based on spatial proximity.
+
+        Args:
+            detected_boxes: List of detected boxes [(x1, y1, x2, y2, confidence), ...]
+            frame_width: Frame width for calculating tolerance
+            frame_height: Frame height for calculating tolerance
+            tolerance_ratio: Maximum distance ratio for clustering (default 1.5%)
+
+        Returns:
+            List of clusters, each cluster is a list of boxes
+        """
+        if not detected_boxes:
+            return []
+
+        # Calculate distance threshold based on frame dimensions
+        max_dimension = max(frame_width, frame_height)
+        distance_threshold = max_dimension * tolerance_ratio
+
+        clusters: List[List[Tuple[int, int, int, int, float]]] = []
+
+        for box in detected_boxes:
+            x1, y1, x2, y2, conf = box
+            center_x = (x1 + x2) / 2
+            center_y = (y1 + y2) / 2
+
+            # Find nearest cluster
+            best_cluster_idx = -1
+            min_distance = float('inf')
+
+            for idx, cluster in enumerate(clusters):
+                # Calculate cluster centroid
+                cluster_centers_x = [(b[0] + b[2]) / 2 for b in cluster]
+                cluster_centers_y = [(b[1] + b[3]) / 2 for b in cluster]
+                centroid_x = sum(cluster_centers_x) / len(cluster_centers_x)
+                centroid_y = sum(cluster_centers_y) / len(cluster_centers_y)
+
+                # Calculate distance to centroid
+                distance = np.sqrt((center_x - centroid_x)**2 + (center_y - centroid_y)**2)
+
+                if distance < min_distance:
+                    min_distance = distance
+                    best_cluster_idx = idx
+
+            # Add to nearest cluster or create new one
+            if min_distance <= distance_threshold:
+                clusters[best_cluster_idx].append(box)
+            else:
+                clusters.append([box])
+
+        return clusters
+
     def detect_auto(
         self,
         callback: Optional[Callable[[int, int], None]] = None
@@ -150,8 +209,25 @@ class LogoDetector:
             print_warn("No logo found. Model might need extension or adjustment.")
             return
 
-        # Calculate average coordinates from all detections
-        boxes_np = np.array(detected_boxes)
+        # Cluster detections by spatial proximity
+        clusters = self._cluster_detections(
+            detected_boxes,
+            self._video.width,
+            self._video.height
+        )
+
+        if not clusters:
+            spinner.stop("No logo detected.")
+            print_warn("Clustering failed. No valid clusters found.")
+            return
+
+        # Find largest cluster (most frequent position)
+        largest_cluster = max(clusters, key=len)
+        cluster_count = len(clusters)
+        largest_cluster_size = len(largest_cluster)
+
+        # Calculate average only from largest cluster
+        boxes_np = np.array(largest_cluster)
         avg_x1 = int(np.mean(boxes_np[:, 0]))
         avg_y1 = int(np.mean(boxes_np[:, 1]))
         avg_x2 = int(np.mean(boxes_np[:, 2]))
@@ -170,7 +246,10 @@ class LogoDetector:
             is_valid=True
         )
 
-        spinner.stop(f"Logo detected at position: x={avg_x1}, y={avg_y1}, w={width}, h={height}")
+        spinner.stop(
+            f"Logo detected at x={avg_x1}, y={avg_y1}, w={width}, h={height} "
+            f"({largest_cluster_size} hits in {cluster_count} clusters)"
+        )
 
     def get_result(self) -> LogoResult:
         """
