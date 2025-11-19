@@ -93,7 +93,7 @@ def _ffmpeg_progress_reader_thread(
             # When we get "progress=continue" or "progress=end", trigger callback
             if line.startswith('progress='):
                 if progress_data and progress_callback:
-                    progress_info = _create_ffmpeg_progress_info(progress_data, total_frames)
+                    progress_info: FfmpegMiniProgressInfo = _create_ffmpeg_progress_info(progress_data, total_frames)
                     progress_callback(progress_info)
 
                 # Exit on "progress=end"

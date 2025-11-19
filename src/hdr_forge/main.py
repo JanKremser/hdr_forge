@@ -3,6 +3,7 @@
 import sys
 from pathlib import Path
 
+from hdr_forge.analyze.detect_logo import LogoDetector, LogoResult
 from hdr_forge.cli.args import pars_args, pars_encoder_settings
 from hdr_forge.cli.cli_output import print_conversion_summary, print_debug, print_err, print_warn
 from hdr_forge.cli.encoder import print_encoding_params
@@ -75,6 +76,19 @@ def show_video_info(input_file: Path) -> bool:
         video = Video(filepath=input_file)
 
         print_video_infos(video=video)
+
+        logo_detector = LogoDetector(video=video)
+        logo_detector.detect_auto()
+        print("\nLogo Detection Result:")
+        if logo_detector.is_logo_detected():
+            logo: LogoResult = logo_detector.get_result()
+            print(f"  Logo detected at (x={logo.x}, y={logo.y}), "
+                  f"size=({logo.width}x{logo.height}), "
+                  f"confidence={logo.confidence:.2f}")
+
+            print(f"Filter: {logo_detector.get_ffmpeg_delogo_filter()}")
+        else:
+            print("  No logo detected.")
         return True
 
     except Exception as e:

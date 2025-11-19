@@ -51,3 +51,4 @@ env/
 
 # Dolby Vision RPU cache files
 *.rpu
+yolov8n.pt

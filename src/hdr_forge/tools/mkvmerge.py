@@ -93,7 +93,7 @@ def extract_hevc(
             stderr_buffer: list = []
             reader_thread = threading.Thread(
                 target=_ffmpeg_progress_reader_thread,
-                args=(ffmpeg_process.stderr, progress_callback, total_frames, stderr_buffer),
+                args=(ffmpeg_process.stderr, ffmpeg_process, progress_callback, total_frames, stderr_buffer),
                 daemon=True
             )
             reader_thread.start()
