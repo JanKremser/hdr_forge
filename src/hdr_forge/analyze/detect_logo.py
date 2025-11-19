@@ -86,7 +86,7 @@ class LogoDetector:
         combined = cv2.bitwise_or(thresh_high, cv2.bitwise_or(thresh_adaptive, thresh_low))
 
         # Remove small noise
-        kernel = np.ones((3, 3), np.uint8)
+        kernel = np.ones((2, 2), np.uint8)
         clean = cv2.morphologyEx(combined, cv2.MORPH_OPEN, kernel, iterations=1)
 
         # Close small gaps (helps with transparent logos)
@@ -421,13 +421,15 @@ class LogoDetector:
         largest_box = reasonable_boxes[0]
         avg_x = largest_box[0]
         avg_y = largest_box[1]
-        avg_hw = int(max(largest_box[2], largest_box[3]))
-        avg_w = avg_hw
-        avg_h = avg_hw
+        # avg_hw = int(max(largest_box[2], largest_box[3]))
+        # avg_w = avg_hw
+        # avg_h = avg_hw
+        avg_w = largest_box[2]
+        avg_h = largest_box[3]
 
-        # Add small 18% padding
-        padding_w = int(avg_w * 0.18)
-        padding_h = int(avg_h * 0.18)
+        # Add small 15% padding
+        padding_w = int(avg_w * 0.01)
+        padding_h = int(avg_h * 0.01)
 
         # Apply padding
         padded_x = avg_x - padding_w
