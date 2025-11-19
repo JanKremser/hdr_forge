@@ -403,17 +403,43 @@ class LogoDetector:
         largest_cluster_size = len(merged_cluster)
         cluster_count = original_cluster_count
 
-        # Calculate position and size from merged cluster
-        boxes_np = np.array([(b[0], b[1], b[2], b[3]) for b in merged_cluster])
+        # Strategy: Use only the largest/best detections to avoid over-sizing
+        # Sort detections by area (largest first)
+        boxes_with_area = [(b[0], b[1], b[2], b[3], b[2] * b[3]) for b in merged_cluster]
+        boxes_with_area.sort(key=lambda x: x[4], reverse=True)
 
-        # Use median for position (more robust against outliers)
-        avg_x = int(np.median(boxes_np[:, 0]))
-        avg_y = int(np.median(boxes_np[:, 1]))
+        # Take top 20% largest detections (or at least 5 detections)
+        num_boxes_to_use = max(5, int(len(boxes_with_area) * 0.2))
+        top_boxes = boxes_with_area[:num_boxes_to_use]
 
-        # Use 95th percentile for width/height to capture full logo size
-        # (some detections might be partial, we want the largest consistent size)
-        avg_w = int(np.percentile(boxes_np[:, 2], 95))
-        avg_h = int(np.percentile(boxes_np[:, 3], 95))
+        # Convert to numpy array
+        boxes_np = np.array([(b[0], b[1], b[2], b[3]) for b in top_boxes])
+
+        # Calculate median position (center of logo cluster)
+        median_x = int(np.median(boxes_np[:, 0]))
+        median_y = int(np.median(boxes_np[:, 1]))
+
+        # Use 90th percentile for width/height from the largest boxes
+        # This captures the actual logo size from the best detections
+        avg_w = int(np.percentile(boxes_np[:, 2], 90))
+        avg_h = int(np.percentile(boxes_np[:, 3], 90))
+
+        # Position the box at median position
+        avg_x = median_x
+        avg_y = median_y
+
+        # Add 10% padding to ensure we don't cut off edges
+        padding_w = int(avg_w * 0.1)
+        padding_h = int(avg_h * 0.1)
+
+        avg_x = max(0, avg_x - padding_w)
+        avg_y = max(0, avg_y - padding_h)
+        avg_w = avg_w + 2 * padding_w
+        avg_h = avg_h + 2 * padding_h
+
+        # Clamp to video bounds
+        avg_w = min(self._video.width - avg_x, avg_w)
+        avg_h = min(self._video.height - avg_y, avg_h)
 
         # Determine most common region in merged cluster
         from collections import Counter
