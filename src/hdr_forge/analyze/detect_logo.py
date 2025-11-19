@@ -375,7 +375,7 @@ class LogoDetector:
 
         # Then: Merge nearby clusters that are close to the main cluster
         max_dimension = max(self._video.width, self._video.height)
-        merge_threshold = max_dimension * 0.15  # 15% distance
+        merge_threshold = max_dimension * 0.08  # 8% distance (stricter merging)
 
         merged_cluster = list(largest_cluster)
         merged_count = 0
@@ -403,43 +403,48 @@ class LogoDetector:
         largest_cluster_size = len(merged_cluster)
         cluster_count = original_cluster_count
 
-        # Strategy: Use only the largest/best detections to avoid over-sizing
-        # Sort detections by area (largest first)
+        # Strategy: Use the largest REASONABLE detection (not oversized false positives)
+        # Sort by area but filter out unreasonably large boxes
         boxes_with_area = [(b[0], b[1], b[2], b[3], b[2] * b[3]) for b in merged_cluster]
-        boxes_with_area.sort(key=lambda x: x[4], reverse=True)
 
-        # Take top 20% largest detections (or at least 5 detections)
-        num_boxes_to_use = max(5, int(len(boxes_with_area) * 0.2))
-        top_boxes = boxes_with_area[:num_boxes_to_use]
+        # Filter: Logo should not be larger than 600x600 pixels (adjust if needed)
+        max_logo_size = 600
+        reasonable_boxes = [b for b in boxes_with_area if b[2] <= max_logo_size and b[3] <= max_logo_size]
 
-        # Convert to numpy array
-        boxes_np = np.array([(b[0], b[1], b[2], b[3]) for b in top_boxes])
+        # If no reasonable boxes, fall back to all boxes
+        if not reasonable_boxes:
+            reasonable_boxes = boxes_with_area
 
-        # Calculate median position (center of logo cluster)
-        median_x = int(np.median(boxes_np[:, 0]))
-        median_y = int(np.median(boxes_np[:, 1]))
+        reasonable_boxes.sort(key=lambda x: x[4], reverse=True)
 
-        # Use 90th percentile for width/height from the largest boxes
-        # This captures the actual logo size from the best detections
-        avg_w = int(np.percentile(boxes_np[:, 2], 90))
-        avg_h = int(np.percentile(boxes_np[:, 3], 90))
+        # Take only the largest reasonable detection
+        largest_box = reasonable_boxes[0]
+        avg_x = largest_box[0]
+        avg_y = largest_box[1]
+        avg_w = largest_box[2]
+        avg_h = largest_box[3]
 
-        # Position the box at median position
-        avg_x = median_x
-        avg_y = median_y
-
-        # Add 10% padding to ensure we don't cut off edges
+        # Add conservative 10% padding
         padding_w = int(avg_w * 0.1)
         padding_h = int(avg_h * 0.1)
 
-        avg_x = max(0, avg_x - padding_w)
-        avg_y = max(0, avg_y - padding_h)
-        avg_w = avg_w + 2 * padding_w
-        avg_h = avg_h + 2 * padding_h
+        # Apply padding
+        padded_x = avg_x - padding_w
+        padded_y = avg_y - padding_h
+        padded_w = avg_w + 2 * padding_w
+        padded_h = avg_h + 2 * padding_h
 
-        # Clamp to video bounds
-        avg_w = min(self._video.width - avg_x, avg_w)
-        avg_h = min(self._video.height - avg_y, avg_h)
+        # Ensure we stay within video bounds
+        avg_x = max(0, padded_x)
+        avg_y = max(0, padded_y)
+        avg_w = min(self._video.width - avg_x, padded_w)
+        avg_h = min(self._video.height - avg_y, padded_h)
+
+        # Double-check bounds (safety check)
+        if avg_x + avg_w > self._video.width:
+            avg_w = self._video.width - avg_x
+        if avg_y + avg_h > self._video.height:
+            avg_h = self._video.height - avg_y
 
         # Determine most common region in merged cluster
         from collections import Counter
