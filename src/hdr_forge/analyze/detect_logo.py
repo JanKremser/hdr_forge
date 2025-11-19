@@ -57,6 +57,7 @@ class LogoDetector:
     ) -> List[Tuple[int, int, int, int, str]]:
         """
         Find bright, contour-based regions in corners of a frame.
+        Uses multiple detection methods for better transparent/semi-transparent logo detection.
 
         Args:
             frame: Frame to analyze
@@ -65,20 +66,35 @@ class LogoDetector:
             List of detected logo candidates: [(x, y, w, h, region), ...]
         """
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-
-        # Strong brightness threshold - logos are almost always white/bright
-        _, thresh = cv2.threshold(gray, self._brightness_threshold, 255, cv2.THRESH_BINARY)
-
-        # Remove small noise
-        kernel = np.ones((3, 3), np.uint8)
-        clean = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel, iterations=1)
-
-        # Extract contours
-        contours, _ = cv2.findContours(clean, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        frame_height, frame_width = frame.shape[:2]
 
         candidates: List[Tuple[int, int, int, int, str]] = []
 
-        frame_height, frame_width = frame.shape[:2]
+        # Method 1: Strong brightness threshold (opaque white logos)
+        _, thresh_high = cv2.threshold(gray, self._brightness_threshold, 255, cv2.THRESH_BINARY)
+
+        # Method 2: Adaptive threshold (semi-transparent logos with local contrast)
+        thresh_adaptive = cv2.adaptiveThreshold(
+            gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+            cv2.THRESH_BINARY, 11, -2
+        )
+
+        # Method 3: Lower threshold for semi-transparent logos
+        _, thresh_low = cv2.threshold(gray, max(self._brightness_threshold - 50, 150), 255, cv2.THRESH_BINARY)
+
+        # Combine all three methods
+        combined = cv2.bitwise_or(thresh_high, cv2.bitwise_or(thresh_adaptive, thresh_low))
+
+        # Remove small noise
+        kernel = np.ones((3, 3), np.uint8)
+        clean = cv2.morphologyEx(combined, cv2.MORPH_OPEN, kernel, iterations=1)
+
+        # Close small gaps (helps with transparent logos)
+        kernel_close = np.ones((5, 5), np.uint8)
+        clean = cv2.morphologyEx(clean, cv2.MORPH_CLOSE, kernel_close, iterations=1)
+
+        # Extract contours
+        contours, _ = cv2.findContours(clean, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
         for cnt in contours:
             area = cv2.contourArea(cnt)
@@ -86,6 +102,15 @@ class LogoDetector:
                 continue
 
             x, y, w, h = cv2.boundingRect(cnt)
+
+            # Additional filter: Check if region has sufficient brightness
+            # (helps filter out false positives from adaptive threshold)
+            roi = gray[y:y+h, x:x+w]
+            mean_brightness = np.mean(roi)
+
+            # Require at least moderate brightness (handles semi-transparent)
+            if mean_brightness < 100:
+                continue
 
             # Determine which corner region this is in
             region = self._determine_corner_region(x, y, w, h, frame_width, frame_height)
