@@ -425,9 +425,9 @@ class LogoDetector:
         avg_w = avg_hw
         avg_h = avg_hw
 
-        # Add small 17% padding
-        padding_w = int(avg_w * 0.17)
-        padding_h = int(avg_h * 0.17)
+        # Add small 18% padding
+        padding_w = int(avg_w * 0.18)
+        padding_h = int(avg_h * 0.18)
 
         # Apply padding
         padded_x = avg_x - padding_w
