@@ -421,12 +421,13 @@ class LogoDetector:
         largest_box = reasonable_boxes[0]
         avg_x = largest_box[0]
         avg_y = largest_box[1]
-        avg_w = largest_box[2]
-        avg_h = largest_box[3]
+        avg_hw = int(max(largest_box[2], largest_box[3]))
+        avg_w = avg_hw
+        avg_h = avg_hw
 
-        # Add conservative 10% padding
-        padding_w = int(avg_w * 0.1)
-        padding_h = int(avg_h * 0.1)
+        # Add small 17% padding
+        padding_w = int(avg_w * 0.17)
+        padding_h = int(avg_h * 0.17)
 
         # Apply padding
         padded_x = avg_x - padding_w
