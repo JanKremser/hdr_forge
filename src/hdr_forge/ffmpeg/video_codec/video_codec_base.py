@@ -4,6 +4,7 @@ import sys
 from typing import Optional, Tuple, Type, TypeVar
 
 from hdr_forge.analyze.crop_video import CropResult, VideoCropper
+from hdr_forge.analyze.detect_logo import LogoDetector
 from hdr_forge.analyze.grain_score import GrainAnalyzer
 from hdr_forge.cli.cli_output import print_err, print_warn
 from hdr_forge.ffmpeg.video_codec.service.presets import calc_hw_prest_params
@@ -37,12 +38,18 @@ class VideoCodecBase(ABC):
             print_err(f"{self.lib.value} does not support the selected {self._hdr_sdr_format_for_encoding.value}-format for encoding.")
             sys.exit(1)
 
+        self._logo_remover = LogoDetector(
+            video=video,
+            logo_removal=encoder_settings.logo_removal,
+        )
+        self._logo_remover.detect_logo()
+
         self._cropper = VideoCropper(
             video=video,
             crop_settings=encoder_settings.crop,
             encoding_hdr_sdr_format=self._hdr_sdr_format_for_encoding,
         )
-        self._cropper.process_crop()
+        self._cropper.detect_crop()
 
         self._grain = GrainAnalyzer(
             video=video,
@@ -139,6 +146,10 @@ class VideoCodecBase(ABC):
         if vf is not None:
             _filter: list[str] = vf.split(',')
             filters.extend(_filter)
+
+        delogo_filter: str | None = self._logo_remover.get_ffmpeg_delogo_filter()
+        if delogo_filter:
+            filters.append(delogo_filter)
 
         encoding_hdr_sdr_format: HdrSdrFormat = self.get_encoding_hdr_sdr_format()
 

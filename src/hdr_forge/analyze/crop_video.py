@@ -2,7 +2,7 @@ import os
 import subprocess
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Callable, Counter, Optional, Tuple
+from typing import Counter, Optional, Tuple
 from dataclasses import dataclass
 from hdr_forge.cli.cli_output import ProgressBarSpinner, print_err, print_warn
 from hdr_forge.typedefs.encoder_typing import CropMode, CropSettings, HdrSdrFormat
@@ -107,7 +107,7 @@ class VideoCropper:
         )
         return crop
 
-    def process_crop(
+    def detect_crop(
         self,
     ) -> None:
         if self._crop_settings.mode == CropMode.OFF:

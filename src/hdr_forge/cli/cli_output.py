@@ -508,7 +508,8 @@ class ProgressBarSpinner:
         self.running = False
         bar: str = create_progress_bar(percent=100, text=text or "Processing Done")
         end_line = color_str("-" * 70, ANSI_GREEN)
-        status: str = f"{ANSI_CLEAR_TWO_LINES}{bar}\n{long_info_text}\n{end_line}\n"
+        long_info: str = f"{long_info_text}\n" if long_info_text else ""
+        status: str = f"{ANSI_CLEAR_TWO_LINES}{bar}\n{long_info}{end_line}\n"
         print(status, end='', flush=True)
 
 def monitor_process_progress(process: subprocess.Popen, description: str) -> None:

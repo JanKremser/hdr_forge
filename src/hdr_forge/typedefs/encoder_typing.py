@@ -178,6 +178,10 @@ class HdrForgeEncodingHardwarePresets(Enum):
     BALANCED = "balanced"
     QUALITY = "quality"
 
+class LogoRemovalMode(Enum):
+    OFF = "off"
+    AUTO = "auto"
+
 @dataclass
 class HdrForgeEncodingPresetSettings:
     preset: HdrForgeEncodingPresets = HdrForgeEncodingPresets.AUTO
@@ -216,6 +220,7 @@ class EncoderSettings:
 
     crop: CropSettings = field(default_factory=lambda: CropSettings(mode=CropMode.AUTO))
     grain: GrainMode = GrainMode.OFF
+    logo_removal: LogoRemovalMode = LogoRemovalMode.OFF
 
     scale_height: Optional[int] = None
     scale_mode: ScaleMode = ScaleMode.HEIGHT

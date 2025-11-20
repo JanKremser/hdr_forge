@@ -1,7 +1,9 @@
 import os
 from dataclasses import dataclass
-from typing import List, Optional, Tuple, Callable
+from typing import List, Optional, Tuple
 import numpy as np
+
+from hdr_forge.typedefs.encoder_typing import LogoRemovalMode
 
 os.environ["OPENCV_FFMPEG_LOGLEVEL"] = "quiet"
 import cv2
@@ -26,6 +28,7 @@ class LogoDetector:
     def __init__(
         self,
         video: Video,
+        logo_removal: LogoRemovalMode = LogoRemovalMode.OFF,
         scan_frames: int = 100,
         brightness_threshold: int = 200,
         min_area: int = 500,
@@ -49,6 +52,7 @@ class LogoDetector:
         self._min_area: int = min_area
         self._max_area: int = max_area
         self._corner_ratio: float = corner_ratio
+        self._logo_removal: LogoRemovalMode = logo_removal
 
         self._result: LogoResult = LogoResult()
 
@@ -284,7 +288,7 @@ class LogoDetector:
 
         return result_clusters
 
-    def detect_auto(
+    def detect_logo(
         self,
         show_debug: bool = False
     ) -> None:
@@ -295,6 +299,9 @@ class LogoDetector:
             callback: Optional callback function(completed_frames, total_frames)
             show_debug: Show debug window with detected regions (default False)
         """
+        if self._logo_removal == LogoRemovalMode.OFF:
+            return
+
         cap = cv2.VideoCapture(str(self._video._filepath))
         if not cap.isOpened():
             print_err("Video could not be opened for logo detection.")

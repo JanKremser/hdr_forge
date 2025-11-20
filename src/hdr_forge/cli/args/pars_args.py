@@ -3,7 +3,7 @@
 import argparse
 
 from hdr_forge import __version__
-from hdr_forge.cli.cli_output import ANSI_BLUE, ANSI_GREEN, ANSI_ORANGE, ANSI_PINK, ANSI_RED, color_str, rainbow_text
+from hdr_forge.cli.cli_output import ANSI_BLUE, ANSI_GREEN, ANSI_ORANGE, ANSI_RED, color_str, rainbow_text
 
 
 HDR_FORGE_LOGO = rainbow_text("""
@@ -238,6 +238,15 @@ Analyze grain in the input video and optimize encoding settings accordingly.
 [cat1]             : Apply light grain settings
 [cat2]             : Apply medium grain settings
 [cat3]             : Apply strong grain settings\n
+"""
+    )
+
+    convert_parser.add_argument(
+        '--remove-logo',
+        help=f"""{sdr_dot} {hdr_dot} {dolby_vision_dot}
+Remove logos from video. Not supported for Dolby Vision encoding.
+[off]         : Default: Do not remove logos
+[auto]        : Automatically detect and remove logos\n
 """
     )
 

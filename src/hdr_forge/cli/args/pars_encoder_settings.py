@@ -7,7 +7,7 @@ from ffmpeg.types import T
 
 from hdr_forge import __version__
 from hdr_forge.cli.cli_output import print_err, print_warn
-from hdr_forge.typedefs.encoder_typing import CropMode, CropSettings, EncoderOverride, GrainMode, HEVC_NVENC_Preset, HdrForgeEncodingHardwarePresets, HdrForgeEncodingPresetSettings, HdrForgeEncodingPresets, HdrSdrFormat, EncoderSettings, NvencParams, NvencRcMode, SampleSettings, ScaleMode, UniversalEncoderParams, VideoCodec, VideoEncoderLibrary, Libx264Params, X264Tune, Libx265Params, X265Tune, x265_x264_Preset
+from hdr_forge.typedefs.encoder_typing import CropMode, CropSettings, EncoderOverride, GrainMode, HEVC_NVENC_Preset, HdrForgeEncodingHardwarePresets, HdrForgeEncodingPresetSettings, HdrForgeEncodingPresets, HdrSdrFormat, EncoderSettings, LogoRemovalMode, NvencParams, NvencRcMode, SampleSettings, ScaleMode, UniversalEncoderParams, VideoCodec, VideoEncoderLibrary, Libx264Params, X264Tune, Libx265Params, X265Tune, x265_x264_Preset
 from hdr_forge.typedefs.dolby_vision_typing import DolbyVisionProfileEncodingMode
 from hdr_forge.typedefs.video_typing import ContentLightLevelMetadata, HdrMetadata, MasterDisplayMetadata
 
@@ -207,6 +207,27 @@ def _get_grain_settings_from_string(grain_str: str | None) -> GrainMode:
         return GrainMode.CAT3
 
     print_err(f"Invalid grain value '{grain_str}', using 'off'")
+    sys.exit(1)
+
+def _get_logo_removal_mode_from_string(logo_str: str | None) -> LogoRemovalMode:
+    """Convert logo removal argument string to LogoRemovalMode enum.
+
+    Args:
+        logo_str: Logo removal argument string
+
+    Returns:
+        LogoRemovalMode enum value
+    """
+    if logo_str is None:
+        return LogoRemovalMode.OFF
+
+    logo_str = logo_str.lower()
+    if logo_str == 'off':
+        return LogoRemovalMode.OFF
+    elif logo_str == 'auto':
+        return LogoRemovalMode.AUTO
+
+    print_err(f"Invalid logo removal value '{logo_str}', using 'off'")
     sys.exit(1)
 
 
@@ -624,6 +645,7 @@ def create_encoder_settings_from_args(args) -> EncoderSettings:
         scale_mode=ScaleMode(args.scale_mode),
         crop=_get_crop_settings_from_string(crop_str=args.crop),
         grain=_get_grain_settings_from_string(grain_str=args.grain),
+        logo_removal=_get_logo_removal_mode_from_string(logo_str=args.remove_logo),
         sample=_get_sample_settings_from_string(sample_str=args.sample),
         hdr_metadata=hdr_metadata,
     )
