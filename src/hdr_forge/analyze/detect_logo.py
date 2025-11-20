@@ -310,8 +310,8 @@ class LogoDetector:
 
         detected_boxes: List[Tuple[int, int, int, int, str]] = []
 
-        spinner = ProgressBarSpinner(description="Detecting logo")
-        spinner.start()
+        progressbar = ProgressBarSpinner(description="Detecting logo")
+        progressbar.start()
 
         for idx, pos_seconds in enumerate(positions_seconds):
             frame_pos = int(pos_seconds * fps)
@@ -337,14 +337,14 @@ class LogoDetector:
                 if cv2.waitKey(1) & 0xFF == ord('q'):
                     break
 
-            spinner.update(percent=((idx + 1) / len(positions_seconds)) * 100)
+            progressbar.update(percent=((idx + 1) / len(positions_seconds)) * 100)
 
         cap.release()
         if show_debug:
             cv2.destroyAllWindows()
 
         if not detected_boxes:
-            spinner.stop("No logo detected.")
+            progressbar.stop("No logo detected.")
             print_warn("No bright logo found in corner regions.")
             return
 
@@ -356,7 +356,7 @@ class LogoDetector:
         )
 
         if not clusters:
-            spinner.stop("No logo detected.")
+            progressbar.stop("No logo detected.")
             print_warn("Clustering failed. No valid clusters found.")
             return
 
@@ -465,7 +465,7 @@ class LogoDetector:
             detection_count=largest_cluster_size
         )
 
-        spinner.stop(
+        progressbar.stop(
             text=f"Logo detected in '{most_common_region}'",
             long_info_text=f"""
 Coordinates:     x={avg_x}, y={avg_y}

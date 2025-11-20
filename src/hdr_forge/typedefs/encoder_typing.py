@@ -32,14 +32,6 @@ RESOLUTION_PRESETS_VALUES: dict[RESOLUTION_PRESETS, tuple[int, int]] = {
 }
 
 
-@dataclass
-class CropHandler:
-    """Datenklasse für die Ergebnisse der Crop-Analyse."""
-    finish_progress: bool = False
-    completed_samples: int = 0
-    total_samples: int = 0
-
-
 class HdrSdrFormat(Enum):
     """Target color format for video encoding."""
     AUTO = "auto"
