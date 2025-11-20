@@ -124,7 +124,7 @@ def print_err(msg: str) -> None:
 
 
 def print_debug(msg: str) -> None:
-    """Print an Debug message in blue color.
+    """Print an Debug message in purple color.
 
     Args:
         message: The Debug message to print
@@ -132,6 +132,14 @@ def print_debug(msg: str) -> None:
     if config.debug_mode == False:
         return
     print(f"{color_str(f'Debug: {msg}', ANSI_PURPLE)}")
+
+def print_info(msg: str) -> None:
+    """Print an Info message in blue color.
+
+    Args:
+        message: The Info message to print
+    """
+    print(f"{color_str(f'Debug: {msg}', ANSI_BLUE)}")
 
 
 def create_progress_bar(percent: float, text: Optional[str] = None, width: int = PROGRESS_BAR_WIDTH) -> str:

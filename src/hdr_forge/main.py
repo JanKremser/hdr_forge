@@ -5,7 +5,7 @@ from pathlib import Path
 
 from hdr_forge.analyze.detect_logo import LogoDetector, LogoResult
 from hdr_forge.cli.args import pars_args, pars_encoder_settings
-from hdr_forge.cli.cli_output import print_conversion_summary, print_debug, print_err, print_warn
+from hdr_forge.cli.cli_output import print_conversion_summary, print_debug, print_err, print_info, print_warn
 from hdr_forge.cli.encoder import print_encoding_params
 from hdr_forge.cli.video import print_video_infos
 from hdr_forge.core import config
@@ -76,19 +76,6 @@ def show_video_info(input_file: Path) -> bool:
         video = Video(filepath=input_file)
 
         print_video_infos(video=video)
-
-        logo_detector = LogoDetector(video=video)
-        logo_detector.detect_auto()
-        print("\nLogo Detection Result:")
-        if logo_detector.is_logo_detected():
-            logo: LogoResult = logo_detector.get_result()
-            print(f"  Logo detected at (x={logo.x}, y={logo.y}), "
-                  f"size=({logo.width}x{logo.height}), "
-                  f"confidence={logo.confidence:.2f}")
-
-            print(f"Filter: {logo_detector.get_ffmpeg_delogo_filter()}")
-        else:
-            print("  No logo detected.")
         return True
 
     except Exception as e:
@@ -265,6 +252,37 @@ def process_inject_hdr_metadata_command(args) -> int:
 
     return 0 if success else 1
 
+def process_detect_logo_command(args) -> int:
+    """Process the detect-logo subcommand."""
+    input_path = Path(args.input)
+
+    # Validate input
+    if not input_path.exists():
+        print_err(f"Error: Input path does not exist: {input_path}")
+        return 1
+
+    # Determine if it's a file or directory
+    if input_path.is_file() is False:
+        print_err("Error: detect-logo command only supports single video files.")
+        return 1
+
+    video = Video(filepath=input_path, with_out_rpu_extraction=True)
+
+    logo_detector = LogoDetector(video=video)
+    logo_detector.detect_auto()
+
+    if logo_detector.is_logo_detected() is False:
+        print_err("  No logo detected.")
+        return 1
+
+    logo: LogoResult = logo_detector.get_result()
+    print_info(f"Logo detected at (x={logo.x}, y={logo.y}), "
+            f"size=({logo.width}x{logo.height}), "
+            f"confidence={logo.confidence:.2f}")
+
+    print_info(f"Delogo-Filter: {logo_detector.get_ffmpeg_delogo_filter()}")
+    return 0
+
 
 def main() -> None:
     """Main entry point for CLI."""
@@ -281,6 +299,8 @@ def main() -> None:
         code = process_convert_command(args)
     elif args.command == 'inject-hdr-metadata':
         code = process_inject_hdr_metadata_command(args)
+    elif args.command == 'detect-logo':
+        code = process_detect_logo_command(args)
     elif args.command == 'calc_maxcll':
         input_path = Path(args.input)
         if not input_path.exists():

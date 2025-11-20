@@ -75,6 +75,29 @@ def _add_maxcll_subcommand(parser: argparse._SubParsersAction) -> None:
         action='store_true',
     )
 
+def _add_detect_logo_subcommand(parser: argparse._SubParsersAction) -> None:
+    """Add arguments for the 'detect_logo' subcommand.
+
+    Args:
+        parser: Argument parser to add arguments to
+    """
+    # "detect_logo" subcommand
+    detect_logo_parser: argparse.ArgumentParser = parser.add_parser('detect-logo',
+        description='Detect logos in a video file',
+        help='Detect logos'
+    )
+
+    detect_logo_parser.add_argument(
+        '-i', '--input',
+        required=True,
+        help='Video file for logo detection'
+    )
+
+    detect_logo_parser.add_argument(
+        '-d', '--debug',
+        action='store_true',
+    )
+
 
 def _add_convert_subcommand(parser: argparse._SubParsersAction) -> None:
     """Add arguments for the 'convert' subcommand.
@@ -488,5 +511,7 @@ def parse_args():
     _add_convert_subcommand(parser=subparsers)
 
     _add_inject_hdr_metadata_subcommand(parser=subparsers)
+
+    _add_detect_logo_subcommand(parser=subparsers)
 
     return parser.parse_args()

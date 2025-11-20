@@ -26,7 +26,7 @@ DEFAULT_MASTER_DISPLAY: LiteralString = (
 class Video:
     """Handles video file metadata extraction and analysis."""
 
-    def __init__(self, filepath: Path) -> None:
+    def __init__(self, filepath: Path, with_out_rpu_extraction: bool = False) -> None:
         """Initialize video object and extract metadata using ffprobe.
 
         Args:
@@ -49,7 +49,7 @@ class Video:
         self._temp_files: list[Path] = []
 
         self._dolby_vision_rpu_info: Optional[DolbyVisionRpuInfo] = None
-        if self.is_dolby_vision_video():
+        if self.is_dolby_vision_video() and not with_out_rpu_extraction:
             ## get dolby vision rpu infos
             rpu_file_path: Path = dovi_tool.extract_rpu(
                 input_path=self.get_filepath(),
