@@ -139,7 +139,7 @@ def print_info(msg: str) -> None:
     Args:
         message: The Info message to print
     """
-    print(f"{color_str(f'Debug: {msg}', ANSI_BLUE)}")
+    print(f"{color_str(f'Info: {msg}', ANSI_BLUE)}")
 
 
 def create_progress_bar(percent: float, text: Optional[str] = None, width: int = PROGRESS_BAR_WIDTH) -> str:
@@ -472,11 +472,22 @@ class ProgressBarSpinner:
         start_line_len: int = start_line_len - (len(self.description) + 4)
         print(color_str(f"-- {self.description} " + ("-" * start_line_len), ANSI_GREEN), flush=True)
 
-    def update(self, count_clear_lines: int | None = None) -> None:
+    def update(self, count_clear_lines: int | None = None, percent: float | None = None) -> None:
         """Update the spinner state."""
         if not self.running:
             return
-        bar: str = create_progress_bar(percent=(self.index % 20) * 5, text=f"Processing {self.spinner[self.index % 4]}")  # Indeterminate progress
+
+        if percent is not None:
+            bar: str = create_progress_bar(
+                percent=percent,
+                text=f"{percent:.1f}% | {self.spinner[self.index % 4]}"
+            )
+        else:
+            bar: str = create_progress_bar(
+                percent=(self.index % 20) * 5,
+                text=f"Processing {self.spinner[self.index % 4]}"
+            )  # Indeterminate progress
+
         end_line = color_str("-" * 70, ANSI_GREEN)
 
         clear_lines_str: str = ""
@@ -492,12 +503,12 @@ class ProgressBarSpinner:
         print(status, end='', flush=True)
         self.index += 1
 
-    def stop(self, text: str | None) -> None:
+    def stop(self, text: str | None, long_info_text: str | None = None) -> None:
         """Stop the spinner."""
         self.running = False
         bar: str = create_progress_bar(percent=100, text=text or "Processing Done")
         end_line = color_str("-" * 70, ANSI_GREEN)
-        status: str = f"{ANSI_CLEAR_TWO_LINES}{bar}\n{end_line}\n"
+        status: str = f"{ANSI_CLEAR_TWO_LINES}{bar}\n{long_info_text}\n{end_line}\n"
         print(status, end='', flush=True)
 
 def monitor_process_progress(process: subprocess.Popen, description: str) -> None:

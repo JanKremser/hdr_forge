@@ -7,7 +7,6 @@ def callback_handler_crop_video(crop_handler: CropHandler) -> None:
 
     Args:
         crop_handler: CropHandler instance
-        message: Optional message to display
     """
 
     if crop_handler.finish_progress:

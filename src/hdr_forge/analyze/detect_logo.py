@@ -2,6 +2,7 @@ import os
 from dataclasses import dataclass
 from typing import List, Optional, Tuple, Callable
 import numpy as np
+
 os.environ["OPENCV_FFMPEG_LOGLEVEL"] = "quiet"
 import cv2
 
@@ -285,7 +286,6 @@ class LogoDetector:
 
     def detect_auto(
         self,
-        callback: Optional[Callable[[int, int], None]] = None,
         show_debug: bool = False
     ) -> None:
         """
@@ -310,7 +310,7 @@ class LogoDetector:
 
         detected_boxes: List[Tuple[int, int, int, int, str]] = []
 
-        spinner = ProgressBarSpinner("Detecting logo (color-based)...")
+        spinner = ProgressBarSpinner(description="Detecting logo")
         spinner.start()
 
         for idx, pos_seconds in enumerate(positions_seconds):
@@ -337,10 +337,7 @@ class LogoDetector:
                 if cv2.waitKey(1) & 0xFF == ord('q'):
                     break
 
-            if callback:
-                callback(idx + 1, len(positions_seconds))
-
-            spinner.update()
+            spinner.update(percent=((idx + 1) / len(positions_seconds)) * 100)
 
         cap.release()
         if show_debug:
@@ -469,8 +466,13 @@ class LogoDetector:
         )
 
         spinner.stop(
-            f"Logo detected in '{most_common_region}': x={avg_x}, y={avg_y}, w={avg_w}, h={avg_h} "
-            f"({largest_cluster_size}/{len(detected_boxes)} detections, {cluster_count} clusters, {merged_count} merged)"
+            text=f"Logo detected in '{most_common_region}'",
+            long_info_text=f"""
+Coordinates:     x={avg_x}, y={avg_y}
+Size:            {avg_w}x{avg_h}
+Detections:      {largest_cluster_size} out of {len(detected_boxes)} total detections
+Clusters found:  {cluster_count}
+Clusters merged: {merged_count}"""
         )
 
     def get_result(self) -> LogoResult:
