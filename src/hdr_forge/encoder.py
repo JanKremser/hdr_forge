@@ -382,6 +382,11 @@ class Encoder:
             "map": "0",
         }
 
+        if self._video_sample_in_sec is not None:
+            start_time, end_time = self._video_sample_in_sec
+            output_options['ss'] = str(start_time)
+            output_options['t'] = str(end_time-start_time)
+
         if self._video_codec_lib:
             output_options.update(self._video_codec_lib.get_ffmpeg_params())
         else:
@@ -393,11 +398,6 @@ class Encoder:
             'c:a': 'copy',
             'c:s': 'copy'
         })
-
-        if self._video_sample_in_sec is not None:
-            start_time, end_time = self._video_sample_in_sec
-            output_options['ss'] = str(start_time)
-            output_options['t'] = str(end_time-start_time)
 
         return output_options
 

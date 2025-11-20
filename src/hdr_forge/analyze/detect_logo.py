@@ -29,7 +29,7 @@ class LogoDetector:
         self,
         video: Video,
         logo_removal: LogoRemovalMode = LogoRemovalMode.OFF,
-        scan_frames: int = 100,
+        scan_frames: int = 1000,
         brightness_threshold: int = 200,
         min_area: int = 500,
         max_area: int = 20000,
@@ -423,8 +423,8 @@ class LogoDetector:
 
         # Take only the largest reasonable detection
         largest_box = reasonable_boxes[0]
-        avg_x = largest_box[0]
-        avg_y = largest_box[1]
+        avg_x = 1 if largest_box[0] == 0 else largest_box[0]
+        avg_y = 1 if largest_box[1] == 0 else largest_box[1]
         # avg_hw = int(max(largest_box[2], largest_box[3]))
         # avg_w = avg_hw
         # avg_h = avg_hw
