@@ -724,31 +724,33 @@ Clusters merged: {merged_count}"""
                 if diff_ratio < diff_threshold and prev_inpainted is not None:
                     use_previous = True
 
-            if use_previous and prev_inpainted is not None:
-                result_bgr = frame.copy()
-                # Convert to LAB für Helligkeitskorrektur
-                frame_lab = cv2.cvtColor(result_bgr, cv2.COLOR_BGR2LAB)
-                prev_lab = cv2.cvtColor(prev_inpainted, cv2.COLOR_BGR2LAB)
+            # if use_previous and prev_inpainted is not None:
+            #     # Frame und vorheriges Inpaint in LAB
+            #     frame_lab = cv2.cvtColor(frame.astype(np.uint8), cv2.COLOR_BGR2LAB)
+            #     prev_lab = cv2.cvtColor(prev_inpainted.astype(np.uint8), cv2.COLOR_BGR2LAB)
 
-                mask_inpainted = ~mask_bin
+            #     # Maske: True = ersetzen (schwarz), False = behalten (weiß)
+            #     replace_mask = (mask_bin == 0)  # Schwarz = 0, soll ersetzt werden
 
-                # nur L-Kanal angleichen
-                frame_lab[...,0][mask_inpainted] = prev_lab[...,0][mask_inpainted]
+            #     # Nur die Schwarz-Pixel durch prev_inpainted übernehmen
+            #     frame_lab[..., 0][replace_mask] = prev_lab[..., 0][replace_mask]  # L-Kanal
+            #     frame_lab[..., 1][replace_mask] = prev_lab[..., 1][replace_mask]  # A-Kanal
+            #     frame_lab[..., 2][replace_mask] = prev_lab[..., 2][replace_mask]  # B-Kanal
 
-                # zurück zu BGR
-                result_bgr = cv2.cvtColor(frame_lab, cv2.COLOR_LAB2BGR)
-            else:
-                # Inpainting ausführen
-                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                with tempfile.NamedTemporaryFile(suffix=".png") as tmp_frame:
-                    Image.fromarray(frame_rgb).save(tmp_frame.name)
-                    inpainter = Inpaint(tmp_frame.name, tmp_mask.name, ps)
-                    result_bgr = inpainter()
+            #     # Zurück zu BGR
+            #     result_bgr = cv2.cvtColor(frame_lab, cv2.COLOR_LAB2BGR)
+            # else:
+            # Inpainting ausführen
+            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            with tempfile.NamedTemporaryFile(suffix=".png") as tmp_frame:
+                Image.fromarray(frame_rgb).save(tmp_frame.name)
+                inpainter = Inpaint(tmp_frame.name, tmp_mask.name, ps)
+                result_bgr = inpainter()
 
-                    result_uint8 = (result_bgr * 255).clip(0,255).astype(np.uint8)
-                    # RGB -> BGR für OpenCV
-                    result_bgr = cv2.cvtColor(result_uint8, cv2.COLOR_RGB2BGR)
-                    #result_bgr = np.clip(result_bgr, 0, 255).astype(np.uint8)
+                result_uint8 = (result_bgr * 255).clip(0,255).astype(np.uint8)
+                # RGB -> BGR für OpenCV
+                result_bgr = cv2.cvtColor(result_uint8, cv2.COLOR_RGB2BGR)
+                #result_bgr = np.clip(result_bgr, 0, 255).astype(np.uint8)
             prev_inpainted = result_bgr.copy()
 
             writer.write(result_bgr)
@@ -759,7 +761,7 @@ Clusters merged: {merged_count}"""
         return tmp_video_path
 
     def inpaint_video_multiprocess(self, input_path: Path, mask: np.ndarray, output_path: Path,
-                                ps: int = 7, processes: int = 14, diff_threshold: float = 0.05):
+                                ps: int = 7, processes: int = 14, diff_threshold: float = 0.15):
         """
         Multiprozess-Inpainting: Video wird in Partitions geteilt, jeder Prozess bearbeitet einen Part.
         """
