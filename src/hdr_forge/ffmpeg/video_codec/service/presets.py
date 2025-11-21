@@ -88,20 +88,20 @@ HW_PRESET: dict = {
         {
             "from_pixel": RESOLUTION_PRESETS.NONE.value,
             "to_pixel": RESOLUTION_PRESETS.HD.value,
-            VideoEncoderLibrary.LIBX265: {"from_CRF": 20, "to_CRF": 19, "from_preset": "faster", "to_preset": "fast"},
-            VideoEncoderLibrary.LIBX264: {"from_CRF": 18, "to_CRF": 17, "from_preset": "faster", "to_preset": "fast"}
+            VideoEncoderLibrary.LIBX265: {"from_CRF": 20, "to_CRF": 19, "from_preset": "veryslow", "to_preset": "slower"},
+            VideoEncoderLibrary.LIBX264: {"from_CRF": 18, "to_CRF": 17, "from_preset": "veryslow", "to_preset": "slower"}
         },
         {
             "from_pixel": RESOLUTION_PRESETS.HD.value + 1,
             "to_pixel": RESOLUTION_PRESETS.FHD.value,
-            VideoEncoderLibrary.LIBX265: {"from_CRF": 19, "to_CRF": 17.5, "from_preset": "medium", "to_preset": "medium"},
-            VideoEncoderLibrary.LIBX264: {"from_CRF": 17, "to_CRF": 16, "from_preset": "medium", "to_preset": "medium"}
+            VideoEncoderLibrary.LIBX265: {"from_CRF": 19, "to_CRF": 16, "from_preset": "slow", "to_preset": "slow"},
+            VideoEncoderLibrary.LIBX264: {"from_CRF": 17, "to_CRF": 15, "from_preset": "slow", "to_preset": "slow"}
         },
         {
             "from_pixel": RESOLUTION_PRESETS.FHD.value + 1,
             "to_pixel": RESOLUTION_PRESETS.UHD.value,
-            VideoEncoderLibrary.LIBX265: {"from_CRF": 17.5, "to_CRF": 15, "from_preset": "medium", "to_preset": "slow"},
-            VideoEncoderLibrary.LIBX264: {"from_CRF": 16, "to_CRF": 14, "from_preset": "medium", "to_preset": "slow"}
+            VideoEncoderLibrary.LIBX265: {"from_CRF": 16, "to_CRF": 15, "from_preset": "slow", "to_preset": "slow"},
+            VideoEncoderLibrary.LIBX264: {"from_CRF": 15, "to_CRF": 14, "from_preset": "slow", "to_preset": "slow"}
         },
         {
             "from_pixel": RESOLUTION_PRESETS.UHD.value + 1,

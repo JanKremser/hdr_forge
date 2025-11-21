@@ -567,6 +567,38 @@ Clusters merged: {merged_count}"""
 
         return success
 
+    def _create_crop_video_with_mask_delogo(self, delogo_path: Path, mask_path: Path) -> bool:
+        #ffmpeg -i crop_video.mp4 -i delogo.mp4 -i mask.png -filter_complex "[2:v]format=yuva420p,scale=iw:ih[mask_alpha];[1:v][mask_alpha]alphamerge[replacement_masked];[0:v][replacement_masked]overlay" -c:a copy output.mp4
+        total_frames = self._video.get_total_frames()
+        duration = self._video.get_duration_seconds()
+
+        progress_callback = None
+
+        process_start_time: float = time.time()
+
+        if duration > 0:
+            progress_callback = create_ffmpeg_progress_handler(
+                duration=duration,
+                total_frames=total_frames,
+                process_start_time=process_start_time,
+            )
+
+        output_options: dict = {
+            'i': [
+                str(delogo_path),
+                str(mask_path),
+            ],
+            "filter_complex": "[2:v]format=yuva420p,scale=iw:ih[mask_alpha];[1:v][mask_alpha]alphamerge[replacement_masked];[0:v][replacement_masked]overlay"
+        }
+        success: bool = ffmpeg_wrapper.run_ffmpeg(
+            input_file=Path("/home/jan/Dokumente/GitHub/ehdr/samples/test/crop_video_center.mp4"),
+            output_file=Path("/home/jan/Dokumente/GitHub/ehdr/samples/test/crop_video_mask_delogo.mp4"),
+            output_options=output_options,
+            progress_callback=progress_callback
+        )
+
+        return success
+
     def _create_mask_from_video(self, video_path: str, crop_rect: Tuple[int, int, int, int], threshold: int = 200, padding: int = 0, blur_radius: int = 0, invated: bool = False) -> MaskResult:
         """
         Erzeugt direkt aus einem Video eine finale Schnittmengen-Maske im Speicher.
@@ -718,31 +750,16 @@ Clusters merged: {merged_count}"""
         # Optional: Begrenzung auf Videogröße kann hier ergänzt werden
         return MaskResult(mask=centered_mask, x=new_x, y=new_y, width=new_w, height=new_h)
 
-    def build_logo_mask(self):
-        mask_crop: MaskResult = self._create_mask_from_video(
-            video_path=str(self._video._filepath),
-            threshold=40,
-            padding=10,
-            blur_radius=5
+    def _create_mask_delogo(self, mask_result: MaskResult):
+        mask_path = Path("/home/jan/Dokumente/GitHub/ehdr/samples/test/mask_mini_test_center.png")
+        cv2.imwrite(str(mask_path), mask_result.mask)
+        self._create_crop_video_by_mask(mask_result)
+        self._create_crop_video_delogo_by_mask(mask_result)
+
+        self._create_crop_video_with_mask_delogo(
+            delogo_path=Path("/home/jan/Dokumente/GitHub/ehdr/samples/test/crop_video_center_delogo.mp4"),
+            mask_path=mask_path,
         )
-        info: dict | None = self._get_mask_info(mask_crop.mask)
-        if info is None:
-            print("Keine Konturen in der Maske gefunden.")
-        else:
-            print(f"Position: ({info['x']}, {info['y']})")
-            print(f"Größe: {info['width']}x{info['height']} px")
-            print(f"Weiße Pixel: {info['area_pixels']}")
-
-        musk_center: MaskResult = self._center_mask_in_canvas(
-            mask=mask_crop.mask,
-            crop_rect=(mask_crop.x, mask_crop.y, mask_crop.width, mask_crop.height),
-            padding=50
-        )
-
-        cv2.imwrite("/home/jan/Dokumente/GitHub/ehdr/samples/test/mask_mini_test_center.png", musk_center.mask)
-
-        self._create_crop_video_by_mask(musk_center)
-        self._create_crop_video_delogo_by_mask(musk_center)
 
     def detect_logo(self) -> None:
         if self._logo_removal_settings.mode == LogoRemovalMode.OFF:
@@ -770,6 +787,8 @@ Clusters merged: {merged_count}"""
 
         self._result = mask_center
 
+        if self._logo_removal_settings.mode == LogoRemovalMode.MASK:
+            self._create_mask_delogo(mask_center)
 
     def get_result(self) -> MaskResult | None:
         """
@@ -803,3 +822,37 @@ Clusters merged: {merged_count}"""
             return None
 
         return f"delogo=x={self._result.x}:y={self._result.y}:w={self._result.width}:h={self._result.height}"
+
+    def get_ffmpeg_overlay_video_input(self) -> Optional[Path]:
+        """
+        Get path to temporary overlay video input for logo masking.
+
+        Returns:
+            Path to overlay video or None if no logo detected
+        """
+        if not self._result:
+            return None
+
+        if self._logo_removal_settings.mode != LogoRemovalMode.MASK:
+            return None
+
+        # Here we would normally return the path to the generated overlay video
+        # For this example, we return a placeholder path
+        return Path("/home/jan/Dokumente/GitHub/ehdr/samples/test/crop_video_mask_delogo.mp4")
+
+    def get_ffmpeg_filter_filter_complex(self) -> Optional[str]:
+        """
+        Generate FFmpeg overlay filter string for logo masking.
+
+        Args:
+            mask_path: Path to the mask image file
+        Returns:
+            FFmpeg overlay filter string or None if no logo detected
+        """
+        if not self._result:
+            return None
+
+        if self._logo_removal_settings.mode != LogoRemovalMode.MASK:
+            return None
+
+        return f"[0:v][1:v]overlay=x={self._result.x}:y={self._result.y}[v]"

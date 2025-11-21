@@ -83,8 +83,8 @@ class Libx265Codec(VideoCodecBase):
         self._preset: x265_x264_Preset = self._get_auto_preset(hw_preset)
         self._tune: X265Tune | None = self._get_auto_tune()
 
-    def get_ffmpeg_params(self) -> dict:
-        output_options: dict = super().get_ffmpeg_params()
+    def get_ffmpeg_params(self, exist_params: dict) -> dict:
+        output_options: dict = super().get_ffmpeg_params(exist_params=exist_params)
         output_options.update({
             "preset": self._preset.value,
             "crf": str(self._crf),

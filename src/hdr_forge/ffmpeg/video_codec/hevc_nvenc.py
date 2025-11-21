@@ -35,8 +35,8 @@ class HevcNvencCodec(VideoCodecBase):
         self._preset: HEVC_NVENC_Preset = self._get_auto_preset(hw_preset)
         self._nvenc_rc: NvencRcMode = self._get_nvenc_rc()
 
-    def get_ffmpeg_params(self) -> dict:
-        output_options: dict = super().get_ffmpeg_params()
+    def get_ffmpeg_params(self, exist_params: dict) -> dict:
+        output_options: dict = super().get_ffmpeg_params(exist_params=exist_params)
         output_options.update({
             "rc": self._nvenc_rc.value,
             "preset": self._preset.value,

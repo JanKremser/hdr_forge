@@ -388,7 +388,7 @@ class Encoder:
             output_options['t'] = str(end_time-start_time)
 
         if self._video_codec_lib:
-            output_options.update(self._video_codec_lib.get_ffmpeg_params())
+            output_options = self._video_codec_lib.get_ffmpeg_params(exist_params=output_options)
         else:
             output_options.update({
                 'c:v': 'copy',

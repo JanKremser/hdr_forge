@@ -62,8 +62,8 @@ class LibSvtAV1Codec(VideoCodecBase):
         self._crf: int = self._get_auto_crf(hw_preset)
         self._preset: int = self._get_auto_preset(hw_preset)
 
-    def get_ffmpeg_params(self) -> dict:
-        output_options: dict = super().get_ffmpeg_params()
+    def get_ffmpeg_params(self, exist_params: dict) -> dict:
+        output_options: dict = super().get_ffmpeg_params(exist_params=exist_params)
         output_options.update({
             "preset": str(self._preset), # kleiner gleich langsamer (0-13)
             "crf": str(self._crf), # kann um 7 größer sein las x265

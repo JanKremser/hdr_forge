@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 import math
+from pathlib import Path
 import sys
 from typing import Optional, Tuple, Type, TypeVar
 
@@ -74,11 +75,23 @@ class VideoCodecBase(ABC):
         return self._gpu_encoding
 
     @abstractmethod
-    def get_ffmpeg_params(self) -> dict:
+    def get_ffmpeg_params(self, exist_params: dict) -> dict:
         """Get FFmpeg parameters for this codec."""
         output_options: dict = {
+            **exist_params,
             "c:v": self.lib.value,
         }
+
+        new_input: Path | None = self._logo_remover.get_ffmpeg_overlay_video_input()
+        if new_input:
+            filter_complex: str | None = self._logo_remover.get_ffmpeg_filter_filter_complex()
+            if filter_complex:
+                output_options = {
+                    "i": str(new_input),
+                    **output_options
+                }
+                output_options["map"] = ['[v]', '0:a?', '0:s?']
+                output_options["filter_complex"] = filter_complex
 
         vf: str | None = self._get_default_video_filter()
         if vf:

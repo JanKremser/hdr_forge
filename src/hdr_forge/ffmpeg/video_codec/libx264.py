@@ -36,8 +36,8 @@ class Libx264Codec(VideoCodecBase):
         self._preset: x265_x264_Preset = self._get_auto_preset(hw_preset)
         self._tune: X264Tune | None = self._get_auto_tune()
 
-    def get_ffmpeg_params(self) -> dict:
-        output_options: dict = super().get_ffmpeg_params()
+    def get_ffmpeg_params(self, exist_params: dict) -> dict:
+        output_options: dict = super().get_ffmpeg_params(exist_params=exist_params)
         output_options.update({
             "profile:v": self.SDR_PROFILE,
             "pix_fmt": self.get_pix_format_for_encoding(),
