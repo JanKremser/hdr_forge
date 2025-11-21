@@ -178,13 +178,24 @@ class HdrForgeEncodingHardwarePresets(Enum):
     BALANCED = "balanced"
     QUALITY = "quality"
 
-class LogoRemovalMode(Enum):
-    OFF = "off"
+class LogoRemovalAutoDetectMode(Enum):
     AUTO = "auto"
     AUTO_TOP_LEFT = "auto-top-left"
     AUTO_TOP_RIGHT = "auto-top-right"
     AUTO_BOT_LEFT = "auto-bot-left"
     AUTO_BOT_RIGHT = "auto-bot-right"
+
+class LogoRemovalMode(Enum):
+    OFF = "off"
+    DELOGO = "delogo"
+    MASK = "mask"
+
+@dataclass
+class LogoRemovelSettings:
+    """Settings for logo removal from video."""
+    mode: LogoRemovalMode = LogoRemovalMode.OFF
+    position: LogoRemovalAutoDetectMode = LogoRemovalAutoDetectMode.AUTO
+    #mask_file: Optional[Path] = None  # Path to custom mask file for logo removal
 
 @dataclass
 class HdrForgeEncodingPresetSettings:
@@ -224,7 +235,7 @@ class EncoderSettings:
 
     crop: CropSettings = field(default_factory=lambda: CropSettings(mode=CropMode.AUTO))
     grain: GrainMode = GrainMode.OFF
-    logo_removal: LogoRemovalMode = LogoRemovalMode.OFF
+    logo_removal: LogoRemovelSettings = field(default_factory=lambda: LogoRemovelSettings())
 
     scale_height: Optional[int] = None
     scale_mode: ScaleMode = ScaleMode.HEIGHT

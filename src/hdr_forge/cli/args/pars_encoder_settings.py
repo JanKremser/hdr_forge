@@ -3,11 +3,10 @@
 import sys
 from typing import Tuple
 
-from ffmpeg.types import T
 
 from hdr_forge import __version__
 from hdr_forge.cli.cli_output import print_err, print_warn
-from hdr_forge.typedefs.encoder_typing import CropMode, CropSettings, EncoderOverride, GrainMode, HEVC_NVENC_Preset, HdrForgeEncodingHardwarePresets, HdrForgeEncodingPresetSettings, HdrForgeEncodingPresets, HdrSdrFormat, EncoderSettings, LogoRemovalMode, NvencParams, NvencRcMode, SampleSettings, ScaleMode, UniversalEncoderParams, VideoCodec, VideoEncoderLibrary, Libx264Params, X264Tune, Libx265Params, X265Tune, x265_x264_Preset
+from hdr_forge.typedefs.encoder_typing import CropMode, CropSettings, EncoderOverride, GrainMode, HEVC_NVENC_Preset, HdrForgeEncodingHardwarePresets, HdrForgeEncodingPresetSettings, HdrForgeEncodingPresets, HdrSdrFormat, EncoderSettings, LogoRemovalAutoDetectMode, LogoRemovalMode, LogoRemovelSettings, NvencParams, NvencRcMode, SampleSettings, ScaleMode, UniversalEncoderParams, VideoCodec, VideoEncoderLibrary, Libx264Params, X264Tune, Libx265Params, X265Tune, x265_x264_Preset
 from hdr_forge.typedefs.dolby_vision_typing import DolbyVisionProfileEncodingMode
 from hdr_forge.typedefs.video_typing import ContentLightLevelMetadata, HdrMetadata, MasterDisplayMetadata
 
@@ -209,7 +208,7 @@ def _get_grain_settings_from_string(grain_str: str | None) -> GrainMode:
     print_err(f"Invalid grain value '{grain_str}', using 'off'")
     sys.exit(1)
 
-def _get_logo_removal_mode_from_string(logo_str: str | None) -> LogoRemovalMode:
+def _get_logo_removal_mode_from_string(logo_str: str | None) -> LogoRemovelSettings:
     """Convert logo removal argument string to LogoRemovalMode enum.
 
     Args:
@@ -219,21 +218,48 @@ def _get_logo_removal_mode_from_string(logo_str: str | None) -> LogoRemovalMode:
         LogoRemovalMode enum value
     """
     if logo_str is None:
-        return LogoRemovalMode.OFF
+        return LogoRemovelSettings(mode=LogoRemovalMode.OFF, position=LogoRemovalAutoDetectMode.AUTO)
 
     logo_str = logo_str.lower()
     if logo_str == 'off':
-        return LogoRemovalMode.OFF
+        return LogoRemovelSettings(mode=LogoRemovalMode.OFF, position=LogoRemovalAutoDetectMode.AUTO)
     elif logo_str == 'auto':
-        return LogoRemovalMode.AUTO
-    elif logo_str == 'auto-top-left':
-        return LogoRemovalMode.AUTO_TOP_LEFT
-    elif logo_str == 'auto-top-right':
-        return LogoRemovalMode.AUTO_TOP_RIGHT
-    elif logo_str == 'auto-bot-left':
-        return LogoRemovalMode.AUTO_BOT_LEFT
-    elif logo_str == 'auto-bot-right':
-        return LogoRemovalMode.AUTO_BOT_RIGHT
+        return LogoRemovelSettings(mode=LogoRemovalMode.DELOGO, position=LogoRemovalAutoDetectMode.AUTO)
+
+    if ':' in logo_str:
+        parts = logo_str.split(':')
+        if len(parts) == 2:
+            mode_part = parts[0]
+            position_part = parts[1]
+
+            mode: LogoRemovalMode
+            position: LogoRemovalAutoDetectMode
+
+            # Determine mode
+            if mode_part == 'delogo':
+                mode = LogoRemovalMode.DELOGO
+            elif mode_part == 'mask':
+                mode = LogoRemovalMode.MASK
+            else:
+                print_err(f"Invalid logo removal mode '{mode_part}', using 'off'")
+                sys.exit(1)
+
+            # Determine position
+            if position_part == 'auto':
+                position = LogoRemovalAutoDetectMode.AUTO
+            elif position_part == 'top-left':
+                position = LogoRemovalAutoDetectMode.AUTO_TOP_LEFT
+            elif position_part == 'top-right':
+                position = LogoRemovalAutoDetectMode.AUTO_TOP_RIGHT
+            elif position_part == 'bot-left':
+                position = LogoRemovalAutoDetectMode.AUTO_BOT_LEFT
+            elif position_part == 'bot-right':
+                position = LogoRemovalAutoDetectMode.AUTO_BOT_RIGHT
+            else:
+                print_err(f"Invalid logo removal position '{position_part}', using 'off'")
+                sys.exit(1)
+
+            return LogoRemovelSettings(mode=mode, position=position)
 
     print_err(f"Invalid logo removal value '{logo_str}', using 'off'")
     sys.exit(1)

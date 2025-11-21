@@ -6,7 +6,7 @@ from typing import List, Optional, Tuple
 import numpy as np
 
 from hdr_forge.ffmpeg import ffmpeg_wrapper
-from hdr_forge.typedefs.encoder_typing import LogoRemovalMode
+from hdr_forge.typedefs.encoder_typing import LogoRemovalAutoDetectMode, LogoRemovalMode, LogoRemovelSettings
 
 os.environ["OPENCV_FFMPEG_LOGLEVEL"] = "quiet"
 import cv2
@@ -24,7 +24,7 @@ class MaskResult:
 
 
 @dataclass
-class LogoResult:
+class LogoDetectResult:
     x: int = 0
     y: int = 0
     width: int = 0
@@ -39,7 +39,7 @@ class LogoDetector:
     def __init__(
         self,
         video: Video,
-        logo_removal: LogoRemovalMode = LogoRemovalMode.OFF,
+        logo_removal: LogoRemovelSettings = LogoRemovelSettings(),
         scan_frames: int = 250,
         brightness_threshold: int = 200,
         min_area: int = 500,
@@ -63,9 +63,9 @@ class LogoDetector:
         self._min_area: int = min_area
         self._max_area: int = max_area
         self._corner_ratio: float = corner_ratio
-        self._logo_removal: LogoRemovalMode = logo_removal
+        self._logo_removal_settings: LogoRemovelSettings = logo_removal
 
-        self._result: LogoResult = LogoResult()
+        self._result: MaskResult | None = None
 
     def _find_logo_in_frame(
         self,
@@ -131,13 +131,13 @@ class LogoDetector:
             # Determine which corner region this is in
             region = self._determine_corner_region(x, y, w, h, frame_width, frame_height)
 
-            if self._logo_removal == LogoRemovalMode.AUTO_TOP_LEFT and region != 'top-left':
+            if self._logo_removal_settings.position == LogoRemovalAutoDetectMode.AUTO_TOP_LEFT and region != 'top-left':
                 continue
-            if self._logo_removal == LogoRemovalMode.AUTO_TOP_RIGHT and region != 'top-right':
+            if self._logo_removal_settings.position == LogoRemovalAutoDetectMode.AUTO_TOP_RIGHT and region != 'top-right':
                 continue
-            if self._logo_removal == LogoRemovalMode.AUTO_BOT_LEFT and region != 'bottom-left':
+            if self._logo_removal_settings.position == LogoRemovalAutoDetectMode.AUTO_BOT_LEFT and region != 'bottom-left':
                 continue
-            if self._logo_removal == LogoRemovalMode.AUTO_BOT_RIGHT and region != 'bottom-right':
+            if self._logo_removal_settings.position == LogoRemovalAutoDetectMode.AUTO_BOT_RIGHT and region != 'bottom-right':
                 continue
 
             # if region not in ['top-left']:
@@ -311,11 +311,11 @@ class LogoDetector:
 
         return result_clusters
 
-    def detect_logo(
+    def _detect_logo_in_video(
         self,
         show_debug: bool = False,
         padding: float = 0.05
-    ) -> None:
+    ) -> None | LogoDetectResult:
         """
         Automatically detect logo position by analyzing multiple frames.
 
@@ -323,9 +323,6 @@ class LogoDetector:
             callback: Optional callback function(completed_frames, total_frames)
             show_debug: Show debug window with detected regions (default False)
         """
-        if self._logo_removal == LogoRemovalMode.OFF:
-            return
-
         cap = cv2.VideoCapture(str(self._video._filepath))
         if not cap.isOpened():
             print_err("Video could not be opened for logo detection.")
@@ -488,17 +485,6 @@ class LogoDetector:
         avg_w = avg_w if avg_w % 2 == 0 else avg_w + 1
         avg_h = avg_h if avg_h % 2 == 0 else avg_h + 1
 
-        self._result = LogoResult(
-            x=avg_x,
-            y=avg_y,
-            width=avg_w,
-            height=avg_h,
-            confidence=confidence,
-            is_valid=True,
-            region=most_common_region,
-            detection_count=largest_cluster_size
-        )
-
         progressbar.stop(
             text=f"Logo detected in '{most_common_region}'",
             long_info_text=f"""
@@ -509,131 +495,16 @@ Clusters found:  {cluster_count}
 Clusters merged: {merged_count}"""
         )
 
-    def get_result(self) -> LogoResult:
-        """
-        Get the logo detection result.
-
-        Returns:
-            LogoResult with detected logo position and dimensions
-        """
-        return self._result
-
-    def is_logo_detected(self) -> bool:
-        """
-        Check if a valid logo was detected.
-
-        Returns:
-            True if logo was detected, False otherwise
-        """
-        return self._result.is_valid
-
-    def get_ffmpeg_delogo_filter(self) -> Optional[str]:
-        """
-        Generate FFmpeg delogo filter string.
-
-        Returns:
-            FFmpeg delogo filter string or None if no logo detected
-        """
-        if not self._result.is_valid:
-            return None
-
-        return f"delogo=x={self._result.x}:y={self._result.y}:w={self._result.width}:h={self._result.height}"
-
-    # def _create_final_mask(self, mask_folder: str, output_path: str, padding: int, blur_radius: int = 0):
-    #     """
-    #     Erzeugt eine finale Maske, bei der nur die Pixel weiß bleiben,
-    #     die auf allen gültigen Masken weiß sind.
-    #     Frames, die komplett schwarz sind, werden ignoriert.
-
-    #     Optional kann die Maske weichgezeichnet werden.
-
-    #     Args:
-    #         mask_folder (str): Pfad zu den Masken (z.B. "./test/all_frames/")
-    #         output_path (str): Pfad zur finalen Maske (z.B. "./test/final_mask.png")
-    #         blur_radius (int, optional): Radius für GaussianBlur. 0 = keine Weichzeichnung.
-    #     """
-    #     # Alle Masken laden
-    #     mask_files = sorted(glob.glob(os.path.join(mask_folder, "*.png")))
-    #     if not mask_files:
-    #         raise FileNotFoundError(f"Keine PNG-Dateien im Ordner {mask_folder} gefunden!")
-
-    #     valid_masks = []
-    #     for f in mask_files:
-    #         mask = cv2.imread(f, cv2.IMREAD_GRAYSCALE)
-    #         if mask is None:
-    #             continue
-    #         # Nur Masken verwenden, die mindestens ein weißes Pixel haben
-    #         if np.any(mask > 0):
-    #             valid_masks.append(mask)
-
-    #     if not valid_masks:
-    #         raise ValueError("Keine gültigen Masken mit weißen Pixeln gefunden!")
-
-    #     # Alle Masken zu einem Stack zusammenfassen
-    #     stack = np.stack(valid_masks, axis=0)
-
-    #     # Pixelweise Minimum über alle Frames (nur weiß, wenn alle Frames an dieser Stelle weiß sind)
-    #     final_mask = np.min(stack, axis=0)
-    #     final_mask[final_mask > 0] = 255  # Binärmaske sicherstellen
-
-    #     # Kernel für Dilate erstellen
-    #     kernel = np.ones((padding, padding), np.uint8)
-    #     # Dilate anwenden → weiße Bereiche wachsen nach außen
-    #     final_mask = cv2.dilate(final_mask, kernel, iterations=1)
-
-    #     # Optional weichzeichnen
-    #     if blur_radius > 0:
-    #         blurred = cv2.GaussianBlur(final_mask, (blur_radius, blur_radius), 0)
-    #         # Optional: wieder hartes Binärbild
-    #         _, padded_mask_soft = cv2.threshold(blurred, 127, 255, cv2.THRESH_BINARY)
-    #         final_mask = padded_mask_soft
-
-    #     # Speichern
-    #     cv2.imwrite(output_path, final_mask)
-    #     print(f"Finale Schnittmengen-Maske erstellt: {output_path}")
-
-    # def generate_mask_images(self, video_path: str, output_folder: str, threshold: int = 120):
-    #     """
-    #     Erstellt aus einem Video binäre Maskenbilder für jeden Frame (oder jede Sekunde).
-
-    #     Args:
-    #         video_path (str): Pfad zum Video.
-    #         output_folder (str): Ordner, in dem die Masken gespeichert werden.
-    #         crop_rect (tuple): (x, y, w, h) Rechteck für Crop.
-    #         threshold (int): Schwellwert für binär (0 oder 255).
-    #     """
-    #     x, y, w, h = self._result.x, self._result.y, self._result.width, self._result.height
-
-    #     if not os.path.exists(output_folder):
-    #         os.makedirs(output_folder)
-
-    #     cap = cv2.VideoCapture(video_path)
-    #     if not cap.isOpened():
-    #         raise FileNotFoundError(f"Video {video_path} konnte nicht geöffnet werden!")
-
-    #     frame_idx = 0
-    #     while True:
-    #         ret, frame = cap.read()
-    #         if not ret:
-    #             break
-
-    #         # Crop
-    #         cropped = frame[y:y+h, x:x+w]
-
-    #         # Graustufen
-    #         gray = cv2.cvtColor(cropped, cv2.COLOR_BGR2GRAY)
-
-    #         # Threshold → Binärmaske
-    #         _, mask = cv2.threshold(gray, threshold, 255, cv2.THRESH_BINARY)
-
-    #         # Speichern
-    #         filename = os.path.join(output_folder, f"mask_{frame_idx:04d}.png")
-    #         cv2.imwrite(filename, mask)
-
-    #         frame_idx += 1
-
-    #     cap.release()
-    #     print(f"{frame_idx} Maskenbilder erzeugt in {output_folder}")
+        return LogoDetectResult(
+            x=avg_x,
+            y=avg_y,
+            width=avg_w,
+            height=avg_h,
+            confidence=confidence,
+            is_valid=True,
+            region=most_common_region,
+            detection_count=largest_cluster_size
+        )
 
     def _create_crop_video_by_mask(self, mask_result: MaskResult) -> bool:
         total_frames = self._video.get_total_frames()
@@ -696,7 +567,7 @@ Clusters merged: {merged_count}"""
 
         return success
 
-    def _create_mask_from_video(self, video_path: str, threshold: int = 200, padding: int = 0, blur_radius: int = 0, invated: bool = False) -> MaskResult:
+    def _create_mask_from_video(self, video_path: str, crop_rect: Tuple[int, int, int, int], threshold: int = 200, padding: int = 0, blur_radius: int = 0, invated: bool = False) -> MaskResult:
         """
         Erzeugt direkt aus einem Video eine finale Schnittmengen-Maske im Speicher.
         Nur Pixel, die in allen gültigen Frames weiß sind, bleiben weiß.
@@ -710,7 +581,7 @@ Clusters merged: {merged_count}"""
         Returns:
             np.ndarray: finale Maske als NumPy-Array (0 oder 255)
         """
-        x, y, w, h = self._result.x, self._result.y, self._result.width, self._result.height
+        x, y, w, h = crop_rect
 
         cap = cv2.VideoCapture(video_path)
         if not cap.isOpened():
@@ -823,6 +694,12 @@ Clusters merged: {merged_count}"""
         new_w = mask_w + 2 * padding
         new_h = mask_h + 2 * padding
 
+        # Seitenverhältnis auf gerade Zahl bringen
+        if new_w % 2 != 0:
+            new_w += 1
+        if new_h % 2 != 0:
+            new_h += 1
+
         # Erstelle neue leere Maske
         centered_mask = np.zeros((new_h, new_w), dtype=np.uint8)
 
@@ -866,3 +743,63 @@ Clusters merged: {merged_count}"""
 
         self._create_crop_video_by_mask(musk_center)
         self._create_crop_video_delogo_by_mask(musk_center)
+
+    def detect_logo(self) -> None:
+        if self._logo_removal_settings.mode == LogoRemovalMode.OFF:
+            return
+
+        detect_logo: None | LogoDetectResult = self._detect_logo_in_video()
+        if detect_logo is None:
+            return
+
+        mask_crop: MaskResult = self._create_mask_from_video(
+            video_path=str(self._video._filepath),
+            crop_rect=(detect_logo.x, detect_logo.y, detect_logo.width, detect_logo.height),
+            threshold=40,
+            padding=10,
+            blur_radius=5
+        )
+        default_padding = 50
+        if self._logo_removal_settings.mode == LogoRemovalMode.DELOGO:
+            default_padding = 0
+        mask_center: MaskResult = self._center_mask_in_canvas(
+            mask=mask_crop.mask,
+            crop_rect=(mask_crop.x, mask_crop.y, mask_crop.width, mask_crop.height),
+            padding=default_padding
+        )
+
+        self._result = mask_center
+
+
+    def get_result(self) -> MaskResult | None:
+        """
+        Get the logo detection result.
+
+        Returns:
+            LogoResult with detected logo position and dimensions
+        """
+        return self._result
+
+    def is_logo_detected(self) -> bool:
+        """
+        Check if a valid logo was detected.
+
+        Returns:
+            True if logo was detected, False otherwise
+        """
+        return self._result is not None
+
+    def get_ffmpeg_delogo_filter(self) -> Optional[str]:
+        """
+        Generate FFmpeg delogo filter string.
+
+        Returns:
+            FFmpeg delogo filter string or None if no logo detected
+        """
+        if not self._result:
+            return None
+
+        if self._logo_removal_settings.mode != LogoRemovalMode.DELOGO:
+            return None
+
+        return f"delogo=x={self._result.x}:y={self._result.y}:w={self._result.width}:h={self._result.height}"

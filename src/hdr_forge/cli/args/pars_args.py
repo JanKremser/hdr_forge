@@ -245,12 +245,25 @@ Analyze grain in the input video and optimize encoding settings accordingly.
         '--remove-logo',
         help=f"""{sdr_dot} {hdr_dot} {dolby_vision_dot}
 Remove logos from video. Not supported for Dolby Vision encoding.
-[off]            : Default: Do not remove logos
-[auto]           : Automatically detect and remove logos
-[auto-top-left]  : Automatically detect (top-left) and remove logos
-[auto-top-right] : Automatically detect (top-right) and remove logos
-[auto-bot-left]  : Automatically detect (bottom-left) and remove logos
-[auto-bot-right] : Automatically detect (bottom-right) and remove logos\n
+Examples:
+    --remove-logo off
+    --remove-logo auto
+    --remove-logo delogo:top-left
+    --remove-logo mask:auto
+[off]              : Default: Do not remove logos
+[auto]             : Automatically detect and remove logo
+
+[delogo:auto]      : Automatically detect and remove logo with delogo filter
+[delogo:top-left]  : Automatically detect (top-left) and remove logo with delogo filter
+[delogo:top-right] : Automatically detect (top-right) and remove logo with delogo filter
+[delogo:bot-left]  : Automatically detect (bottom-left) and remove logo with delogo filter
+[delogo:bot-right] : Automatically detect (bottom-right) and remove logo with delogo filter
+
+[mask:auto]        : Automatically detect logo and apply mask-based removal
+[mask:top-left]    : Automatically detect (top-left) logo and apply mask-based removal
+[mask:top-right]   : Automatically detect (top-right) logo and apply mask-based removal
+[mask:bot-left]    : Automatically detect (bottom-left) logo and apply mask-based removal
+[mask:bot-right]   : Automatically detect (bottom-right) logo and apply\n
 """
     )
 

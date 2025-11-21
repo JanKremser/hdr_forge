@@ -11,7 +11,7 @@ from hdr_forge.cli.video import print_video_infos
 from hdr_forge.core import config
 from hdr_forge.core.service import shutdown_system
 from hdr_forge.hdr_metadata_injector import HdrMetadataInjector
-from hdr_forge.typedefs.encoder_typing import EncoderSettings, LogoRemovalMode
+from hdr_forge.typedefs.encoder_typing import EncoderSettings, LogoRemovalAutoDetectMode, LogoRemovalMode, LogoRemovelSettings
 from hdr_forge.encoder import Encoder
 from hdr_forge.video import Video
 from hdr_forge.analyze.maxcll import calc_maxcll
@@ -268,11 +268,11 @@ def process_detect_logo_command(args) -> int:
 
     video = Video(filepath=input_path, with_out_rpu_extraction=True)
 
-    logo_detector = LogoDetector(video=video, logo_removal=LogoRemovalMode.AUTO_TOP_LEFT)
-    logo_detector.detect_logo(
-        padding=0.15,
-    )
-    logo_detector.build_logo_mask()
+    logo_detector = LogoDetector(video=video, logo_removal=LogoRemovelSettings(
+        mode=LogoRemovalMode.DELOGO,
+        position=LogoRemovalAutoDetectMode.AUTO_TOP_LEFT,
+    ))
+    logo_detector.detect_logo()
 
     # if logo_detector.is_logo_detected() is False:
     #     print_err("  No logo detected.")
