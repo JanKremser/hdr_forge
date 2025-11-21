@@ -7,6 +7,7 @@ import time
 from typing import Dict, Optional, Tuple
 
 from hdr_forge.cli.cli_output import create_ffmpeg_progress_handler, print_debug, print_err
+from hdr_forge.core.config import get_global_temp_directory
 from hdr_forge.core.service import build_ffmpeg_cmd_dict_to_str
 from hdr_forge.tools import mkvmerge
 from hdr_forge.ffmpeg.ffmpeg_wrapper import run_ffmpeg
@@ -39,6 +40,8 @@ class Encoder:
             settings: Encoder settings containing all encoding parameters
             crop_callback: Optional callback for crop detection progress
         """
+        self.temp_dir: Path = get_global_temp_directory()
+
         self._video: Video = video
         self._target_file: Path = target_file
         self._target_video_codec: VideoCodec = settings.video_codec
@@ -342,36 +345,6 @@ class Encoder:
         """
         return self._target_file
 
-    def _get_temp_directory(self) -> Path:
-        """Get or create temporary directory for intermediate files.
-
-        Creates a temp directory in the same location as target_file:
-        {target_file_dir}/.hdr_forge_temp_{target_file_stem}/
-
-        Returns:
-            Path to temporary directory
-        """
-        temp_dir = self._target_file.parent / f".hdr_forge_temp_{self._target_file.stem}"
-        temp_dir.mkdir(parents=True, exist_ok=True)
-        return temp_dir
-
-    def cleanup_temp_directory(self) -> None:
-        """Remove temporary directory and all its contents.
-
-        Deletes the temp directory created by _get_temp_directory().
-        Handles errors gracefully and prints warnings if cleanup fails.
-        """
-        import shutil
-
-        temp_dir = self._target_file.parent / f".hdr_forge_temp_{self._target_file.stem}"
-
-        if temp_dir.exists() and temp_dir.is_dir():
-            try:
-                shutil.rmtree(temp_dir)
-                print(f"Cleaned up temporary files: {temp_dir}")
-            except Exception as e:
-                print(f"Warning: Failed to clean up temporary directory {temp_dir}: {e}")
-
     def _build_ffmpeg_output_options(self) -> Dict[str, str]:
         """Build FFmpeg output options dictionary for encoding.
 
@@ -470,13 +443,10 @@ class Encoder:
         total_frames: int = self._video.get_total_frames()
         duration: int = self._video.get_total_frames()
 
-        # Create temporary directory for all intermediate files
-        temp_dir: Path = self._get_temp_directory()
-
         # Step 1: Extract base layer (HEVC without EL+RPU) from original video
         base_layer_hevc_path: Path = dovi_tool.extract_base_layer(
             input_path=input_file,
-            output_hevc=temp_dir / f"video_BL.hevc",
+            output_hevc=self.temp_dir / f"video_BL.hevc",
             total_frames=total_frames,
             duration=duration,
         )
@@ -489,8 +459,6 @@ class Encoder:
             output_mkv=self._target_file,
         )
 
-        self.cleanup_temp_directory()
-
         return True
 
     def _convert_dolby_profile(
@@ -500,7 +468,7 @@ class Encoder:
         source_dv_profile: DolbyVisionProfile | None,
         target_dv_profile: DolbyVisionProfile | None,
     ) -> Path:
-        temp_dir: Path = self._get_temp_directory()
+        temp_dir: Path = self.temp_dir
         total_frames: int = self._video.get_total_frames()
         duration: int = self._video.get_total_frames()
 
@@ -512,6 +480,7 @@ class Encoder:
             dv_profile_encoding=target_dv_profile,
             total_frames=total_frames,
             duration=duration,
+            use_cache=True,
         )
 
         hevc: Path = hevc_bl
@@ -549,7 +518,7 @@ class Encoder:
         duration: int = self._video.get_total_frames()
 
         # Create temporary directory for all intermediate files
-        temp_dir: Path = self._get_temp_directory()
+        temp_dir: Path = self.temp_dir
 
         # Step 1: Extract base layer (HEVC without RPU) from original video
         base_layer_hevc_path: Path = dovi_tool.extract_base_layer(
@@ -573,9 +542,6 @@ class Encoder:
             input_mkv=input_file,
             output_mkv=self._target_file,
         )
-
-        # Step 4: Clean up temporary directory (should be empty now, but removes it anyway)
-        self.cleanup_temp_directory()
 
         return True
 
@@ -611,7 +577,7 @@ class Encoder:
         duration: int = self._video.get_total_frames()
 
         # Create temporary directory for all intermediate files
-        temp_dir: Path = self._get_temp_directory()
+        temp_dir: Path = self.temp_dir
 
         # Step 1: Extract base layer (HEVC without RPU) from original video
         base_layer_hevc_path: Path = dovi_tool.extract_base_layer(
@@ -651,7 +617,6 @@ class Encoder:
 
         # For HDR10 or SDR encoding, we are done here
         if only_hdr10_or_sdr_encoding:
-            self.cleanup_temp_directory()
             return True
 
         print()
@@ -681,9 +646,6 @@ class Encoder:
             input_mkv=encoded_base_layer_mkv,
             output_mkv=self._target_file,
         )
-
-        # Step 7: Clean up temporary directory (should be empty now, but removes it anyway)
-        self.cleanup_temp_directory()
 
         return True
 

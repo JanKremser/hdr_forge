@@ -166,7 +166,8 @@ def extract_rpu(
     dv_profile_source: Optional[DolbyVisionProfile] = None,
     dv_profile_encoding: Optional[DolbyVisionProfile] = None,
     total_frames: Optional[int] = None,
-    duration: Optional[float] = None
+    duration: Optional[float] = None,
+    use_cache: bool = False,
 ) -> Path:
     """Extract Dolby Vision RPU (Reference Processing Unit) metadata.
 
@@ -186,11 +187,12 @@ def extract_rpu(
         RuntimeError: If RPU extraction fails
     """
     fallback_path = input_path.with_suffix('.rpu')
-    # if fallback_path.exists():
-    #     return fallback_path
 
     if output_rpu is None:
         output_rpu = fallback_path
+
+    if output_rpu.exists() and use_cache:
+        return output_rpu
 
     dovi_tool_exec = _get_dovi_tool_path()
 

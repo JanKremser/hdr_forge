@@ -8,9 +8,10 @@ debug_mode: bool = False
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.abspath(os.path.join(CURRENT_DIR, "../../../"))
 
-session_temp_folder: str = os.path.join(CURRENT_DIR, ".hdr_forge_temp")
+global_temp_dir: Path = Path(f"{PROJECT_ROOT}/.hdr_forge_temp")
 
-def set_session_temp_folder(input_path_str: str | None, output_path_str: str | None) -> None:
+def set_global_temp_directory(input_path_str: str | None, output_path_str: str | None) -> None:
+    global global_temp_dir
     input_path: Path | None = None
     if input_path_str:
         input_path = Path(input_path_str)
@@ -19,9 +20,43 @@ def set_session_temp_folder(input_path_str: str | None, output_path_str: str | N
     if output_path_str:
         output_path = Path(output_path_str)
 
-    if input_path and input_path.is_file():
-        base_temp_folder = input_path.parent
-    elif output_path and output_path.is_file():
-        base_temp_folder = output_path.parent
+    base_temp_folder: Path = Path("/tmp")
 
-    session_temp_folder = os.path.join(base_temp_folder, ".hdr_forge_temp")
+    if output_path and output_path.is_file():
+        base_temp_folder = output_path.parent / f".hdr_forge_temp_{output_path.stem}"
+    elif input_path and input_path.is_file():
+        base_temp_folder = input_path.parent / f".hdr_forge_temp_{input_path.stem}"
+
+    global_temp_dir = base_temp_folder
+
+def get_global_temp_directory(sub_folder: str | None = None) -> Path:
+    """Get or create temporary directory for intermediate files.
+
+    Creates a temp directory in the same location as target_file:
+    {target_file_dir}/.hdr_forge_temp_{target_file_stem}/
+
+    Returns:
+        Path to temporary directory
+    """
+    temp_dir: Path = global_temp_dir
+    if sub_folder:
+        temp_dir = temp_dir / sub_folder
+    temp_dir.mkdir(parents=True, exist_ok=True)
+    return temp_dir
+
+def clear_global_temp_directory() -> None:
+    """Remove temporary directory and all its contents.
+
+    Deletes the temp directory created by get_temp_directory().
+    Handles errors gracefully and prints warnings if cleanup fails.
+    """
+    import shutil
+
+    temp_dir: Path = get_global_temp_directory()
+
+    if temp_dir.exists() and temp_dir.is_dir():
+        try:
+            shutil.rmtree(temp_dir)
+            print(f"Cleaned up temporary files: {temp_dir}")
+        except Exception as e:
+            print(f"Warning: Failed to clean up temporary directory {temp_dir}: {e}")

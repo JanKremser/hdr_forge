@@ -82,7 +82,7 @@ def show_video_info(input_file: Path) -> bool:
         print(f"Error processing {input_file.name}: {e}")
         return False
     finally:
-        video.cleanup_temp_files()
+        config.clear_global_temp_directory()
 
 
 def convert_video(
@@ -127,8 +127,7 @@ def convert_video(
         print(f"Error processing {video.get_filepath().name}: {e}")
         return False
     finally:
-        video.cleanup_temp_files()
-        encoder.cleanup_temp_directory()
+        config.clear_global_temp_directory()
 
 
 def process_convert_command(args) -> int:
@@ -247,8 +246,7 @@ def process_inject_hdr_metadata_command(args) -> int:
         print_err(f"Error processing {input_path.name}: {e}")
         return 1
     finally:
-        video.cleanup_temp_files()
-        injector.cleanup_temp_directory()
+        config.clear_global_temp_directory()
 
     return 0 if success else 1
 
@@ -294,7 +292,7 @@ def main() -> None:
     if config.debug_mode:
         print_debug("Debug mode enabled")
 
-    config.set_session_temp_folder(getattr(args, 'input', None), getattr(args, 'output', None))
+    config.set_global_temp_directory(input_path_str=getattr(args, 'input', None), output_path_str=getattr(args, 'output', None))
 
     code: int = 0
     # Execute the corresponding subcommand
@@ -315,6 +313,8 @@ def main() -> None:
     else:
         print_err(f"Unknown command: {args.command}")
         code = 1
+
+    config.clear_global_temp_directory()
 
     shutdown: bool = getattr(args, 'shutdown', False) or False
     if shutdown:

@@ -6,6 +6,7 @@ import subprocess
 from pathlib import Path
 from typing import Dict, LiteralString, Optional, Tuple
 
+from hdr_forge.core.config import get_global_temp_directory
 from hdr_forge.tools import mkvmerge
 from hdr_forge.tools import dovi_tool
 from hdr_forge.typedefs.encoder_typing import HdrSdrFormat
@@ -46,32 +47,22 @@ class Video:
         self.width: int = video_stream.get('width', 0)
         self.height: int = video_stream.get('height', 0)
 
-        self._temp_files: list[Path] = []
+        self.temp_dir: Path = get_global_temp_directory()
 
         self._dolby_vision_rpu_info: Optional[DolbyVisionRpuInfo] = None
         if self.is_dolby_vision_video() and not with_out_rpu_extraction:
             ## get dolby vision rpu infos
             rpu_file_path: Path = dovi_tool.extract_rpu(
                 input_path=self.get_filepath(),
+                output_rpu=self.temp_dir / "RPU.rpu",
                 dv_profile_source=self.get_dolby_vision_profile(),
                 total_frames=self.get_total_frames(),
                 duration=self.get_duration_seconds(),
+                use_cache=False,
             )
-            self._temp_files.append(rpu_file_path)
             self._dolby_vision_rpu_info = dovi_tool.get_rpu_info(
                 rpu_path=Path(rpu_file_path)
             )
-
-    def cleanup_temp_files(self) -> None:
-        """Remove temporary files created during processing."""
-        import os
-
-        for temp_file in self._temp_files:
-            try:
-                if temp_file.exists():
-                    temp_file.unlink(missing_ok=True)
-            except Exception as e:
-                print(f"Warning: Failed to remove temporary file {temp_file}: {e}")
 
     def extract_hdr_metadata(self) -> HdrMetadata:
         # FFmpeg command: run showinfo only until data appears
