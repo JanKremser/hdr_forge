@@ -635,7 +635,7 @@ Clusters merged: {merged_count}"""
     #     cap.release()
     #     print(f"{frame_idx} Maskenbilder erzeugt in {output_folder}")
 
-    def _create_crop_video(self) -> bool:
+    def _create_crop_video_by_mask(self, mask_result: MaskResult) -> bool:
         total_frames = self._video.get_total_frames()
         duration = self._video.get_duration_seconds()
 
@@ -651,11 +651,45 @@ Clusters merged: {merged_count}"""
             )
 
         output_options = {
-            'vf': f"crop=x={self._result.x}:y={self._result.y}:w={self._result.width}:h={self._result.height}"
+            'vf': f"crop=x={mask_result.x}:y={mask_result.y}:w={mask_result.width}:h={mask_result.height}"
         }
         success: bool = ffmpeg_wrapper.run_ffmpeg(
             input_file=self._video._filepath,
-            output_file=Path("/home/jan/Dokumente/GitHub/ehdr/samples/test/crop_video.mp4"),
+            output_file=Path("/home/jan/Dokumente/GitHub/ehdr/samples/test/crop_video_center.mp4"),
+            output_options=output_options,
+            progress_callback=progress_callback
+        )
+
+        return success
+
+    def _create_crop_video_delogo_by_mask(self, mask_result: MaskResult) -> bool:
+        total_frames = self._video.get_total_frames()
+        duration = self._video.get_duration_seconds()
+
+        progress_callback = None
+
+        process_start_time: float = time.time()
+
+        if duration > 0:
+            progress_callback = create_ffmpeg_progress_handler(
+                duration=duration,
+                total_frames=total_frames,
+                process_start_time=process_start_time,
+            )
+
+        mask_info: dict | None = self._get_mask_info(mask_result.mask)
+        if mask_info is None:
+            print_err("Could not get mask info for delogo filter.")
+            return False
+
+        delogo_str: str = f"delogo=x={mask_info['x']}:y={mask_info['y']}:w={mask_info['width']}:h={mask_info['height']}"
+
+        output_options = {
+            'vf': f"crop=x={mask_result.x}:y={mask_result.y}:w={mask_result.width}:h={mask_result.height},{delogo_str}"
+        }
+        success: bool = ffmpeg_wrapper.run_ffmpeg(
+            input_file=self._video._filepath,
+            output_file=Path("/home/jan/Dokumente/GitHub/ehdr/samples/test/crop_video_center_delogo.mp4"),
             output_options=output_options,
             progress_callback=progress_callback
         )
@@ -829,4 +863,6 @@ Clusters merged: {merged_count}"""
         )
 
         cv2.imwrite("/home/jan/Dokumente/GitHub/ehdr/samples/test/mask_mini_test_center.png", musk_center.mask)
-        print(f"Finale Schnittmengen-Maske erstellt:")
+
+        self._create_crop_video_by_mask(musk_center)
+        self._create_crop_video_delogo_by_mask(musk_center)
