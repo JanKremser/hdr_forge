@@ -3,9 +3,9 @@
 import sys
 from pathlib import Path
 
-from hdr_forge.analyze.detect_logo import LogoDetector, LogoResult
+from hdr_forge.analyze.detect_logo import LogoDetector
 from hdr_forge.cli.args import pars_args, pars_encoder_settings
-from hdr_forge.cli.cli_output import print_conversion_summary, print_debug, print_err, print_info, print_warn
+from hdr_forge.cli.cli_output import print_conversion_summary, print_debug, print_err, print_warn
 from hdr_forge.cli.encoder import print_encoding_params
 from hdr_forge.cli.video import print_video_infos
 from hdr_forge.core import config
@@ -268,19 +268,22 @@ def process_detect_logo_command(args) -> int:
 
     video = Video(filepath=input_path, with_out_rpu_extraction=True)
 
-    logo_detector = LogoDetector(video=video, logo_removal=LogoRemovalMode.AUTO)
-    logo_detector.detect_logo()
+    logo_detector = LogoDetector(video=video, logo_removal=LogoRemovalMode.AUTO_TOP_LEFT)
+    # logo_detector.detect_logo(
+    #     padding=0.15,
+    # )
+    logo_detector.build_logo_mask()
 
-    if logo_detector.is_logo_detected() is False:
-        print_err("  No logo detected.")
-        return 1
+    # if logo_detector.is_logo_detected() is False:
+    #     print_err("  No logo detected.")
+    #     return 1
 
-    logo: LogoResult = logo_detector.get_result()
-    print_info(f"Logo detected at (x={logo.x}, y={logo.y}), "
-            f"size=({logo.width}x{logo.height}), "
-            f"confidence={logo.confidence:.2f}")
+    # logo: LogoResult = logo_detector.get_result()
+    # print_info(f"Logo detected at (x={logo.x}, y={logo.y}), "
+    #         f"size=({logo.width}x{logo.height}), "
+    #         f"confidence={logo.confidence:.2f}")
 
-    print_info(f"Delogo-Filter: {logo_detector.get_ffmpeg_delogo_filter()}")
+    # print_info(f"Delogo-Filter: {logo_detector.get_ffmpeg_delogo_filter()}")
     return 0
 
 
@@ -290,6 +293,8 @@ def main() -> None:
     config.debug_mode = getattr(args, 'debug', False) or False
     if config.debug_mode:
         print_debug("Debug mode enabled")
+
+    config.set_session_temp_folder(getattr(args, 'input', None), getattr(args, 'output', None))
 
     code: int = 0
     # Execute the corresponding subcommand

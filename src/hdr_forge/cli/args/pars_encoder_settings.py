@@ -226,6 +226,14 @@ def _get_logo_removal_mode_from_string(logo_str: str | None) -> LogoRemovalMode:
         return LogoRemovalMode.OFF
     elif logo_str == 'auto':
         return LogoRemovalMode.AUTO
+    elif logo_str == 'auto-top-left':
+        return LogoRemovalMode.AUTO_TOP_LEFT
+    elif logo_str == 'auto-top-right':
+        return LogoRemovalMode.AUTO_TOP_RIGHT
+    elif logo_str == 'auto-bot-left':
+        return LogoRemovalMode.AUTO_BOT_LEFT
+    elif logo_str == 'auto-bot-right':
+        return LogoRemovalMode.AUTO_BOT_RIGHT
 
     print_err(f"Invalid logo removal value '{logo_str}', using 'off'")
     sys.exit(1)

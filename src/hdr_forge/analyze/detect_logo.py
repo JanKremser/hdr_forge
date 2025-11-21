@@ -1,14 +1,19 @@
 import os
 from dataclasses import dataclass
+from pathlib import Path
+import time
 from typing import List, Optional, Tuple
+from cv2.gapi import crop
 import numpy as np
 
+from hdr_forge.ffmpeg import ffmpeg_wrapper
 from hdr_forge.typedefs.encoder_typing import LogoRemovalMode
 
 os.environ["OPENCV_FFMPEG_LOGLEVEL"] = "quiet"
 import cv2
+import glob
 
-from hdr_forge.cli.cli_output import print_warn, print_err, ProgressBarSpinner
+from hdr_forge.cli.cli_output import create_ffmpeg_progress_handler, print_warn, print_err, ProgressBarSpinner
 from hdr_forge.video import Video
 
 
@@ -29,10 +34,10 @@ class LogoDetector:
         self,
         video: Video,
         logo_removal: LogoRemovalMode = LogoRemovalMode.OFF,
-        scan_frames: int = 1000,
+        scan_frames: int = 250,
         brightness_threshold: int = 200,
         min_area: int = 500,
-        max_area: int = 20000,
+        max_area: int = 15000,
         corner_ratio: float = 0.3
     ):
         """
@@ -119,6 +124,18 @@ class LogoDetector:
 
             # Determine which corner region this is in
             region = self._determine_corner_region(x, y, w, h, frame_width, frame_height)
+
+            if self._logo_removal == LogoRemovalMode.AUTO_TOP_LEFT and region != 'top-left':
+                continue
+            if self._logo_removal == LogoRemovalMode.AUTO_TOP_RIGHT and region != 'top-right':
+                continue
+            if self._logo_removal == LogoRemovalMode.AUTO_BOT_LEFT and region != 'bottom-left':
+                continue
+            if self._logo_removal == LogoRemovalMode.AUTO_BOT_RIGHT and region != 'bottom-right':
+                continue
+
+            # if region not in ['top-left']:
+            #     continue
 
             if region:
                 candidates.append((x, y, w, h, region))
@@ -290,7 +307,8 @@ class LogoDetector:
 
     def detect_logo(
         self,
-        show_debug: bool = False
+        show_debug: bool = False,
+        padding: float = 0.05
     ) -> None:
         """
         Automatically detect logo position by analyzing multiple frames.
@@ -423,17 +441,17 @@ class LogoDetector:
 
         # Take only the largest reasonable detection
         largest_box = reasonable_boxes[0]
-        avg_x = 1 if largest_box[0] == 0 else largest_box[0]
-        avg_y = 1 if largest_box[1] == 0 else largest_box[1]
+        avg_x = largest_box[0]
+        avg_y = largest_box[1]
         # avg_hw = int(max(largest_box[2], largest_box[3]))
         # avg_w = avg_hw
         # avg_h = avg_hw
         avg_w = largest_box[2]
         avg_h = largest_box[3]
 
-        # Add small 15% padding
-        padding_w = int(avg_w * 0.01)
-        padding_h = int(avg_h * 0.01)
+        # Add small 5% padding
+        padding_w = int(avg_w * padding)
+        padding_h = int(avg_h * padding)
 
         # Apply padding
         padded_x = avg_x - padding_w
@@ -442,8 +460,8 @@ class LogoDetector:
         padded_h = avg_h + 2 * padding_h
 
         # Ensure we stay within video bounds
-        avg_x = max(0, padded_x)
-        avg_y = max(0, padded_y)
+        avg_x = max(1, padded_x)
+        avg_y = max(1, padded_y)
         avg_w = min(self._video.width - avg_x, padded_w)
         avg_h = min(self._video.height - avg_y, padded_h)
 
@@ -460,6 +478,9 @@ class LogoDetector:
 
         # Calculate confidence based on detection consistency
         confidence = largest_cluster_size / len(detected_boxes) if detected_boxes else 0.0
+
+        avg_w = avg_w if avg_w % 2 == 0 else avg_w + 1
+        avg_h = avg_h if avg_h % 2 == 0 else avg_h + 1
 
         self._result = LogoResult(
             x=avg_x,
@@ -511,3 +532,234 @@ Clusters merged: {merged_count}"""
             return None
 
         return f"delogo=x={self._result.x}:y={self._result.y}:w={self._result.width}:h={self._result.height}"
+
+    # def _create_final_mask(self, mask_folder: str, output_path: str, padding: int, blur_radius: int = 0):
+    #     """
+    #     Erzeugt eine finale Maske, bei der nur die Pixel weiß bleiben,
+    #     die auf allen gültigen Masken weiß sind.
+    #     Frames, die komplett schwarz sind, werden ignoriert.
+
+    #     Optional kann die Maske weichgezeichnet werden.
+
+    #     Args:
+    #         mask_folder (str): Pfad zu den Masken (z.B. "./test/all_frames/")
+    #         output_path (str): Pfad zur finalen Maske (z.B. "./test/final_mask.png")
+    #         blur_radius (int, optional): Radius für GaussianBlur. 0 = keine Weichzeichnung.
+    #     """
+    #     # Alle Masken laden
+    #     mask_files = sorted(glob.glob(os.path.join(mask_folder, "*.png")))
+    #     if not mask_files:
+    #         raise FileNotFoundError(f"Keine PNG-Dateien im Ordner {mask_folder} gefunden!")
+
+    #     valid_masks = []
+    #     for f in mask_files:
+    #         mask = cv2.imread(f, cv2.IMREAD_GRAYSCALE)
+    #         if mask is None:
+    #             continue
+    #         # Nur Masken verwenden, die mindestens ein weißes Pixel haben
+    #         if np.any(mask > 0):
+    #             valid_masks.append(mask)
+
+    #     if not valid_masks:
+    #         raise ValueError("Keine gültigen Masken mit weißen Pixeln gefunden!")
+
+    #     # Alle Masken zu einem Stack zusammenfassen
+    #     stack = np.stack(valid_masks, axis=0)
+
+    #     # Pixelweise Minimum über alle Frames (nur weiß, wenn alle Frames an dieser Stelle weiß sind)
+    #     final_mask = np.min(stack, axis=0)
+    #     final_mask[final_mask > 0] = 255  # Binärmaske sicherstellen
+
+    #     # Kernel für Dilate erstellen
+    #     kernel = np.ones((padding, padding), np.uint8)
+    #     # Dilate anwenden → weiße Bereiche wachsen nach außen
+    #     final_mask = cv2.dilate(final_mask, kernel, iterations=1)
+
+    #     # Optional weichzeichnen
+    #     if blur_radius > 0:
+    #         blurred = cv2.GaussianBlur(final_mask, (blur_radius, blur_radius), 0)
+    #         # Optional: wieder hartes Binärbild
+    #         _, padded_mask_soft = cv2.threshold(blurred, 127, 255, cv2.THRESH_BINARY)
+    #         final_mask = padded_mask_soft
+
+    #     # Speichern
+    #     cv2.imwrite(output_path, final_mask)
+    #     print(f"Finale Schnittmengen-Maske erstellt: {output_path}")
+
+    # def generate_mask_images(self, video_path: str, output_folder: str, threshold: int = 120):
+    #     """
+    #     Erstellt aus einem Video binäre Maskenbilder für jeden Frame (oder jede Sekunde).
+
+    #     Args:
+    #         video_path (str): Pfad zum Video.
+    #         output_folder (str): Ordner, in dem die Masken gespeichert werden.
+    #         crop_rect (tuple): (x, y, w, h) Rechteck für Crop.
+    #         threshold (int): Schwellwert für binär (0 oder 255).
+    #     """
+    #     x, y, w, h = self._result.x, self._result.y, self._result.width, self._result.height
+
+    #     if not os.path.exists(output_folder):
+    #         os.makedirs(output_folder)
+
+    #     cap = cv2.VideoCapture(video_path)
+    #     if not cap.isOpened():
+    #         raise FileNotFoundError(f"Video {video_path} konnte nicht geöffnet werden!")
+
+    #     frame_idx = 0
+    #     while True:
+    #         ret, frame = cap.read()
+    #         if not ret:
+    #             break
+
+    #         # Crop
+    #         cropped = frame[y:y+h, x:x+w]
+
+    #         # Graustufen
+    #         gray = cv2.cvtColor(cropped, cv2.COLOR_BGR2GRAY)
+
+    #         # Threshold → Binärmaske
+    #         _, mask = cv2.threshold(gray, threshold, 255, cv2.THRESH_BINARY)
+
+    #         # Speichern
+    #         filename = os.path.join(output_folder, f"mask_{frame_idx:04d}.png")
+    #         cv2.imwrite(filename, mask)
+
+    #         frame_idx += 1
+
+    #     cap.release()
+    #     print(f"{frame_idx} Maskenbilder erzeugt in {output_folder}")
+
+    def _create_crop_video(self) -> bool:
+        total_frames = self._video.get_total_frames()
+        duration = self._video.get_duration_seconds()
+
+        progress_callback = None
+
+        process_start_time: float = time.time()
+
+        if duration > 0:
+            progress_callback = create_ffmpeg_progress_handler(
+                duration=duration,
+                total_frames=total_frames,
+                process_start_time=process_start_time,
+            )
+
+        output_options = {
+            'vf': f"crop=x={self._result.x}:y={self._result.y}:w={self._result.width}:h={self._result.height}"
+        }
+        success: bool = ffmpeg_wrapper.run_ffmpeg(
+            input_file=self._video._filepath,
+            output_file=Path("/home/jan/Dokumente/GitHub/ehdr/samples/test/crop_video.mp4"),
+            output_options=output_options,
+            progress_callback=progress_callback
+        )
+
+        return success
+
+    def _create_mask_from_video(self, video_path: str, threshold: int = 200, padding: int = 0, blur_radius: int = 0):
+        """
+        Erzeugt direkt aus einem Video eine finale Schnittmengen-Maske im Speicher.
+        Nur Pixel, die in allen gültigen Frames weiß sind, bleiben weiß.
+
+        Args:
+            video_path (str): Pfad zum Video.
+            crop_rect (tuple): (x, y, w, h) für Crop.
+            threshold (int): Schwellwert für binär (0 oder 255).
+            blur_radius (int, optional): Radius für Weichzeichnen (0 = keine Weichzeichnung).
+
+        Returns:
+            np.ndarray: finale Maske als NumPy-Array (0 oder 255)
+        """
+        x, y, w, h = self._result.x, self._result.y, self._result.width, self._result.height
+
+        crop_size = w * h
+
+        cap = cv2.VideoCapture(video_path)
+        if not cap.isOpened():
+            raise FileNotFoundError(f"Video {video_path} konnte nicht geöffnet werden!")
+
+        valid_masks = []
+
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break
+
+            # Crop
+            cropped = frame[y:y+h, x:x+w]
+
+            # Graustufen
+            gray = cv2.cvtColor(cropped, cv2.COLOR_BGR2GRAY)
+
+            # Threshold → Binärmaske
+            _, mask = cv2.threshold(gray, threshold, 255, cv2.THRESH_BINARY)
+
+            # Nur Masken verwenden, die mindestens 1% weißes Pixel haben
+            if np.any(mask > (crop_size * 0.01)):
+                valid_masks.append(mask)
+
+        cap.release()
+
+        if not valid_masks:
+            raise ValueError("Keine gültigen Masken mit weißen Pixeln gefunden!")
+
+        # Stack zu einem 3D-Array
+        stack = np.stack(valid_masks, axis=0)
+
+        # Schnittmenge: Pixel nur weiß, wenn in allen Frames weiß
+        final_mask = np.min(stack, axis=0)
+        final_mask[final_mask > 0] = 255
+
+        # add padding
+        kernel = np.ones((padding, padding), np.uint8)
+        final_mask = cv2.dilate(final_mask, kernel, iterations=1)
+
+        # Optional Padding / Weichzeichnen
+        if blur_radius > 0:
+            final_mask = cv2.GaussianBlur(final_mask, (blur_radius, blur_radius), 0)
+
+        #inverted_mask = cv2.bitwise_not(final_mask)
+        return final_mask
+
+    def _get_mask_info(self, mask):
+        """Findet Position und Größe der Maske."""
+        # Konturen finden
+        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+        if not contours:
+            return None
+
+        # Größte Kontur oder alle kombinieren
+        all_points = np.vstack(contours)
+        x, y, w, h = cv2.boundingRect(all_points)
+
+        # Zusätzliche Infos
+        white_pixels = np.count_nonzero(mask)
+        total_pixels = mask.shape[0] * mask.shape[1]
+
+        return {
+            'x': x,
+            'y': y,
+            'width': w,
+            'height': h,
+            'area_pixels': white_pixels,
+            'coverage': white_pixels / total_pixels
+        }
+
+    def build_logo_mask(self):
+        mask = self._create_mask_from_video(
+            video_path=str(self._video._filepath),
+            threshold=80,
+            padding=10,
+            blur_radius=5
+        )
+        info: dict | None = self._get_mask_info(mask)
+        if info is None:
+            print("Keine Konturen in der Maske gefunden.")
+        else:
+            print(f"Position: ({info['x']}, {info['y']})")
+            print(f"Größe: {info['width']}x{info['height']} px")
+            print(f"Weiße Pixel: {info['area_pixels']}")
+
+        cv2.imwrite("/home/jan/Dokumente/GitHub/ehdr/samples/test/mask_full_mini.png", mask)
+        print(f"Finale Schnittmengen-Maske erstellt:")

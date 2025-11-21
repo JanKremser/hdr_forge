@@ -181,6 +181,10 @@ class HdrForgeEncodingHardwarePresets(Enum):
 class LogoRemovalMode(Enum):
     OFF = "off"
     AUTO = "auto"
+    AUTO_TOP_LEFT = "auto-top-left"
+    AUTO_TOP_RIGHT = "auto-top-right"
+    AUTO_BOT_LEFT = "auto-bot-left"
+    AUTO_BOT_RIGHT = "auto-bot-right"
 
 @dataclass
 class HdrForgeEncodingPresetSettings:
