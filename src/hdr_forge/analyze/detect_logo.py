@@ -3,7 +3,6 @@ from dataclasses import dataclass
 from pathlib import Path
 import time
 from typing import List, Optional, Tuple
-from idlelib.colorizer import prog
 import numpy as np
 
 from hdr_forge.ffmpeg import ffmpeg_wrapper
@@ -14,6 +13,14 @@ import cv2
 
 from hdr_forge.cli.cli_output import create_ffmpeg_progress_handler, print_warn, print_err, ProgressBarSpinner
 from hdr_forge.video import Video
+
+@dataclass
+class MaskResult:
+    mask: np.ndarray
+    x: int
+    y: int
+    width: int
+    height: int
 
 
 @dataclass
@@ -655,7 +662,7 @@ Clusters merged: {merged_count}"""
 
         return success
 
-    def _create_mask_from_video(self, video_path: str, threshold: int = 200, padding: int = 0, blur_radius: int = 0, invated: bool = False) -> np.ndarray:
+    def _create_mask_from_video(self, video_path: str, threshold: int = 200, padding: int = 0, blur_radius: int = 0, invated: bool = False) -> MaskResult:
         """
         Erzeugt direkt aus einem Video eine finale Schnittmengen-Maske im Speicher.
         Nur Pixel, die in allen gültigen Frames weiß sind, bleiben weiß.
@@ -723,8 +730,14 @@ Clusters merged: {merged_count}"""
         if invated:
             inverted_mask = cv2.bitwise_not(final_mask)
             final_mask = inverted_mask
-            
-        return final_mask
+
+        return MaskResult(
+            mask=final_mask,
+            x=x,
+            y=y,
+            width=w,
+            height=h
+        )
 
     def _get_mask_info(self, mask):
         """Findet Position und Größe der Maske."""
@@ -751,14 +764,57 @@ Clusters merged: {merged_count}"""
             'coverage': white_pixels / total_pixels
         }
 
+    def _center_mask_in_canvas(self, mask: np.ndarray, crop_rect: Tuple[int, int, int, int], padding: int = 10) -> MaskResult:
+        """
+        Verschiebt die Maskierung in der Maske in die Mitte einer neuen Maske mit Padding.
+        Berechnet die neue Position und Größe im Originalvideo.
+
+        Args:
+            mask (np.ndarray): Binärmaske (0/255).
+            crop_rect (tuple): (x, y, w, h) Bereich im Originalvideo, aus dem die Maske stammt.
+            padding (int): Abstand um die Maskierung herum.
+
+        Returns:
+            centered_mask (np.ndarray): Neue Maske mit zentrierter Maskierung.
+            new_video_pos (tuple): (x, y, w, h) im Originalvideo.
+        """
+        info = self._get_mask_info(mask)
+        if info is None:
+            raise ValueError("Keine Kontur in der Maske gefunden!")
+
+        # Alte Position und Größe in der Maske
+        mask_x, mask_y, mask_w, mask_h = info['x'], info['y'], info['width'], info['height']
+
+        # Neue Größe inkl. Padding
+        new_w = mask_w + 2 * padding
+        new_h = mask_h + 2 * padding
+
+        # Erstelle neue leere Maske
+        centered_mask = np.zeros((new_h, new_w), dtype=np.uint8)
+
+        # Kopiere die Maskierung in die Mitte
+        centered_mask[padding:padding+mask_h, padding:padding+mask_w] = mask[mask_y:mask_y+mask_h, mask_x:mask_x+mask_w]
+
+        # Berechne neue Position im Originalvideo
+        crop_x, crop_y, crop_w, crop_h = crop_rect
+        new_x = crop_x + mask_x - padding
+        new_y = crop_y + mask_y - padding
+
+        # Stelle sicher, dass die neue Position nicht negativ ist
+        new_x = max(0, new_x)
+        new_y = max(0, new_y)
+
+        # Optional: Begrenzung auf Videogröße kann hier ergänzt werden
+        return MaskResult(mask=centered_mask, x=new_x, y=new_y, width=new_w, height=new_h)
+
     def build_logo_mask(self):
-        mask = self._create_mask_from_video(
+        mask_crop: MaskResult = self._create_mask_from_video(
             video_path=str(self._video._filepath),
             threshold=40,
             padding=10,
             blur_radius=5
         )
-        info: dict | None = self._get_mask_info(mask)
+        info: dict | None = self._get_mask_info(mask_crop.mask)
         if info is None:
             print("Keine Konturen in der Maske gefunden.")
         else:
@@ -766,5 +822,11 @@ Clusters merged: {merged_count}"""
             print(f"Größe: {info['width']}x{info['height']} px")
             print(f"Weiße Pixel: {info['area_pixels']}")
 
-        cv2.imwrite("/home/jan/Dokumente/GitHub/ehdr/samples/test/mask_mini_test.png", mask)
+        musk_center: MaskResult = self._center_mask_in_canvas(
+            mask=mask_crop.mask,
+            crop_rect=(mask_crop.x, mask_crop.y, mask_crop.width, mask_crop.height),
+            padding=50
+        )
+
+        cv2.imwrite("/home/jan/Dokumente/GitHub/ehdr/samples/test/mask_mini_test_center.png", musk_center.mask)
         print(f"Finale Schnittmengen-Maske erstellt:")
