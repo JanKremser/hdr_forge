@@ -1,4 +1,4 @@
 # Python dependencies
 numpy==2.3.5
 opencv-python==4.12.0.88
-ultralytics==8.3.229
+pyinpaint==1.0.0

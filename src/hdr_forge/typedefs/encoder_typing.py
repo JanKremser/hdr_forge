@@ -189,6 +189,7 @@ class LogoRemovalMode(Enum):
     OFF = "off"
     DELOGO = "delogo"
     MASK = "mask"
+    INPAINT = "inpaint"
 
 @dataclass
 class LogoRemovelSettings:

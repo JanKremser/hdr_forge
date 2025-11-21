@@ -240,6 +240,8 @@ def _get_logo_removal_mode_from_string(logo_str: str | None) -> LogoRemovelSetti
                 mode = LogoRemovalMode.DELOGO
             elif mode_part == 'mask':
                 mode = LogoRemovalMode.MASK
+            elif mode_part == 'inpaint':
+                mode = LogoRemovalMode.INPAINT
             else:
                 print_err(f"Invalid logo removal mode '{mode_part}', using 'off'")
                 sys.exit(1)

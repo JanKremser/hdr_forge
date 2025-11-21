@@ -3,9 +3,10 @@
 import sys
 from pathlib import Path
 
-from hdr_forge.analyze.detect_logo import LogoDetector
+from hdr_forge.analyze.detect_logo import LogoDetector, MaskResult
 from hdr_forge.cli.args import pars_args, pars_encoder_settings
 from hdr_forge.cli.cli_output import print_conversion_summary, print_debug, print_err, print_warn
+from hdr_forge.cli.detect_logo import print_mask_infos
 from hdr_forge.cli.encoder import print_encoding_params
 from hdr_forge.cli.video import print_video_infos
 from hdr_forge.core import config
@@ -127,7 +128,8 @@ def convert_video(
         print(f"Error processing {video.get_filepath().name}: {e}")
         return False
     finally:
-        config.clear_global_temp_directory()
+        #config.clear_global_temp_directory()
+        pass
 
 
 def process_convert_command(args) -> int:
@@ -270,18 +272,9 @@ def process_detect_logo_command(args) -> int:
         mode=LogoRemovalMode.DELOGO,
         position=LogoRemovalAutoDetectMode.AUTO_TOP_LEFT,
     ))
-    logo_detector.detect_logo()
+    mask: MaskResult | None = logo_detector.create_mask()
+    print_mask_infos(mask=mask)
 
-    # if logo_detector.is_logo_detected() is False:
-    #     print_err("  No logo detected.")
-    #     return 1
-
-    # logo: LogoResult = logo_detector.get_result()
-    # print_info(f"Logo detected at (x={logo.x}, y={logo.y}), "
-    #         f"size=({logo.width}x{logo.height}), "
-    #         f"confidence={logo.confidence:.2f}")
-
-    # print_info(f"Delogo-Filter: {logo_detector.get_ffmpeg_delogo_filter()}")
     return 0
 
 
@@ -314,7 +307,7 @@ def main() -> None:
         print_err(f"Unknown command: {args.command}")
         code = 1
 
-    config.clear_global_temp_directory()
+    #config.clear_global_temp_directory()
 
     shutdown: bool = getattr(args, 'shutdown', False) or False
     if shutdown:

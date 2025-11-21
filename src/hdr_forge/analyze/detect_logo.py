@@ -1,3 +1,5 @@
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ProcessPoolExecutor
 import os
 from dataclasses import dataclass
 from pathlib import Path
@@ -5,6 +7,11 @@ import sys
 import time
 from typing import List, Optional, Tuple
 import numpy as np
+from pyinpaint import Inpaint
+
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from PIL import Image
+import tempfile
 
 from hdr_forge.core.config import get_global_temp_directory
 from hdr_forge.ffmpeg import ffmpeg_wrapper
@@ -71,7 +78,7 @@ class LogoDetector:
         self._result: MaskResult | None = None
         self._crop_mask_delogo_video: Path | None = None
 
-        self.temp_dir: Path = get_global_temp_directory("remove_logo")
+        self.temp_dir: Path = get_global_temp_directory(sub_folder="remove_logo")
 
     def _find_logo_in_frame(
         self,
@@ -693,6 +700,133 @@ Clusters merged: {merged_count}"""
             height=h
         )
 
+    def process_video_part(self, frames, mask_bin, ps, tmp_video_path, diff_threshold):
+        """
+        Bearbeitet einen Teil des Videos mit Masken-Reuse (für Multiprocessing)
+        """
+        height, width = frames[0].shape[:2]
+        fps = 30  # nur für VideoWriter
+        fourcc = cv2.VideoWriter.fourcc(*"mp4v")
+        writer = cv2.VideoWriter(str(tmp_video_path), fourcc, fps, (width, height))
+
+        prev_frame = None
+        prev_inpainted = None
+
+        tmp_mask = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+        mask_uint8 = (mask_bin * 255).astype(np.uint8)  # True->255, False->0
+        Image.fromarray(mask_uint8).save(tmp_mask.name)
+
+        for frame in frames:
+            use_previous = False
+            if prev_frame is not None:
+                diff = cv2.absdiff(frame, prev_frame)
+                diff_ratio = np.mean(diff > 10)
+                if diff_ratio < diff_threshold and prev_inpainted is not None:
+                    use_previous = True
+
+            if use_previous and prev_inpainted is not None:
+                result_bgr = frame.copy()
+                # Convert to LAB für Helligkeitskorrektur
+                frame_lab = cv2.cvtColor(result_bgr, cv2.COLOR_BGR2LAB)
+                prev_lab = cv2.cvtColor(prev_inpainted, cv2.COLOR_BGR2LAB)
+
+                mask_inpainted = ~mask_bin
+
+                # nur L-Kanal angleichen
+                frame_lab[...,0][mask_inpainted] = prev_lab[...,0][mask_inpainted]
+
+                # zurück zu BGR
+                result_bgr = cv2.cvtColor(frame_lab, cv2.COLOR_LAB2BGR)
+            else:
+                # Inpainting ausführen
+                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                with tempfile.NamedTemporaryFile(suffix=".png") as tmp_frame:
+                    Image.fromarray(frame_rgb).save(tmp_frame.name)
+                    inpainter = Inpaint(tmp_frame.name, tmp_mask.name, ps)
+                    result_bgr = inpainter()
+
+                    result_uint8 = (result_bgr * 255).clip(0,255).astype(np.uint8)
+                    # RGB -> BGR für OpenCV
+                    result_bgr = cv2.cvtColor(result_uint8, cv2.COLOR_RGB2BGR)
+                    #result_bgr = np.clip(result_bgr, 0, 255).astype(np.uint8)
+            prev_inpainted = result_bgr.copy()
+
+            writer.write(result_bgr)
+            prev_frame = frame.copy()
+
+        writer.release()
+        tmp_mask.close()
+        return tmp_video_path
+
+    def inpaint_video_multiprocess(self, input_path: Path, mask: np.ndarray, output_path: Path,
+                                ps: int = 7, processes: int = 14, diff_threshold: float = 0.05):
+        """
+        Multiprozess-Inpainting: Video wird in Partitions geteilt, jeder Prozess bearbeitet einen Part.
+        """
+        cap = cv2.VideoCapture(str(input_path))
+        if not cap.isOpened():
+            raise ValueError(f"Kann Video nicht öffnen: {input_path}")
+
+        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        fps = cap.get(cv2.CAP_PROP_FPS)
+        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+
+        # Maske prüfen / konvertieren
+        if mask.shape[:2] != (height, width):
+            raise ValueError(f"Maskengröße stimmt nicht: {mask.shape[:2]} != {(height, width)}")
+        if len(mask.shape) == 3:
+            mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
+        mask_bin = (mask > 127) # 0/255 to bool
+
+        # Alle Frames laden
+        frames = []
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break
+            frames.append(frame)
+        cap.release()
+
+        # Video in Parts aufteilen
+        part_size = (len(frames) + processes - 1) // processes
+        frame_parts = [frames[i*part_size:(i+1)*part_size] for i in range(processes)]
+
+        tmp_video_files = [tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) for _ in range(processes)]
+        tmp_paths = [f.name for f in tmp_video_files]
+
+        # --- Multiprocessing ---
+        with ProcessPoolExecutor(max_workers=processes) as executor:
+            futures = []
+            for i in range(processes):
+                if len(frame_parts[i]) > 0:
+                    futures.append(executor.submit(self.process_video_part,
+                                                frame_parts[i],
+                                                mask_bin,
+                                                ps,
+                                                tmp_paths[i],
+                                                diff_threshold))
+            # Ergebnisse abwarten
+            for f in futures:
+                f.result()  # jeder Prozess erstellt sein temporäres Video
+
+        # --- Temporäre Videos zusammenführen ---
+        fourcc = cv2.VideoWriter.fourcc(*"mp4v")
+        writer = cv2.VideoWriter(str(output_path), fourcc, fps, (width, height))
+
+        for tmp_path in tmp_paths:
+            cap = cv2.VideoCapture(tmp_path)
+            while True:
+                ret, frame = cap.read()
+                if not ret:
+                    break
+                writer.write(frame)
+            cap.release()
+            os.remove(tmp_path)
+
+        writer.release()
+        print(f"Fertig! Video gespeichert unter: {output_path}")
+
     def _get_mask_info(self, mask):
         """Findet Position und Größe der Maske."""
         # Konturen finden
@@ -790,13 +924,35 @@ Clusters merged: {merged_count}"""
             return None
         return final_crop_video_path
 
-    def detect_logo(self) -> None:
-        if self._logo_removal_settings.mode == LogoRemovalMode.OFF:
-            return
+    def _create_inpainted_mask_video(self, mask_result: MaskResult) -> None | Path:
+        crop_video_path: Path | None = self._create_crop_video_by_mask_size(mask_result=mask_result)
+        if crop_video_path is None:
+            print_err("Could not create crop video.")
+            return None
 
+        output_path: Path = self.temp_dir / "inpainted_logo_video.mp4"
+
+        invate_mask = cv2.bitwise_not(mask_result.mask)
+        mask_path: Path = self.temp_dir / "invate_mask.png"
+        cv2.imwrite(str(mask_path), invate_mask)
+
+        try:
+            self.inpaint_video_multiprocess(
+                input_path=crop_video_path,
+                mask=invate_mask,
+                output_path=output_path,
+            )
+        except Exception as e:
+            print_err(f"Error during inpainting: {e}")
+            return None
+
+        return output_path
+
+
+    def create_mask(self) -> MaskResult | None:
         detect_logo: None | LogoDetectResult = self._detect_logo_in_video()
         if detect_logo is None:
-            return
+            return None
 
         mask_crop: MaskResult = self._create_mask_from_video(
             video_path=str(self._video._filepath),
@@ -805,7 +961,7 @@ Clusters merged: {merged_count}"""
             padding=10,
             blur_radius=5
         )
-        default_padding = 50
+        default_padding = 60
         if self._logo_removal_settings.mode == LogoRemovalMode.DELOGO:
             default_padding = 5
         mask_center: MaskResult = self._center_mask_in_canvas(
@@ -815,13 +971,28 @@ Clusters merged: {merged_count}"""
         )
 
         self._result = mask_center
+        return mask_center
+
+    def detect_logo(self) -> None:
+        if self._logo_removal_settings.mode == LogoRemovalMode.OFF:
+            return
+
+        mask: MaskResult | None = self.create_mask()
+        if mask is None:
+            return None
 
         if self._logo_removal_settings.mode == LogoRemovalMode.MASK:
-            final_mask_delogo_video: None | Path = self._create_mask_delogo(mask_center)
+            final_mask_delogo_video: None | Path = self._create_mask_delogo(mask_result=mask)
             if final_mask_delogo_video is None:
                 sys.exit(1)
                 return
             self._crop_mask_delogo_video = final_mask_delogo_video
+        elif self._logo_removal_settings.mode == LogoRemovalMode.INPAINT:
+            inpainted_video_path: None | Path = self._create_inpainted_mask_video(mask_result=mask)
+            if inpainted_video_path is None:
+                sys.exit(1)
+                return
+            self._crop_mask_delogo_video = inpainted_video_path
 
     def get_result(self) -> MaskResult | None:
         """
@@ -866,7 +1037,7 @@ Clusters merged: {merged_count}"""
         if not self._result:
             return None
 
-        if self._logo_removal_settings.mode != LogoRemovalMode.MASK:
+        if self._logo_removal_settings.mode not in [LogoRemovalMode.MASK, LogoRemovalMode.INPAINT]:
             return None
 
         # Here we would normally return the path to the generated overlay video
@@ -885,7 +1056,7 @@ Clusters merged: {merged_count}"""
         if not self._result:
             return None
 
-        if self._logo_removal_settings.mode != LogoRemovalMode.MASK:
+        if self._logo_removal_settings.mode not in [LogoRemovalMode.MASK, LogoRemovalMode.INPAINT]:
             return None
 
         return f"[0:v][1:v]overlay=x={self._result.x}:y={self._result.y}[v]"
