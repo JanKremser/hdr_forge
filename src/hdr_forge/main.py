@@ -269,9 +269,9 @@ def process_detect_logo_command(args) -> int:
     video = Video(filepath=input_path, with_out_rpu_extraction=True)
 
     logo_detector = LogoDetector(video=video, logo_removal=LogoRemovalMode.AUTO_TOP_LEFT)
-    # logo_detector.detect_logo(
-    #     padding=0.15,
-    # )
+    logo_detector.detect_logo(
+        padding=0.15,
+    )
     logo_detector.build_logo_mask()
 
     # if logo_detector.is_logo_detected() is False:

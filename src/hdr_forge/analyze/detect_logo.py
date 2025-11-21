@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from pathlib import Path
 import time
 from typing import List, Optional, Tuple
-from cv2.gapi import crop
+from idlelib.colorizer import prog
 import numpy as np
 
 from hdr_forge.ffmpeg import ffmpeg_wrapper
@@ -11,7 +11,6 @@ from hdr_forge.typedefs.encoder_typing import LogoRemovalMode
 
 os.environ["OPENCV_FFMPEG_LOGLEVEL"] = "quiet"
 import cv2
-import glob
 
 from hdr_forge.cli.cli_output import create_ffmpeg_progress_handler, print_warn, print_err, ProgressBarSpinner
 from hdr_forge.video import Video
@@ -656,7 +655,7 @@ Clusters merged: {merged_count}"""
 
         return success
 
-    def _create_mask_from_video(self, video_path: str, threshold: int = 200, padding: int = 0, blur_radius: int = 0):
+    def _create_mask_from_video(self, video_path: str, threshold: int = 200, padding: int = 0, blur_radius: int = 0, invated: bool = False) -> np.ndarray:
         """
         Erzeugt direkt aus einem Video eine finale Schnittmengen-Maske im Speicher.
         Nur Pixel, die in allen gültigen Frames weiß sind, bleiben weiß.
@@ -672,11 +671,12 @@ Clusters merged: {merged_count}"""
         """
         x, y, w, h = self._result.x, self._result.y, self._result.width, self._result.height
 
-        crop_size = w * h
-
         cap = cv2.VideoCapture(video_path)
         if not cap.isOpened():
             raise FileNotFoundError(f"Video {video_path} konnte nicht geöffnet werden!")
+
+        progressbar = ProgressBarSpinner(description="Creating logo mask")
+        progressbar.start()
 
         valid_masks = []
 
@@ -694,12 +694,14 @@ Clusters merged: {merged_count}"""
             # Threshold → Binärmaske
             _, mask = cv2.threshold(gray, threshold, 255, cv2.THRESH_BINARY)
 
-            # Nur Masken verwenden, die mindestens 1% weißes Pixel haben
-            if np.any(mask > (crop_size * 0.01)):
+            if np.any(mask > 0):
                 valid_masks.append(mask)
 
-        cap.release()
+            progressbar.update(percent=(cap.get(cv2.CAP_PROP_POS_FRAMES) / cap.get(cv2.CAP_PROP_FRAME_COUNT)) * 100)
 
+        progressbar.stop("Mask creation completed.")
+
+        cap.release()
         if not valid_masks:
             raise ValueError("Keine gültigen Masken mit weißen Pixeln gefunden!")
 
@@ -718,7 +720,10 @@ Clusters merged: {merged_count}"""
         if blur_radius > 0:
             final_mask = cv2.GaussianBlur(final_mask, (blur_radius, blur_radius), 0)
 
-        #inverted_mask = cv2.bitwise_not(final_mask)
+        if invated:
+            inverted_mask = cv2.bitwise_not(final_mask)
+            final_mask = inverted_mask
+            
         return final_mask
 
     def _get_mask_info(self, mask):
@@ -749,7 +754,7 @@ Clusters merged: {merged_count}"""
     def build_logo_mask(self):
         mask = self._create_mask_from_video(
             video_path=str(self._video._filepath),
-            threshold=80,
+            threshold=40,
             padding=10,
             blur_radius=5
         )
@@ -761,5 +766,5 @@ Clusters merged: {merged_count}"""
             print(f"Größe: {info['width']}x{info['height']} px")
             print(f"Weiße Pixel: {info['area_pixels']}")
 
-        cv2.imwrite("/home/jan/Dokumente/GitHub/ehdr/samples/test/mask_full_mini.png", mask)
+        cv2.imwrite("/home/jan/Dokumente/GitHub/ehdr/samples/test/mask_mini_test.png", mask)
         print(f"Finale Schnittmengen-Maske erstellt:")
