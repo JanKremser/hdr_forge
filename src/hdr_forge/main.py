@@ -128,7 +128,7 @@ def convert_video(
         print(f"Error processing {video.get_filepath().name}: {e}")
         return False
     finally:
-        #config.clear_global_temp_directory()
+        config.clear_global_temp_directory()
         pass
 
 
@@ -307,7 +307,7 @@ def main() -> None:
         print_err(f"Unknown command: {args.command}")
         code = 1
 
-    #config.clear_global_temp_directory()
+    config.clear_global_temp_directory()
 
     shutdown: bool = getattr(args, 'shutdown', False) or False
     if shutdown:

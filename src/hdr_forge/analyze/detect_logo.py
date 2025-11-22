@@ -964,7 +964,7 @@ Clusters merged: {merged_count}"""
             padding=10,
             blur_radius=5
         )
-        default_padding = 60
+        default_padding = 10
         if self._logo_removal_settings.mode == LogoRemovalMode.DELOGO:
             default_padding = 5
         mask_center: MaskResult = self._center_mask_in_canvas(
