@@ -3,6 +3,7 @@ from concurrent.futures import ProcessPoolExecutor
 import os
 from dataclasses import dataclass
 from pathlib import Path
+import subprocess
 import sys
 import time
 from typing import List, Optional, Tuple
@@ -724,33 +725,33 @@ Clusters merged: {merged_count}"""
                 if diff_ratio < diff_threshold and prev_inpainted is not None:
                     use_previous = True
 
-            # if use_previous and prev_inpainted is not None:
-            #     # Frame und vorheriges Inpaint in LAB
-            #     frame_lab = cv2.cvtColor(frame.astype(np.uint8), cv2.COLOR_BGR2LAB)
-            #     prev_lab = cv2.cvtColor(prev_inpainted.astype(np.uint8), cv2.COLOR_BGR2LAB)
+            if use_previous and prev_inpainted is not None:
+                # Frame und vorheriges Inpaint in LAB
+                frame_lab = cv2.cvtColor(frame.astype(np.uint8), cv2.COLOR_BGR2LAB)
+                prev_lab = cv2.cvtColor(prev_inpainted.astype(np.uint8), cv2.COLOR_BGR2LAB)
 
-            #     # Maske: True = ersetzen (schwarz), False = behalten (weiß)
-            #     replace_mask = (mask_bin == 0)  # Schwarz = 0, soll ersetzt werden
+                # Maske: True = ersetzen (schwarz), False = behalten (weiß)
+                replace_mask = (mask_bin == 0)  # Schwarz = 0, soll ersetzt werden
 
-            #     # Nur die Schwarz-Pixel durch prev_inpainted übernehmen
-            #     frame_lab[..., 0][replace_mask] = prev_lab[..., 0][replace_mask]  # L-Kanal
-            #     frame_lab[..., 1][replace_mask] = prev_lab[..., 1][replace_mask]  # A-Kanal
-            #     frame_lab[..., 2][replace_mask] = prev_lab[..., 2][replace_mask]  # B-Kanal
+                # Nur die Schwarz-Pixel durch prev_inpainted übernehmen
+                frame_lab[..., 0][replace_mask] = prev_lab[..., 0][replace_mask]  # L-Kanal
+                frame_lab[..., 1][replace_mask] = prev_lab[..., 1][replace_mask]  # A-Kanal
+                frame_lab[..., 2][replace_mask] = prev_lab[..., 2][replace_mask]  # B-Kanal
 
-            #     # Zurück zu BGR
-            #     result_bgr = cv2.cvtColor(frame_lab, cv2.COLOR_LAB2BGR)
-            # else:
-            # Inpainting ausführen
-            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            with tempfile.NamedTemporaryFile(suffix=".png") as tmp_frame:
-                Image.fromarray(frame_rgb).save(tmp_frame.name)
-                inpainter = Inpaint(tmp_frame.name, tmp_mask.name, ps)
-                result_bgr = inpainter()
+                # Zurück zu BGR
+                result_bgr = cv2.cvtColor(frame_lab, cv2.COLOR_LAB2BGR)
+            else:
+                # Inpainting ausführen
+                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                with tempfile.NamedTemporaryFile(suffix=".png") as tmp_frame:
+                    Image.fromarray(frame_rgb).save(tmp_frame.name)
+                    inpainter = Inpaint(tmp_frame.name, tmp_mask.name, ps)
+                    result_bgr = inpainter()
 
-                result_uint8 = (result_bgr * 255).clip(0,255).astype(np.uint8)
-                # RGB -> BGR für OpenCV
-                result_bgr = cv2.cvtColor(result_uint8, cv2.COLOR_RGB2BGR)
-                #result_bgr = np.clip(result_bgr, 0, 255).astype(np.uint8)
+                    result_uint8 = (result_bgr * 255).clip(0,255).astype(np.uint8)
+                    # RGB -> BGR für OpenCV
+                    result_bgr = cv2.cvtColor(result_uint8, cv2.COLOR_RGB2BGR)
+                    #result_bgr = np.clip(result_bgr, 0, 255).astype(np.uint8)
             prev_inpainted = result_bgr.copy()
 
             writer.write(result_bgr)
@@ -1061,4 +1062,4 @@ Clusters merged: {merged_count}"""
         if self._logo_removal_settings.mode not in [LogoRemovalMode.MASK, LogoRemovalMode.INPAINT]:
             return None
 
-        return f"[0:v][1:v]overlay=x={self._result.x}:y={self._result.y}[v]"
+        return f"[0:v][1:v]overlay=x={self._result.x}:y={self._result.y}"

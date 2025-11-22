@@ -82,6 +82,10 @@ class VideoCodecBase(ABC):
             "c:v": self.lib.value,
         }
 
+        vf: str | None = self._get_default_video_filter()
+        if vf:
+            output_options["vf"] = vf
+
         new_input: Path | None = self._logo_remover.get_ffmpeg_overlay_video_input()
         if new_input:
             filter_complex: str | None = self._logo_remover.get_ffmpeg_filter_filter_complex()
@@ -91,11 +95,10 @@ class VideoCodecBase(ABC):
                     **output_options
                 }
                 output_options["map"] = ['[v]', '0:a?', '0:s?']
-                output_options["filter_complex"] = filter_complex
-
-        vf: str | None = self._get_default_video_filter()
-        if vf:
-            output_options["vf"] = vf
+                filter_vf: str | None = output_options.get("vf", None)
+                if filter_vf:
+                    del output_options["vf"]
+                output_options["filter_complex"] = f"{filter_complex}{"," + filter_vf if filter_vf else ""}[v]"
 
         if self._encoder_settings.dar_ratio is not None:
             dar_w, dar_h = self._encoder_settings.dar_ratio
