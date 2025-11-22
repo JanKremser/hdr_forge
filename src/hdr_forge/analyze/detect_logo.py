@@ -262,69 +262,6 @@ class LogoDetector:
 
         return clusters
 
-    def _merge_nearby_clusters(
-        self,
-        clusters: List[List[Tuple[int, int, int, int, str]]],
-        frame_width: int,
-        frame_height: int,
-        merge_distance_ratio: float = 0.15
-    ) -> List[List[Tuple[int, int, int, int, str]]]:
-        """
-        Merge clusters that are spatially close to each other (likely parts of same logo).
-
-        Args:
-            clusters: List of clusters
-            frame_width: Frame width for calculating distance
-            frame_height: Frame height for calculating distance
-            merge_distance_ratio: Maximum distance ratio for merging (default 15%)
-
-        Returns:
-            List of merged clusters
-        """
-        if len(clusters) <= 1:
-            return clusters
-
-        max_dimension = max(frame_width, frame_height)
-        merge_threshold = max_dimension * merge_distance_ratio
-
-        def get_cluster_centroid(cluster):
-            """Calculate centroid of a cluster."""
-            centers_x = [b[0] + b[2] / 2 for b in cluster]
-            centers_y = [b[1] + b[3] / 2 for b in cluster]
-            return (sum(centers_x) / len(centers_x), sum(centers_y) / len(centers_y))
-
-        # Build distance matrix between clusters
-        merged = [False] * len(clusters)
-        result_clusters = []
-
-        for i, cluster_i in enumerate(clusters):
-            if merged[i]:
-                continue
-
-            # Start new merged cluster
-            merged_cluster = list(cluster_i)
-            merged[i] = True
-            centroid_i = get_cluster_centroid(cluster_i)
-
-            # Find nearby clusters to merge
-            for j, cluster_j in enumerate(clusters):
-                if i >= j or merged[j]:
-                    continue
-
-                centroid_j = get_cluster_centroid(cluster_j)
-                distance = np.sqrt(
-                    (centroid_i[0] - centroid_j[0])**2 +
-                    (centroid_i[1] - centroid_j[1])**2
-                )
-
-                if distance <= merge_threshold:
-                    merged_cluster.extend(cluster_j)
-                    merged[j] = True
-
-            result_clusters.append(merged_cluster)
-
-        return result_clusters
-
     def _detect_logo_in_video(
         self,
         show_debug: bool = False,
