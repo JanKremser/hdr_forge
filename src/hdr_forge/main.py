@@ -3,6 +3,8 @@
 import sys
 from pathlib import Path
 
+from torch import export
+
 from hdr_forge.analyze.detect_logo import LogoDetector, MaskResult
 from hdr_forge.cli.args import pars_args, pars_encoder_settings
 from hdr_forge.cli.cli_output import print_conversion_summary, print_debug, print_err, print_warn
@@ -256,6 +258,9 @@ def process_detect_logo_command(args) -> int:
     """Process the detect-logo subcommand."""
     input_path = Path(args.input)
 
+    export_path_str: str | None = getattr(args, 'export', None)
+    export_path: Path | None = Path(export_path_str) if export_path_str else None
+
     # Validate input
     if not input_path.exists():
         print_err(f"Error: Input path does not exist: {input_path}")
@@ -270,9 +275,11 @@ def process_detect_logo_command(args) -> int:
 
     logo_detector = LogoDetector(video=video, logo_removal=LogoRemovelSettings(
         mode=LogoRemovalMode.DELOGO,
-        position=LogoRemovalAutoDetectMode.AUTO_TOP_LEFT,
+        position=LogoRemovalAutoDetectMode.AUTO,
     ))
     mask: MaskResult | None = logo_detector.create_mask()
+    if export_path and mask:
+        logo_detector.save_mask_image(output_path=export_path)
     print_mask_infos(mask=mask)
 
     return 0

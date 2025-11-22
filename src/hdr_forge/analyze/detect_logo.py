@@ -21,7 +21,7 @@ from hdr_forge.typedefs.encoder_typing import LogoRemovalAutoDetectMode, LogoRem
 os.environ["OPENCV_FFMPEG_LOGLEVEL"] = "quiet"
 import cv2
 
-from hdr_forge.cli.cli_output import create_ffmpeg_progress_handler, print_warn, print_err, ProgressBarSpinner
+from hdr_forge.cli.cli_output import create_ffmpeg_progress_handler, print_info, print_warn, print_err, ProgressBarSpinner
 from hdr_forge.video import Video
 
 @dataclass
@@ -647,7 +647,7 @@ Clusters merged: {merged_count}"""
         progressbar = ProgressBarSpinner(description="Creating logo mask")
         progressbar.start()
 
-        valid_masks = []
+        valid_masks: list = []
 
         while True:
             ret, frame = cap.read()
@@ -701,7 +701,7 @@ Clusters merged: {merged_count}"""
             height=h
         )
 
-    def process_video_part(self, frames, mask_bin, ps, tmp_video_path, diff_threshold):
+    def _process_video_part(self, frames, mask_bin, ps, tmp_video_path, diff_threshold):
         """
         Bearbeitet einen Teil des Videos mit Masken-Reuse (für Multiprocessing)
         """
@@ -761,8 +761,7 @@ Clusters merged: {merged_count}"""
         tmp_mask.close()
         return tmp_video_path
 
-    def inpaint_video_multiprocess(self, input_path: Path, mask: np.ndarray, output_path: Path,
-                                ps: int = 7, processes: int = 14, diff_threshold: float = 0.15):
+    def _inpaint_video_multiprocess(self, input_path: Path, mask: np.ndarray, output_path: Path, ps: int = 7, processes: int = 14, diff_threshold: float = 0.15):
         """
         Multiprozess-Inpainting: Video wird in Partitions geteilt, jeder Prozess bearbeitet einen Part.
         """
@@ -803,7 +802,7 @@ Clusters merged: {merged_count}"""
             futures = []
             for i in range(processes):
                 if len(frame_parts[i]) > 0:
-                    futures.append(executor.submit(self.process_video_part,
+                    futures.append(executor.submit(self._process_video_part,
                                                 frame_parts[i],
                                                 mask_bin,
                                                 ps,
@@ -906,8 +905,8 @@ Clusters merged: {merged_count}"""
 
     def _create_mask_delogo(self, mask_result: MaskResult) -> None | Path:
         mask_path: Path = self.temp_dir / "logo_mask.png"
+        self.save_mask_image(output_path=mask_path, mask_result=mask_result, user_info=False)
 
-        cv2.imwrite(str(mask_path), mask_result.mask)
         crop_video_path: Path | None = self._create_crop_video_by_mask_size(mask_result=mask_result)
         if crop_video_path is None:
             print_err("Could not create crop video.")
@@ -940,7 +939,7 @@ Clusters merged: {merged_count}"""
         cv2.imwrite(str(mask_path), invate_mask)
 
         try:
-            self.inpaint_video_multiprocess(
+            self._inpaint_video_multiprocess(
                 input_path=crop_video_path,
                 mask=invate_mask,
                 output_path=output_path,
@@ -951,6 +950,32 @@ Clusters merged: {merged_count}"""
 
         return output_path
 
+    def save_mask_image(self, output_path: Path, mask_result: MaskResult | None = None, user_info: bool = True) -> bool:
+        """
+        Save the generated mask image to a file.
+
+        Args:
+            output_path (Path): Path to save the mask image.
+
+        Returns:
+            bool: True if saved successfully, False otherwise.
+        """
+        mask: MaskResult | None = mask_result if mask_result is not None else self._result
+        if mask is None:
+            print_err("No mask available to save.")
+            return False
+
+        if output_path.is_dir():
+            output_path = output_path / f"mask_x{mask.x}y{mask.y}.png"
+
+        try:
+            cv2.imwrite(str(output_path), mask.mask)
+            if user_info:
+                print_info(f"Mask image saved to: {output_path}")
+            return True
+        except Exception as e:
+            print_err(f"Error saving mask image: {e}")
+            return False
 
     def create_mask(self) -> MaskResult | None:
         detect_logo: None | LogoDetectResult = self._detect_logo_in_video()

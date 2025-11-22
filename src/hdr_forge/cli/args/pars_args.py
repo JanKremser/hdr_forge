@@ -94,6 +94,11 @@ def _add_detect_logo_subcommand(parser: argparse._SubParsersAction) -> None:
     )
 
     detect_logo_parser.add_argument(
+        '-e', '--export',
+        help='Export detected logo mask to specified file path as PNG image'
+    )
+
+    detect_logo_parser.add_argument(
         '-d', '--debug',
         action='store_true',
     )
