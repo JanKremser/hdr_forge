@@ -77,10 +77,12 @@ def print_mask_infos(mask: MaskResult | None) -> None:
     print(f"{color_str('_', color)}" * 70)
 
     print(f"  Logo Detected:")
+    if mask.region:
+        print(f"    Region: {color_str(mask.region, color)}")
     print(f"    Position: x={color_str(str(mask.x), color)}, y={color_str(str(mask.y), color)}")
     print(f"    Size: width={color_str(str(mask.width), color)}, height={color_str(str(mask.height), color)}")
     print(f"    Mask Path:")
     if mask.mask is not None:
-        _print_mask_unicode(mask=mask.mask)
+        _print_mask_unicode(mask=mask.mask, max_width=140)
 
     print(f"{color_str('_', color)}" * 70)

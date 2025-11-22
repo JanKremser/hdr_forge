@@ -61,7 +61,6 @@ def determine_output_file(video_file: Path, output_path: Path, is_batch: bool) -
     return output_path
 
 
-
 def show_video_info(input_file: Path) -> bool:
     """Show detailed information about a video file.
 
@@ -84,8 +83,6 @@ def show_video_info(input_file: Path) -> bool:
     except Exception as e:
         print(f"Error processing {input_file.name}: {e}")
         return False
-    finally:
-        config.clear_global_temp_directory()
 
 
 def convert_video(
@@ -129,9 +126,6 @@ def convert_video(
     except Exception as e:
         print(f"Error processing {video.get_filepath().name}: {e}")
         return False
-    finally:
-        config.clear_global_temp_directory()
-        pass
 
 
 def process_convert_command(args) -> int:
@@ -249,8 +243,6 @@ def process_inject_hdr_metadata_command(args) -> int:
     except Exception as e:
         print_err(f"Error processing {input_path.name}: {e}")
         return 1
-    finally:
-        config.clear_global_temp_directory()
 
     return 0 if success else 1
 

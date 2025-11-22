@@ -1,16 +1,14 @@
-from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import ProcessPoolExecutor
 import os
 from dataclasses import dataclass
 from pathlib import Path
-import subprocess
 import sys
 import time
 from typing import List, Optional, Tuple
 import numpy as np
 from pyinpaint import Inpaint
+from collections import Counter
 
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from PIL import Image
 import tempfile
 
@@ -31,6 +29,7 @@ class MaskResult:
     y: int
     width: int
     height: int
+    region: str | None = None
 
 
 @dataclass
@@ -43,6 +42,17 @@ class LogoDetectResult:
     is_valid: bool = False
     region: str = ""
     detection_count: int = 0
+
+@dataclass
+class ClusterInfo:
+    boxes: List[Tuple[int, int, int, int, str]]
+    centroid_x: float
+    centroid_y: float
+    merged_count: int = 0
+
+    @property
+    def size(self) -> int:
+        return len(self.boxes)
 
 
 class LogoDetector:
@@ -80,6 +90,61 @@ class LogoDetector:
         self._crop_mask_delogo_video: Path | None = None
 
         self.temp_dir: Path = get_global_temp_directory(sub_folder="remove_logo")
+    def _filter_logo_results(
+        self,
+        results: list[LogoDetectResult],
+        video_width: int,
+        video_height: int,
+        max_size_ratio: float = 0.10,
+        min_size_ratio: float = 0.005,
+        min_confidence: float = 0.0,
+        min_detection_count: int = 1
+    ) -> List[LogoDetectResult]:
+        """
+        Filter LogoDetectResult list based on video resolution and thresholds.
+
+        Args:
+            results: List of LogoDetectResult to filter
+            video_width: Video width in pixels
+            video_height: Video height in pixels
+            max_size_ratio: Maximum logo size as ratio of video dimension (default 10%)
+            min_size_ratio: Minimum logo size as ratio of video dimension (default 0.5%)
+            min_confidence: Minimum confidence threshold (default 0.0)
+            min_detection_count: Minimum number of detections (default 1)
+
+        Returns:
+            Filtered list of LogoDetectResult
+        """
+        if not results:
+            return []
+
+        max_width = video_width * max_size_ratio
+        max_height = video_height * max_size_ratio
+        min_width = video_width * min_size_ratio
+        min_height = video_height * min_size_ratio
+
+        filtered: List[LogoDetectResult] = []
+
+        for result in results:
+            # Größen-Filter (zu groß)
+            if result.width > max_width or result.height > max_height:
+                continue
+
+            # Größen-Filter (zu klein)
+            if result.width < min_width or result.height < min_height:
+                continue
+
+            # Confidence-Filter
+            if result.confidence < min_confidence:
+                continue
+
+            # Detection-Count-Filter
+            if result.detection_count < min_detection_count:
+                continue
+
+            filtered.append(result)
+
+        return filtered
 
     def _find_logo_in_frame(
         self,
@@ -262,35 +327,18 @@ class LogoDetector:
 
         return clusters
 
-    def _detect_logo_in_video(
-        self,
-        show_debug: bool = False,
-        padding: float = 0.05
-    ) -> None | LogoDetectResult:
+    def _sample_frames(self, cap: cv2.VideoCapture) -> List[Tuple[int, int, int, int, str]]:
         """
-        Automatically detect logo position by analyzing multiple frames.
-
-        Args:
-            callback: Optional callback function(completed_frames, total_frames)
-            show_debug: Show debug window with detected regions (default False)
+        Sample frames across the video and collect logo candidates.
         """
-        cap = cv2.VideoCapture(str(self._video._filepath))
-        if not cap.isOpened():
-            print_err("Video could not be opened for logo detection.")
-            return
-
         fps = self._video.get_fps()
         total_frames = self._video.get_total_frames()
         duration_seconds = self._video.get_duration_seconds()
 
-        # Calculate frame positions to sample across the video
         interval = max(duration_seconds / (self._scan_frames + 1), 1.0)
         positions_seconds = [int(interval * (i + 1)) for i in range(self._scan_frames)]
 
         detected_boxes: List[Tuple[int, int, int, int, str]] = []
-
-        progressbar = ProgressBarSpinner(description="Detecting logo")
-        progressbar.start()
 
         for idx, pos_seconds in enumerate(positions_seconds):
             frame_pos = int(pos_seconds * fps)
@@ -306,28 +354,238 @@ class LogoDetector:
             candidates = self._find_logo_in_frame(frame)
             detected_boxes.extend(candidates)
 
-            if show_debug and candidates:
-                debug_frame = frame.copy()
-                for x, y, w, h, region in candidates:
-                    cv2.rectangle(debug_frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
-                    cv2.putText(debug_frame, region, (x, y - 5),
-                               cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
-                cv2.imshow("Logo Detection", debug_frame)
-                if cv2.waitKey(1) & 0xFF == ord('q'):
-                    break
+            self._progressbar.update(percent=((idx + 1) / len(positions_seconds)) * 100)
 
-            progressbar.update(percent=((idx + 1) / len(positions_seconds)) * 100)
+        return detected_boxes
 
+    def _calculate_cluster_centroid(
+        self,
+        cluster: List[Tuple[int, int, int, int, str]]
+    ) -> Tuple[float, float]:
+        """Calculate the centroid of a cluster."""
+        centers_x = [b[0] + b[2] / 2 for b in cluster]
+        centers_y = [b[1] + b[3] / 2 for b in cluster]
+        return (
+            sum(centers_x) / len(centers_x),
+            sum(centers_y) / len(centers_y)
+        )
+
+    def _merge_cluster_into_base(
+        self,
+        base_cluster_idx: int,
+        all_clusters: List[List[Tuple[int, int, int, int, str]]],
+        merge_threshold: float
+    ) -> Tuple[List[Tuple[int, int, int, int, str]], int, List[int]]:
+        """
+        Merge nearby clusters into a base cluster.
+
+        Args:
+            base_cluster_idx: Index of the base cluster in all_clusters
+            all_clusters: List of all clusters
+            merge_threshold: Maximum distance for merging
+
+        Returns:
+            Tuple of (merged_boxes, merge_count, merged_indices)
+        """
+        base_cluster = all_clusters[base_cluster_idx]
+        base_centroid_x, base_centroid_y = self._calculate_cluster_centroid(base_cluster)
+        merged_boxes = list(base_cluster)
+        merged_count = 0
+        merged_indices: List[int] = []
+
+        for idx, cluster in enumerate(all_clusters):
+            if idx == base_cluster_idx:
+                continue
+
+            centroid_x, centroid_y = self._calculate_cluster_centroid(cluster)
+            distance = np.sqrt(
+                (base_centroid_x - centroid_x)**2 +
+                (base_centroid_y - centroid_y)**2
+            )
+
+            if distance <= merge_threshold:
+                merged_boxes.extend(cluster)
+                merged_count += 1
+                merged_indices.append(idx)
+
+        return merged_boxes, merged_count, merged_indices
+
+    def _get_largest_box_area(
+        self,
+        cluster: List[Tuple[int, int, int, int, str]],
+        max_logo_size: int = 600
+    ) -> int:
+        """Get the area of the largest reasonable box in a cluster."""
+        reasonable = [
+            b[2] * b[3] for b in cluster
+            if b[2] <= max_logo_size and b[3] <= max_logo_size
+        ]
+        if not reasonable:
+            reasonable = [b[2] * b[3] for b in cluster]
+        return max(reasonable) if reasonable else 0
+
+    def _build_all_merged_clusters(
+        self,
+        clusters: List[List[Tuple[int, int, int, int, str]]]
+    ) -> List[ClusterInfo]:
+        """
+        Build merged clusters matching original algorithm:
+
+        1. Sort clusters by size (largest first)
+        2. For each cluster, merge nearby clusters into it
+        3. Track which clusters have been used
+        4. Return all merged clusters (sorted by size)
+        """
+        max_dimension = max(self._video.width, self._video.height)
+        merge_threshold = max_dimension * 0.08
+
+        # Erstelle Index-Liste sortiert nach Cluster-Größe (größte zuerst)
+        sorted_indices = sorted(range(len(clusters)), key=lambda i: len(clusters[i]), reverse=True)
+
+        merged_results: List[ClusterInfo] = []
+        used_clusters: set = set()
+
+        for orig_idx in sorted_indices:
+            if orig_idx in used_clusters:
+                continue
+
+            merged_boxes, merged_count, merged_indices = self._merge_cluster_into_base(
+                orig_idx, clusters, merge_threshold
+            )
+
+            # Markiere verwendete Cluster
+            used_clusters.add(orig_idx)
+            for idx in merged_indices:
+                used_clusters.add(idx)
+
+            centroid_x, centroid_y = self._calculate_cluster_centroid(merged_boxes)
+            merged_results.append(ClusterInfo(
+                boxes=merged_boxes,
+                centroid_x=centroid_x,
+                centroid_y=centroid_y,
+                merged_count=merged_count
+            ))
+
+        # Ergebnisse sind bereits nach ursprünglicher Cluster-Größe geordnet
+        # (größter initialer Cluster zuerst)
+        return merged_results
+
+    def _find_largest_reasonable_box(
+        self,
+        cluster: List[Tuple[int, int, int, int, str]],
+        max_logo_size: int = 600
+    ) -> Tuple[int, int, int, int]:
+        """
+        Find the largest reasonable detection box from a cluster.
+        """
+        boxes_with_area = [(b[0], b[1], b[2], b[3], b[2] * b[3]) for b in cluster]
+
+        reasonable_boxes = [
+            b for b in boxes_with_area
+            if b[2] <= max_logo_size and b[3] <= max_logo_size
+        ]
+
+        if not reasonable_boxes:
+            reasonable_boxes = boxes_with_area
+
+        reasonable_boxes.sort(key=lambda x: x[4], reverse=True)
+        largest = reasonable_boxes[0]
+
+        return largest[0], largest[1], largest[2], largest[3]
+
+    def _apply_padding_and_bounds(
+        self,
+        x: int, y: int, w: int, h: int,
+        padding: float
+    ) -> Tuple[int, int, int, int]:
+        """
+        Apply padding to box coordinates and ensure bounds are valid.
+        """
+        padding_w = int(w * padding)
+        padding_h = int(h * padding)
+
+        padded_x = max(1, x - padding_w)
+        padded_y = max(1, y - padding_h)
+        padded_w = min(self._video.width - padded_x, w + 2 * padding_w)
+        padded_h = min(self._video.height - padded_y, h + 2 * padding_h)
+
+        # Safety bounds check
+        if padded_x + padded_w > self._video.width:
+            padded_w = self._video.width - padded_x
+        if padded_y + padded_h > self._video.height:
+            padded_h = self._video.height - padded_y
+
+        # Ensure even dimensions
+        padded_w = padded_w if padded_w % 2 == 0 else padded_w + 1
+        padded_h = padded_h if padded_h % 2 == 0 else padded_h + 1
+
+        return padded_x, padded_y, padded_w, padded_h
+
+    def _create_logo_result(
+        self,
+        cluster_info: ClusterInfo,
+        total_detections: int,
+        padding: float
+    ) -> LogoDetectResult:
+        """
+        Create a LogoDetectResult from a ClusterInfo.
+        """
+        x, y, w, h = self._find_largest_reasonable_box(cluster_info.boxes)
+        x, y, w, h = self._apply_padding_and_bounds(x, y, w, h, padding)
+
+        region_counter = Counter([b[4] for b in cluster_info.boxes])
+        most_common_region = region_counter.most_common(1)[0][0]
+
+        confidence = cluster_info.size / total_detections if total_detections else 0.0
+
+        return LogoDetectResult(
+            x=x,
+            y=y,
+            width=w,
+            height=h,
+            confidence=confidence,
+            is_valid=True,
+            region=most_common_region,
+            detection_count=cluster_info.size
+        )
+
+    def _detect_logo_in_video(
+        self,
+        show_debug: bool = False,
+        padding: float = 0.1
+    ) -> Optional[List[LogoDetectResult]]:
+        """
+        Automatically detect logo positions by analyzing multiple frames.
+
+        Args:
+            show_debug: Show debug window with detected regions
+            padding: Padding ratio to add around detected logos
+
+        Returns:
+            List of LogoDetectResult sorted by cluster size (largest first),
+            or None if no logos detected
+        """
+        cap = cv2.VideoCapture(str(self._video._filepath))
+        if not cap.isOpened():
+            print_err("Video could not be opened for logo detection.")
+            return None
+
+        self._progressbar = ProgressBarSpinner(description="Detecting logo")
+        self._progressbar.start()
+
+        # Step 1: Sample frames and collect detections
+        detected_boxes = self._sample_frames(cap)
         cap.release()
+
         if show_debug:
             cv2.destroyAllWindows()
 
         if not detected_boxes:
-            progressbar.stop("No logo detected.")
+            self._progressbar.stop("No logo detected.")
             print_warn("No bright logo found in corner regions.")
-            return
+            return None
 
-        # Cluster detections by spatial proximity
+        # Step 2: Initial clustering
         clusters = self._cluster_detections(
             detected_boxes,
             self._video.width,
@@ -335,127 +593,31 @@ class LogoDetector:
         )
 
         if not clusters:
-            progressbar.stop("No logo detected.")
+            self._progressbar.stop("No logo detected.")
             print_warn("Clustering failed. No valid clusters found.")
-            return
+            return None
 
-        # First: Find largest cluster (most frequent position)
-        largest_cluster = max(clusters, key=len)
-        original_cluster_count = len(clusters)
+        # Step 3: Build all merged clusters (sorted by size, largest first)
+        merged_clusters: List[ClusterInfo] = self._build_all_merged_clusters(clusters)
 
-        # Calculate centroid of largest cluster
-        largest_centers_x = [b[0] + b[2] / 2 for b in largest_cluster]
-        largest_centers_y = [b[1] + b[3] / 2 for b in largest_cluster]
-        main_centroid_x = sum(largest_centers_x) / len(largest_centers_x)
-        main_centroid_y = sum(largest_centers_y) / len(largest_centers_y)
+        # Step 4: Create LogoDetectResult for each merged cluster
+        results: List[LogoDetectResult] = [
+            self._create_logo_result(cluster_info, len(detected_boxes), padding)
+            for cluster_info in merged_clusters
+        ]
 
-        # Then: Merge nearby clusters that are close to the main cluster
-        max_dimension = max(self._video.width, self._video.height)
-        merge_threshold = max_dimension * 0.08  # 8% distance (stricter merging)
+        # Log info for the largest/best cluster
+        #largest = results[0]
+        #largest_cluster_info = merged_clusters[0]
 
-        merged_cluster = list(largest_cluster)
-        merged_count = 0
-
-        for cluster in clusters:
-            if cluster is largest_cluster:
-                continue
-
-            # Calculate centroid of this cluster
-            centers_x = [b[0] + b[2] / 2 for b in cluster]
-            centers_y = [b[1] + b[3] / 2 for b in cluster]
-            centroid_x = sum(centers_x) / len(centers_x)
-            centroid_y = sum(centers_y) / len(centers_y)
-
-            # Check distance to main cluster
-            distance = np.sqrt(
-                (main_centroid_x - centroid_x)**2 +
-                (main_centroid_y - centroid_y)**2
-            )
-
-            if distance <= merge_threshold:
-                merged_cluster.extend(cluster)
-                merged_count += 1
-
-        largest_cluster_size = len(merged_cluster)
-        cluster_count = original_cluster_count
-
-        # Strategy: Use the largest REASONABLE detection (not oversized false positives)
-        # Sort by area but filter out unreasonably large boxes
-        boxes_with_area = [(b[0], b[1], b[2], b[3], b[2] * b[3]) for b in merged_cluster]
-
-        # Filter: Logo should not be larger than 600x600 pixels (adjust if needed)
-        max_logo_size = 600
-        reasonable_boxes = [b for b in boxes_with_area if b[2] <= max_logo_size and b[3] <= max_logo_size]
-
-        # If no reasonable boxes, fall back to all boxes
-        if not reasonable_boxes:
-            reasonable_boxes = boxes_with_area
-
-        reasonable_boxes.sort(key=lambda x: x[4], reverse=True)
-
-        # Take only the largest reasonable detection
-        largest_box = reasonable_boxes[0]
-        avg_x = largest_box[0]
-        avg_y = largest_box[1]
-        # avg_hw = int(max(largest_box[2], largest_box[3]))
-        # avg_w = avg_hw
-        # avg_h = avg_hw
-        avg_w = largest_box[2]
-        avg_h = largest_box[3]
-
-        # Add small 5% padding
-        padding_w = int(avg_w * padding)
-        padding_h = int(avg_h * padding)
-
-        # Apply padding
-        padded_x = avg_x - padding_w
-        padded_y = avg_y - padding_h
-        padded_w = avg_w + 2 * padding_w
-        padded_h = avg_h + 2 * padding_h
-
-        # Ensure we stay within video bounds
-        avg_x = max(1, padded_x)
-        avg_y = max(1, padded_y)
-        avg_w = min(self._video.width - avg_x, padded_w)
-        avg_h = min(self._video.height - avg_y, padded_h)
-
-        # Double-check bounds (safety check)
-        if avg_x + avg_w > self._video.width:
-            avg_w = self._video.width - avg_x
-        if avg_y + avg_h > self._video.height:
-            avg_h = self._video.height - avg_y
-
-        # Determine most common region in merged cluster
-        from collections import Counter
-        region_counter = Counter([b[4] for b in merged_cluster])
-        most_common_region = region_counter.most_common(1)[0][0]
-
-        # Calculate confidence based on detection consistency
-        confidence = largest_cluster_size / len(detected_boxes) if detected_boxes else 0.0
-
-        avg_w = avg_w if avg_w % 2 == 0 else avg_w + 1
-        avg_h = avg_h if avg_h % 2 == 0 else avg_h + 1
-
-        progressbar.stop(
-            text=f"Logo detected in '{most_common_region}'",
+        self._progressbar.stop(
+            text=f"Logos detected",
             long_info_text=f"""
-Coordinates:     x={avg_x}, y={avg_y}
-Size:            {avg_w}x{avg_h}
-Detections:      {largest_cluster_size} out of {len(detected_boxes)} total detections
-Clusters found:  {cluster_count}
-Clusters merged: {merged_count}"""
+Clusters found:  {len(clusters)}
+Total candidates: {len(results)}"""
         )
 
-        return LogoDetectResult(
-            x=avg_x,
-            y=avg_y,
-            width=avg_w,
-            height=avg_h,
-            confidence=confidence,
-            is_valid=True,
-            region=most_common_region,
-            detection_count=largest_cluster_size
-        )
+        return results
 
     def _create_crop_video_by_mask_size(self, mask_result: MaskResult) -> Path | None:
         total_frames = self._video.get_total_frames()
@@ -739,12 +901,14 @@ Clusters merged: {merged_count}"""
             futures = []
             for i in range(processes):
                 if len(frame_parts[i]) > 0:
-                    futures.append(executor.submit(self._process_video_part,
-                                                frame_parts[i],
-                                                mask_bin,
-                                                ps,
-                                                tmp_paths[i],
-                                                diff_threshold))
+                    futures.append(executor.submit(
+                        self._process_video_part,
+                        frame_parts[i],
+                        mask_bin,
+                        ps,
+                        tmp_paths[i],
+                        diff_threshold,
+                    ))
             # Ergebnisse abwarten
             for f in futures:
                 f.result()  # jeder Prozess erstellt sein temporäres Video
@@ -838,7 +1002,7 @@ Clusters merged: {merged_count}"""
         new_y = max(0, new_y)
 
         # Optional: Begrenzung auf Videogröße kann hier ergänzt werden
-        return MaskResult(mask=centered_mask, x=new_x, y=new_y, width=new_w, height=new_h)
+        return MaskResult(mask=centered_mask, x=new_x, y=new_y, width=new_w, height=new_h, region=None)
 
     def _create_mask_delogo(self, mask_result: MaskResult) -> None | Path:
         mask_path: Path = self.temp_dir / "logo_mask.png"
@@ -914,26 +1078,49 @@ Clusters merged: {merged_count}"""
             print_err(f"Error saving mask image: {e}")
             return False
 
-    def create_mask(self) -> MaskResult | None:
-        detect_logo: None | LogoDetectResult = self._detect_logo_in_video()
-        if detect_logo is None:
+    def _find_valid_mask(self, detect_logos: List[LogoDetectResult], index: int = 0) -> MaskResult | None:
+        try:
+            detect_logo: LogoDetectResult = detect_logos[index]
+            mask_crop: MaskResult = self._create_mask_from_video(
+                video_path=str(self._video._filepath),
+                crop_rect=(detect_logo.x, detect_logo.y, detect_logo.width, detect_logo.height),
+                threshold=40,
+                padding=10,
+                blur_radius=20
+            )
+            default_padding = 10
+            if self._logo_removal_settings.mode == LogoRemovalMode.DELOGO:
+                default_padding = 5
+
+            mask_center: MaskResult = self._center_mask_in_canvas(
+                mask=mask_crop.mask,
+                crop_rect=(mask_crop.x, mask_crop.y, mask_crop.width, mask_crop.height),
+                padding=default_padding
+            )
+            mask_center.region = detect_logo.region
+            return mask_center
+        except Exception as e:
+            if index + 1 < len(detect_logos):
+                print_info(f"Trying next detected logo candidate (index {index + 1})...")
+                return self._find_valid_mask(detect_logos=detect_logos, index=index + 1)
+            print_err(f"Could not create valid mask: {e}")
             return None
 
-        mask_crop: MaskResult = self._create_mask_from_video(
-            video_path=str(self._video._filepath),
-            crop_rect=(detect_logo.x, detect_logo.y, detect_logo.width, detect_logo.height),
-            threshold=40,
-            padding=10,
-            blur_radius=5
+    def create_mask(self) -> MaskResult | None:
+        detect_logos: List[LogoDetectResult] | None = self._detect_logo_in_video()
+        if detect_logos is None:
+            return None
+        detect_logos = self._filter_logo_results(
+            results=detect_logos,
+            max_size_ratio=0.15,
+            min_size_ratio=0.01,
+            video_height=self._video.height,
+            video_width=self._video.width,
         )
-        default_padding = 10
-        if self._logo_removal_settings.mode == LogoRemovalMode.DELOGO:
-            default_padding = 5
-        mask_center: MaskResult = self._center_mask_in_canvas(
-            mask=mask_crop.mask,
-            crop_rect=(mask_crop.x, mask_crop.y, mask_crop.width, mask_crop.height),
-            padding=default_padding
-        )
+        if len(detect_logos) == 0:
+            return None
+
+        mask_center: MaskResult | None = self._find_valid_mask(detect_logos=detect_logos, index=0)
 
         self._result = mask_center
         return mask_center
