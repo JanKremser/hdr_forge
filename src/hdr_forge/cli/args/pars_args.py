@@ -470,60 +470,6 @@ Enable debug output\n
 """
     )
 
-def _add_inject_hdr_metadata_subcommand(parser: argparse._SubParsersAction) -> None:
-    """Add arguments for the 'inject_hdr_metadata' subcommand.
-
-    Args:
-        parser: Argument parser to add arguments to
-    """
-    inject_parser: argparse.ArgumentParser = parser.add_parser('inject-hdr-metadata',
-        description="""Inject HDR metadata into an existing HEVC video stream, without re-encoding.
-NVENC GPU-encoded videos cannot be retroactively assigned HDR metadata using this function.
-Only CPU-encoded videos can be retroactively assigned HDR metadata.
-""",
-        help='Inject HDR metadata'
-    )
-
-    inject_parser.add_argument(
-        '-i', '--input',
-        required=True,
-        help='Input Video file'
-    )
-
-    inject_parser.add_argument(
-        '-o', '--output',
-        required=True,
-        help='Output MKV video file with injected HDR metadata'
-    )
-
-    inject_parser.add_argument(
-        '--master-display',
-        required=True,
-        help="""
-Set custom Master Display metadata for HDR10 videos. Format:
-G(x,y)B(x,y)R(x,y)WP(x,y)L(max,min)
-
-Example:
-    --master-display "G(13250,34500)B(7500,30000)R(34000,16000)WP(15635,16450)L(1000,0.05)"
-"""
-    )
-
-    inject_parser.add_argument(
-        '--max-cll',
-        required=False,
-        help="""
-Set custom MaxCLL and MaxFALL values for HDR10 videos. Format:
-
-Example:
-    --max-cll "1000,400"
-"""
-    )
-
-    inject_parser.add_argument(
-        '-d', '--debug',
-        action='store_true',
-    )
-
 def _add_extract_dolby_vision_hdr_metadata_subcommand(parser: argparse._SubParsersAction) -> None:
     """Add arguments for the 'extract_dv_metadata' subcommand.
 
@@ -563,6 +509,8 @@ def _add_inject_dolby_vision_hdr_metadata_subcommand(parser: argparse._SubParser
     inject_parser: argparse.ArgumentParser = parser.add_parser('inject-metadata',
         description="""
 Inject Dolby Vision and/or HDR10 metadata into an existing HEVC video stream, without re-encoding.
+NVENC GPU-encoded videos cannot be retroactively assigned HDR metadata using this function.
+Only CPU-encoded videos can be retroactively assigned HDR metadata.
 """,
         help='Inject Dolby Vision metadata'
     )
@@ -576,7 +524,7 @@ Inject Dolby Vision and/or HDR10 metadata into an existing HEVC video stream, wi
     inject_parser.add_argument(
         '-o', '--output',
         required=True,
-        help='Output MKV video file'
+        help='Output video file'
     )
 
     inject_parser.add_argument(
@@ -610,6 +558,29 @@ Example:
 """
     )
 
+#     inject_parser.add_argument(
+#         '--master-display',
+#         required=True,
+#         help="""
+# Set custom Master Display metadata for HDR10 videos. Format:
+# G(x,y)B(x,y)R(x,y)WP(x,y)L(max,min)
+
+# Example:
+#     --master-display "G(13250,34500)B(7500,30000)R(34000,16000)WP(15635,16450)L(1000,0.05)"
+# """
+#     )
+
+#     inject_parser.add_argument(
+#         '--max-cll',
+#         required=False,
+#         help="""
+# Set custom MaxCLL and MaxFALL values for HDR10 videos. Format:
+
+# Example:
+#     --max-cll "1000,400"
+# """
+#     )
+
     inject_parser.add_argument(
         '-d', '--debug',
         action='store_true',
@@ -638,8 +609,6 @@ def parse_args():
     _add_maxcll_subcommand(parser=subparsers)
 
     _add_convert_subcommand(parser=subparsers)
-
-    _add_inject_hdr_metadata_subcommand(parser=subparsers)
 
     _add_extract_dolby_vision_hdr_metadata_subcommand(parser=subparsers)
 

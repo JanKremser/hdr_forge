@@ -13,7 +13,6 @@ from hdr_forge.cli.video import print_video_infos
 from hdr_forge.core import config
 from hdr_forge.core.service import shutdown_system
 from hdr_forge.metadata_injector import MetadataInjector
-from hdr_forge.hdr_metadata_injector import HdrMetadataInjector
 from hdr_forge.tools import dovi_tool, hevc_hdr_editor
 from hdr_forge.typedefs.encoder_typing import EncoderSettings, LogoRemovalAutoDetectMode, LogoRemovalMode, LogoRemovelSettings
 from hdr_forge.encoder import Encoder
@@ -212,41 +211,6 @@ def process_info_command(args) -> int:
             show_video_info(video_file)
     return 0
 
-def process_inject_hdr_metadata_command(args) -> int:
-    """Process the inject-hdr-metadata subcommand."""
-    input_path = Path(args.input)
-    output_path = Path(args.output)
-
-    # Validate input
-    if not input_path.exists():
-        print(f"Error: Input path does not exist: {input_path}")
-        return 1
-
-    # Determine output file
-    if output_path is None:
-        output_path = input_path.with_suffix('.mkv')
-
-
-    success: bool = False
-    try:
-        video = Video(filepath=input_path)
-        print_video_infos(video=video)
-
-        hdr_metadata: pars_encoder_settings.HdrMetadata = pars_encoder_settings.get_hdr_metadata_from_args(args)
-
-        injector = HdrMetadataInjector(
-            video=video,
-            target_file=output_path,
-            metadata=hdr_metadata,
-        )
-
-        success = injector.inject_metadata()
-    except Exception as e:
-        print_err(f"Error processing {input_path.name}: {e}")
-        return 1
-
-    return 0 if success else 1
-
 def process_extract_metadata_command(args) -> int:
     """Process the extract-dv-metadata subcommand."""
     input_path = Path(args.input)
@@ -371,8 +335,6 @@ def main() -> None:
         code = process_info_command(args)
     elif args.command == 'convert':
         code = process_convert_command(args)
-    elif args.command == 'inject-hdr-metadata':
-        code = process_inject_hdr_metadata_command(args)
     elif args.command == 'extract-metadata':
         code = process_extract_metadata_command(args)
     elif args.command == 'inject-metadata':
