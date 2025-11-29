@@ -632,6 +632,7 @@ Total candidates: {len(results)}"""
                 duration=duration,
                 total_frames=total_frames,
                 process_start_time=process_start_time,
+                video_fps=self._video.get_fps(),
             )
 
         output_options: dict = {
@@ -662,6 +663,7 @@ Total candidates: {len(results)}"""
                 duration=duration,
                 total_frames=total_frames,
                 process_start_time=process_start_time,
+                video_fps=self._video.get_fps(),
             )
 
         mask_info: dict | None = self._get_mask_info(mask_result.mask)
@@ -671,7 +673,7 @@ Total candidates: {len(results)}"""
 
         delogo_str: str = f"delogo=x={mask_info['x']}:y={mask_info['y']}:w={mask_info['width']}:h={mask_info['height']}"
 
-        output_options = {
+        output_options: dict[str, str] = {
             'vf': f"crop=x={mask_result.x}:y={mask_result.y}:w={mask_result.width}:h={mask_result.height},{delogo_str}"
         }
         output_path: Path = self.temp_dir / "crop_delogo_video.mp4"
@@ -701,6 +703,7 @@ Total candidates: {len(results)}"""
                 duration=duration,
                 total_frames=total_frames,
                 process_start_time=process_start_time,
+                video_fps=self._video.get_fps(),
             )
 
         output_options: dict = {

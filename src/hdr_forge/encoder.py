@@ -393,6 +393,7 @@ class Encoder:
                 duration=duration,
                 total_frames=total_frames,
                 process_start_time=process_start_time,
+                video_fps=self._video.get_fps(),
             )
 
         try:

@@ -248,7 +248,13 @@ def estimate_final_size(current_size_bytes: int | None, current_frame: int, tota
     return estimated_size
 
 
-def print_progress_info(first_update: bool, current_frame: int, total_frames: int, duration_seconds: float, process_time_seconds: float, fps: float, speed: float | None, time_seconds: float | None, bitrate_kbs: float | None, size_bytes: int | None) -> None:
+def print_progress_info(first_update: bool, current_frame: int, total_frames: int, duration_seconds: float, process_time_seconds: float, fps: float, speed: float | None, time_seconds: float | None, bitrate_kbs: float | None, size_bytes: int | None, video_fps: float | None) -> None:
+    #fix current_frame
+    if current_frame > total_frames:
+        current_frame = total_frames
+    elif current_frame < 0:
+        current_frame = total_frames
+
     # Calculate percentage
     percent: float = (current_frame / total_frames * 100) if total_frames > 0 else 0.0
 
@@ -258,23 +264,23 @@ def print_progress_info(first_update: bool, current_frame: int, total_frames: in
     # Create progress bar
     progress_bar: str = create_progress_bar_with_percent(percent=percent)
 
-    if time_seconds is None or (time_seconds == 0 and current_frame > 0):
-        time_seconds = calculate_time_seconds_backup(
-            current_frame=current_frame,
-            total_frames=total_frames,
-            duration_seconds=duration_seconds,
-        )
+    #if time_seconds is None or (time_seconds == 0 and current_frame > 0):
+    time_seconds = calculate_time_seconds(
+        current_frame=current_frame,
+        total_frames=total_frames,
+        duration_seconds=duration_seconds,
+        backup_time_seconds=time_seconds,
+    )
     time_str: str = format_time(seconds=time_seconds) if time_seconds is not None else "--:--:--"
 
     duration_str: str = format_time(seconds=duration_seconds) if duration_seconds is not None else "--:--:--"
     process_time_str: str = format_time(seconds=process_time_seconds)
 
-    if speed is None or (speed == 0 and current_frame > 0):
-        speed = calculate_speed_backup(
-            current_frame=current_frame,
-            process_time_seconds=process_time_seconds,
-            fps=fps,
-        )
+    speed = calculate_speed(
+        actual_fps=fps,
+        video_fps=video_fps,
+        backup_speed=speed,
+    )
     speed_str: str = f"{speed:.2f}" if speed is not None else "--.-"
 
     bitrate_str: str = f"{bitrate_kbs:.2f}" if bitrate_kbs is not None else "--.-"
@@ -314,6 +320,12 @@ Final size    : {color_str(estimated_size_kb_str, ANSI_GREEN)} KB ~> {color_str(
     print(info_line, end="", flush=True)
 
 def print_progress_info_minimal(process_name: str, first_update: bool, current_frame: int, total_frames: int, duration_seconds: float, process_time_seconds: float, fps: float, time_seconds: float | None) -> None:
+    #fix current_frame
+    if current_frame > total_frames:
+        current_frame = total_frames
+    elif current_frame < 0:
+        current_frame = total_frames
+
     # Calculate percentage
     percent: float = (current_frame / total_frames * 100) if total_frames > 0 else 0.0
 
@@ -323,12 +335,13 @@ def print_progress_info_minimal(process_name: str, first_update: bool, current_f
     # Create progress bar
     progress_bar: str = create_progress_bar_with_percent(percent=percent)
 
-    if time_seconds is None or (time_seconds == 0 and current_frame > 0):
-        time_seconds = calculate_time_seconds_backup(
-            current_frame=current_frame,
-            total_frames=total_frames,
-            duration_seconds=duration_seconds,
-        )
+    # Calculate time_seconds if not provided
+    time_seconds = calculate_time_seconds(
+        current_frame=current_frame,
+        total_frames=total_frames,
+        duration_seconds=duration_seconds,
+        time_seconds=time_seconds,
+    )
 
     process_time_str: str = format_time(seconds=process_time_seconds)
 
@@ -348,7 +361,7 @@ Process Time  : {color_str(process_time_str, ANSI_GREEN)}
     print(info_line, end="", flush=True)
 
 
-def create_ffmpeg_progress_handler(duration: float, total_frames: int, process_start_time: float) -> Callable[[FfmpegProgressInfo], None]:
+def create_ffmpeg_progress_handler(duration: float, total_frames: int, process_start_time: float, video_fps: float | None) -> Callable[[FfmpegProgressInfo], None]:
     """Create a progress handler for ffmpeg encoding.
 
     Args:
@@ -385,6 +398,7 @@ def create_ffmpeg_progress_handler(duration: float, total_frames: int, process_s
             time_seconds=time_seconds,
             bitrate_kbs=progress.bitrate,
             size_bytes=progress.size,
+            video_fps=video_fps,
         )
         if first_update:
             first_update = False
@@ -589,26 +603,24 @@ def create_aspect_ratio_str(width: int, height: int, tolerance: float = 0.02) ->
     ratio_x_to_1: float = width / height
     return f"{ratio_x_to_1:.2f}:1"
 
-def calculate_speed_backup(current_frame: int, process_time_seconds: float, fps: float) -> float | None:
+def calculate_speed(actual_fps: float, video_fps: float | None, backup_speed: float | None) -> float | None:
     """
     Calculates a backup speed value if speed is None.
     Uses current frames and elapsed process time.
 
     Args:
-        current_frame (int): Current frame number
-        process_time_seconds (float): Elapsed process time in seconds
-        fps (float): Current FPS
+        actual_fps (float): Actual frames processed per second
+        video_fps (float): Original video frames per second
+        backup_speed (float | None): Backup speed value
 
     Returns:
         float | None: Calculated speed (e.g. 1.23 for 1.23x), or None if not calculable
     """
-    if process_time_seconds > 0 and fps > 0 and current_frame > 0:
-        # Actual speed = (processed frames per second) / (target FPS)
-        actual_fps = current_frame / process_time_seconds
-        return actual_fps / fps
-    return None
+    if actual_fps > 0 and video_fps and video_fps > 0:
+        return actual_fps / video_fps
+    return backup_speed
 
-def calculate_time_seconds_backup(current_frame: int, total_frames: int, duration_seconds: float) -> float | None:
+def calculate_time_seconds(current_frame: int, total_frames: int, duration_seconds: float, backup_time_seconds: float | None) -> float | None:
     """
     Calculates a backup time value (time_seconds) if it is None.
     Uses the ratio of current_frame to total_frames and multiplies by duration_seconds.
@@ -616,11 +628,12 @@ def calculate_time_seconds_backup(current_frame: int, total_frames: int, duratio
     Args:
         current_frame (int): Current frame number
         total_frames (int): Total number of frames
-        duration_seconds (float): Total duration in seconds
+        duration_seconds (float): Total video duration in seconds
+        backup_time_seconds (float | None): Backup time value
 
     Returns:
         float | None: Calculated time in seconds or None if not calculable
     """
     if total_frames > 0 and duration_seconds > 0 and current_frame >= 0:
         return (current_frame / total_frames) * duration_seconds
-    return None
+    return backup_time_seconds
