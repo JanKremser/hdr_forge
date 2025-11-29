@@ -38,6 +38,7 @@ class HdrSdrFormat(Enum):
     SDR = "sdr"
     HDR = "hdr"
     HDR10 = "hdr10"
+    HDR10_PLUS = "hdr10_plus"
     DOLBY_VISION = "dolby_vision"
 
 

@@ -10,6 +10,7 @@
 /.docs
 dovi_tool
 hevc_hdr_editor
+hdr10plus_tool
 
 # Python
 __pycache__/

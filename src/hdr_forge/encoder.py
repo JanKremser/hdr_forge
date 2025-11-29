@@ -40,8 +40,6 @@ class Encoder:
             settings: Encoder settings containing all encoding parameters
             crop_callback: Optional callback for crop detection progress
         """
-        self.temp_dir: Path = get_global_temp_directory()
-
         self._video: Video = video
         self._target_file: Path = target_file
         self._target_video_codec: VideoCodec = settings.video_codec
@@ -315,29 +313,29 @@ class Encoder:
         """
         return self._target_video_codec
 
-    def get_encoding_hdr_sdr_format(self) -> HdrSdrFormat:
+    def get_encoding_hdr_sdr_format(self) -> list[HdrSdrFormat]:
         """Get the effective color format for encoding.
 
         Returns:
             Effective ColorFormat
         """
         if self._video_codec_lib is None:
-            if self._video.get_hdr_sdr_format() == HdrSdrFormat.DOLBY_VISION and self._encoder_settings.hdr_sdr_format == HdrSdrFormat.HDR10:
-                return HdrSdrFormat.HDR10
+            if HdrSdrFormat.DOLBY_VISION in self._video.get_hdr_sdr_format() and self._encoder_settings.hdr_sdr_format == HdrSdrFormat.HDR10:
+                return [HdrSdrFormat.HDR10]
             return self._video.get_hdr_sdr_format()
-        return self._video_codec_lib.get_encoding_hdr_sdr_format()
+        return [self._video_codec_lib.get_encoding_hdr_sdr_format()]
 
     def is_dolby_vision_encoding(self) -> bool:
         """Check if encoding to Dolby Vision format."""
-        return self.get_encoding_hdr_sdr_format() == HdrSdrFormat.DOLBY_VISION
+        return HdrSdrFormat.DOLBY_VISION in self.get_encoding_hdr_sdr_format()
 
     def is_hdr10_encoding(self) -> bool:
         """Check if encoding to HDR10 format."""
-        return self.get_encoding_hdr_sdr_format() == HdrSdrFormat.HDR10
+        return HdrSdrFormat.HDR10 in self.get_encoding_hdr_sdr_format()
 
     def is_sdr_encoding(self) -> bool:
         """Check if encoding to SDR format."""
-        return self.get_encoding_hdr_sdr_format() == HdrSdrFormat.SDR
+        return HdrSdrFormat.SDR in self.get_encoding_hdr_sdr_format()
 
     def get_target_file(self) -> Path:
         """Get the target output file path.
@@ -442,6 +440,8 @@ class Encoder:
     def convert_dolby_vision_to_hdr10_without_re_encoding(
         self,
     ) -> bool:
+        temp_dir: Path = get_global_temp_directory()
+
         input_file: Path = self._video.get_filepath()
         total_frames: int = self._video.get_total_frames()
         duration: int = self._video.get_total_frames()
@@ -449,7 +449,7 @@ class Encoder:
         # Step 1: Extract base layer (HEVC without EL+RPU) from original video
         base_layer_hevc_path: Path = dovi_tool.extract_base_layer(
             input_path=input_file,
-            output_hevc=self.temp_dir / f"video_BL.hevc",
+            output_hevc=temp_dir / f"video_BL.hevc",
             total_frames=total_frames,
             duration=duration,
         )
@@ -471,7 +471,8 @@ class Encoder:
         source_dv_profile: DolbyVisionProfile | None,
         target_dv_profile: DolbyVisionProfile | None,
     ) -> Path:
-        temp_dir: Path = self.temp_dir
+        temp_dir: Path = get_global_temp_directory()
+
         total_frames: int = self._video.get_total_frames()
         duration: int = self._video.get_total_frames()
 
@@ -521,7 +522,7 @@ class Encoder:
         duration: int = self._video.get_total_frames()
 
         # Create temporary directory for all intermediate files
-        temp_dir: Path = self.temp_dir
+        temp_dir: Path = get_global_temp_directory()
 
         # Step 1: Extract base layer (HEVC without RPU) from original video
         base_layer_hevc_path: Path = dovi_tool.extract_base_layer(
@@ -580,7 +581,7 @@ class Encoder:
         duration: int = self._video.get_total_frames()
 
         # Create temporary directory for all intermediate files
-        temp_dir: Path = self.temp_dir
+        temp_dir: Path = get_global_temp_directory()
 
         # Step 1: Extract base layer (HEVC without RPU) from original video
         base_layer_hevc_path: Path = dovi_tool.extract_base_layer(

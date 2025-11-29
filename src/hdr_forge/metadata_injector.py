@@ -3,13 +3,13 @@
 from pathlib import Path
 
 from hdr_forge.core.config import get_global_temp_directory
-from hdr_forge.tools import dovi_tool, hevc_hdr_editor, mkvmerge
+from hdr_forge.tools import dovi_tool, hdr10plus_tool, hevc_hdr_editor, mkvmerge
 from hdr_forge.video import Video
 
 
 class MetadataInjector:
 
-    def __init__(self, video: Video, target_file: Path, rpu_file: Path | None = None, el_file: Path | None = None, hdr_metadata: Path | None = None):
+    def __init__(self, video: Video, target_file: Path, rpu_file: Path | None = None, el_file: Path | None = None, hdr10plus_metadata: Path | None = None, hdr_metadata: Path | None = None):
         self.temp_dir: Path = get_global_temp_directory()
 
         self._input_file: Path = video.get_filepath()
@@ -20,6 +20,7 @@ class MetadataInjector:
         self._el_file: Path | None = el_file
         self._dv_info: dovi_tool.DolbyVisionRpuInfo | None = dovi_tool.get_rpu_info(rpu_path=rpu_file) if rpu_file else None
 
+        self._hdr10plus_metadata: Path | None = hdr10plus_metadata
         self._hdr_metadata: Path | None = hdr_metadata
 
     def inject_metadata(self) -> bool:
@@ -51,6 +52,17 @@ class MetadataInjector:
                 total_frames=self._video.get_total_frames(),
                 duration=self._video.get_duration_seconds(),
             )
+
+        if self._hdr10plus_metadata is not None:
+            # Inject HDR10+ metadata
+            assert hevc_file is not None
+            hdr10plus_hevc_file: Path = hdr10plus_tool.inject_hdr10plus_metadata(
+                input_path=hevc_file,
+                hdr10plus_metadata_path=self._hdr10plus_metadata,
+                output_path=self.temp_dir / "hdr10plus.hevc",
+            )
+            hevc_file.unlink(missing_ok=True)
+            hevc_file = hdr10plus_hevc_file
 
         if self._rpu_file is not None:
             # Inject RPU into the HEVC file

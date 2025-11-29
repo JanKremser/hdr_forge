@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Optional
 
 from hdr_forge.cli.cli_output import monitor_process_progress, print_debug, create_ffmpeg_minimal_progress_handler
+from hdr_forge.core.config import PROJECT_ROOT
 from hdr_forge.core.service import build_cmd_array_to_str
 from hdr_forge.tools.helper import _ffmpeg_progress_reader_thread
 from hdr_forge.typedefs.mkv_typing import MkvInfo, parse_mkv_info
@@ -18,8 +19,7 @@ def _get_mkvmerge_path() -> str:
     Returns:
         Path to mkvmerge executable as string
     """
-    project_root: Path = Path(__file__).parent.parent.parent
-    mkvmerge_path: Path = project_root / "mkvmerge"
+    mkvmerge_path: Path = Path(PROJECT_ROOT) / "mkvmerge"
 
     if mkvmerge_path.exists():
         return str(mkvmerge_path)

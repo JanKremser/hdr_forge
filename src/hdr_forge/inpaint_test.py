@@ -1,8 +1,6 @@
 import cv2
 from pyinpaint import Inpaint
-import matplotlib.pyplot as plt
 from pathlib import Path
-from PIL import Image
 import numpy as np
 
 def test_inpaint_correct(frame_path: Path, mask_path: Path, output_path: Path, ps: int = 7):

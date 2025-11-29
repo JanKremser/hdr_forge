@@ -20,12 +20,18 @@ def set_global_temp_directory(input_path_str: str | None, output_path_str: str |
     if output_path_str:
         output_path = Path(output_path_str)
 
-    base_temp_folder: Path = Path("/tmp")
+    base_temp_folder: Path = Path("/tmp/.hdr_forge_temp")
 
-    if output_path and output_path.is_file():
-        base_temp_folder = output_path.parent / f".hdr_forge_temp_{output_path.stem}"
-    elif input_path and input_path.is_file():
-        base_temp_folder = input_path.parent / f".hdr_forge_temp_{input_path.stem}"
+    if output_path and output_path.exists():
+        if output_path.is_dir():
+            base_temp_folder = output_path / f".hdr_forge_temp_{output_path.stem}"
+        else:
+            base_temp_folder = output_path.parent / f".hdr_forge_temp_{output_path.stem}"
+    elif input_path and input_path.exists():
+        if input_path.is_dir():
+            base_temp_folder = input_path / f".hdr_forge_temp_{input_path.stem}"
+        else:
+            base_temp_folder = input_path.parent / f".hdr_forge_temp_{input_path.stem}"
 
     global_temp_dir = base_temp_folder
 
@@ -52,7 +58,7 @@ def clear_global_temp_directory() -> None:
     """
     import shutil
 
-    temp_dir: Path = get_global_temp_directory()
+    temp_dir: Path = global_temp_dir
 
     if temp_dir.exists() and temp_dir.is_dir():
         try:

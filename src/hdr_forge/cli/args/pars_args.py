@@ -508,7 +508,7 @@ def _add_inject_dolby_vision_hdr_metadata_subcommand(parser: argparse._SubParser
     """
     inject_parser: argparse.ArgumentParser = parser.add_parser('inject-metadata',
         description="""
-Inject Dolby Vision and/or HDR10 metadata into an existing HEVC video stream, without re-encoding.
+Inject Dolby Vision/HDR10 and/or HDR10Plus metadata into an existing HEVC video stream, without re-encoding.
 NVENC GPU-encoded videos cannot be retroactively assigned HDR metadata using this function.
 Only CPU-encoded videos can be retroactively assigned HDR metadata.
 """,
@@ -549,12 +549,22 @@ Example:
     )
 
     inject_parser.add_argument(
-        '--hdr',
+        '--hdr10',
         required=False,
         help="""
 Path to HDR10 metadata JSON file to be injected.
 Example:
-    --hdr "path/to/hdr10_metadata.json"
+    --hdr10 "path/to/hdr10_metadata.json"
+"""
+    )
+
+    inject_parser.add_argument(
+        '--hdr10plus',
+        required=False,
+        help="""
+Path to HDR10 metadata JSON file to be injected.
+Example:
+    --hdr10plus "path/to/hdr10plus_metadata.json"
 """
     )
 

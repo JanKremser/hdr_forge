@@ -380,6 +380,7 @@ def create_ffmpeg_progress_handler(duration: float, total_frames: int, process_s
         if progress.time and duration > 0:
             time_seconds = progress.time
 
+
         current_frame: int = progress.frame
         fps: float = progress.fps if progress.fps else 0.0
 

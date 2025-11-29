@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Optional
 
 from hdr_forge.cli.cli_output import monitor_process_progress, print_debug
+from hdr_forge.core.config import PROJECT_ROOT
 from hdr_forge.core.service import build_cmd_array_to_str
 from hdr_forge.tools.helper import run_ffmpeg_tool_pipeline
 from hdr_forge.typedefs.dolby_vision_typing import DolbyVisionProfile, DolbyVisionRpuInfo
@@ -21,8 +22,7 @@ def _get_dovi_tool_path() -> str:
         Path to dovi_tool executable as string
     """
     # Get path to local dovi_tool (in project root)
-    project_root = Path(__file__).parent.parent.parent
-    dovi_tool_path = project_root / "dovi_tool"
+    dovi_tool_path: Path = Path(PROJECT_ROOT) / "dovi_tool"
 
     # Fallback to system dovi_tool if local one doesn't exist
     if dovi_tool_path.exists():

@@ -62,7 +62,9 @@ def print_video_infos(video: Video) -> None:
     print(f"  Color Transfer: {color_str(video.get_color_transfer(), color)}")
     print(f"  Color Space: {color_str(video.get_color_space(), color)}")
     print(f"  Bit depth: {color_str(video.get_bit_depth(), color)}")
-    print(f"  HDR/SDR: {color_str(video.get_hdr_sdr_format().value.upper(), color)}")
+
+    hdr_formats_str: str = ', '.join([fmt.value.upper() for fmt in video.get_hdr_sdr_format()])
+    print(f"  HDR/SDR: {color_str(hdr_formats_str, color)}")
     if video.is_hdr10_video():
         _print_hdr10_metadata(video=video)
 

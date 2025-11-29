@@ -1,4 +1,5 @@
 # Python dependencies
-numpy==2.3.5
+numpy==2.2.6
 opencv-python==4.12.0.88
 pyinpaint==1.0.0
+pyinstaller==6.17.0

@@ -5,7 +5,7 @@ from hdr_forge.cli.args.pars_encoder_settings import print_parameter_warnings
 from hdr_forge.cli.cli_output import ANSI_BLUE, color_str, create_aspect_ratio_str
 from hdr_forge.ffmpeg.video_codec.video_codec_base import VideoCodecBase
 from hdr_forge.typedefs.dolby_vision_typing import DolbyVisionEnhancementLayer, DolbyVisionProfile
-from hdr_forge.typedefs.encoder_typing import EncoderSettings, VideoCodec
+from hdr_forge.typedefs.encoder_typing import EncoderSettings, HdrSdrFormat, VideoCodec
 from hdr_forge.encoder import Encoder
 
 
@@ -69,7 +69,9 @@ def print_encoding_params(encoder: Encoder) -> None:
         print(f"  Resolution: {color_str(f"{resolution_w}x{resolution_h}", color)}")
         print(f"  Aspect Ratio: {color_str(aspect_ratio, color)}")
         print(f"  Bit Depth: {color_str(video_codec_lib.get_bit_depth_for_encoding(), color)}")
-        print(f"  HDR/SDR: {color_str(encoder.get_encoding_hdr_sdr_format().value.upper(), color)}")
+
+        hdr_formats_str: str = ', '.join([fmt.value.upper() for fmt in encoder.get_encoding_hdr_sdr_format()])
+        print(f"  HDR/SDR: {color_str(hdr_formats_str, color)}")
         if video_codec_lib.is_hdr10_encoding():
             _print_hdr10_metadata(video_codec_lib=video_codec_lib)
     if encoder.is_dolby_vision_encoding():

@@ -13,7 +13,7 @@ from hdr_forge.cli.video import print_video_infos
 from hdr_forge.core import config
 from hdr_forge.core.service import shutdown_system
 from hdr_forge.metadata_injector import MetadataInjector
-from hdr_forge.tools import dovi_tool, hevc_hdr_editor
+from hdr_forge.tools import dovi_tool, hdr10plus_tool, hevc_hdr_editor
 from hdr_forge.typedefs.encoder_typing import EncoderSettings, LogoRemovalAutoDetectMode, LogoRemovalMode, LogoRemovelSettings
 from hdr_forge.encoder import Encoder
 from hdr_forge.video import Video
@@ -232,6 +232,12 @@ def process_extract_metadata_command(args) -> int:
                 output_json=hdr_file_path,
             )
 
+        if video.is_hdr10plus_video():
+            hdr10plus_tool.extract_hdr10plus_metadata(
+                input_path=video.get_filepath(),
+                output_path=output_path / f"{input_path.stem}_hdr10plus.json",
+            )
+
         if video.is_dolby_vision_video():
             rpu_file_path: Path = output_path / f"{input_path.stem}.rpu"
             dovi_tool.extract_rpu(
@@ -273,14 +279,16 @@ def process_inject_metadata_command(args) -> int:
 
         rpu_path_str: str | None = getattr(args, 'rpu', None)
         el_path_str: str | None = getattr(args, 'el', None)
-        hdr_path_str: str | None = getattr(args, 'hdr', None)
+        hdr10_path_str: str | None = getattr(args, 'hdr10', None)
+        hdr10plus_path_str: str | None = getattr(args, 'hdr10plus', None)
 
         metadata_injector = MetadataInjector(
             video=video,
             target_file=output_path,
             rpu_file=Path(rpu_path_str) if rpu_path_str else None,
             el_file=Path(el_path_str) if el_path_str else None,
-            hdr_metadata=Path(hdr_path_str) if hdr_path_str else None,
+            hdr10plus_metadata=Path(hdr10plus_path_str) if hdr10plus_path_str else None,
+            hdr_metadata=Path(hdr10_path_str) if hdr10_path_str else None,
         )
         success = metadata_injector.inject_metadata()
     except Exception as e:

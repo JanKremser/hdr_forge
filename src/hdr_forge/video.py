@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Dict, LiteralString, Optional, Tuple
 
 from hdr_forge.core.config import get_global_temp_directory
-from hdr_forge.tools import mkvmerge
+from hdr_forge.tools import hdr10plus_tool, mkvmerge
 from hdr_forge.tools import dovi_tool
 from hdr_forge.typedefs.encoder_typing import HdrSdrFormat
 from hdr_forge.typedefs.dolby_vision_typing import DolbyVisionEnhancementLayer, DolbyVisionInfo, DolbyVisionProfile, DolbyVisionSiteDataInfo, DolbyVisionRpuInfo
@@ -40,6 +40,8 @@ class Video:
         self._video_metadata: dict = self._extract_video_metadata()
         self._hdr_metadata: HdrMetadata = self.extract_hdr_metadata()
 
+        self._is_hdr10plus: bool = hdr10plus_tool.verify_hdr10plus(input_path=filepath)
+
         self._container_metadata: MkvInfo = mkvmerge.extract_container_info_json(input_mkv_mp4_ts_file=filepath)
 
         # Extract dimensions from video stream
@@ -47,14 +49,14 @@ class Video:
         self.width: int = video_stream.get('width', 0)
         self.height: int = video_stream.get('height', 0)
 
-        self.temp_dir: Path = get_global_temp_directory()
 
         self._dolby_vision_rpu_info: Optional[DolbyVisionRpuInfo] = None
         if self.is_dolby_vision_video() and not with_out_rpu_extraction:
+            temp_dir: Path = get_global_temp_directory()
             ## get dolby vision rpu infos
             rpu_file_path: Path = dovi_tool.extract_rpu(
                 input_path=self.get_filepath(),
-                output_rpu=self.temp_dir / "RPU.rpu",
+                output_rpu=temp_dir / "RPU.rpu",
                 dv_profile_source=self.get_dolby_vision_profile(),
                 total_frames=self.get_total_frames(),
                 duration=self.get_duration_seconds(),
@@ -443,6 +445,23 @@ class Video:
             return False
         return self.is_hdr_video()
 
+    def is_hdr10plus_video(self) -> bool:
+        """Check if video contains HDR10+ metadata.
+
+        Returns:
+            True if HDR10+ metadata is present, False otherwise
+        """
+        return self._is_hdr10plus
+
+    def is_dolby_vision_video(self) -> bool:
+        """Check if video contains Dolby Vision metadata.
+
+        Returns:
+            True if Dolby Vision metadata is present, False otherwise
+        """
+        dv_info: DolbyVisionSiteDataInfo | None = self._get_dolby_vision_side_data_infos()
+        return dv_info is not None and dv_info.rpu_present_flag == 1
+
     def get_bit_depth(self) -> int:
         """Get the bit depth of the video.
 
@@ -455,29 +474,27 @@ class Video:
             return int(match.group(1))
         return 8
 
-    def is_dolby_vision_video(self) -> bool:
-        """Check if video contains Dolby Vision metadata.
-
-        Returns:
-            True if Dolby Vision metadata is present, False otherwise
-        """
-        dv_info: DolbyVisionSiteDataInfo | None = self._get_dolby_vision_side_data_infos()
-        return dv_info is not None and dv_info.rpu_present_flag == 1
-
-    def get_hdr_sdr_format(self) -> HdrSdrFormat:
+    def get_hdr_sdr_format(self) -> list[HdrSdrFormat]:
         """Determine the color format of the video.
 
         Returns:
             ColorFormat enum value representing the color format
         """
+        hdr_formats: list[HdrSdrFormat] = []
         if self.is_dolby_vision_video():
-            return HdrSdrFormat.DOLBY_VISION
-        elif self.is_hdr10_video():
-            return HdrSdrFormat.HDR10
-        elif self.is_hdr_video():
-            return HdrSdrFormat.HDR
+            hdr_formats.append(HdrSdrFormat.DOLBY_VISION)
+        if self.is_hdr10plus_video():
+            hdr_formats.append(HdrSdrFormat.HDR10_PLUS)
+        if self.is_hdr10_video():
+            hdr_formats.append(HdrSdrFormat.HDR10)
+
+        if len(hdr_formats) > 0:
+            return hdr_formats
+
+        if self.is_hdr_video():
+            return [HdrSdrFormat.HDR]
         else:
-            return HdrSdrFormat.SDR
+            return [HdrSdrFormat.SDR]
 
     def get_fps(self) -> float:
         """Get video frame rate (frames per second).
