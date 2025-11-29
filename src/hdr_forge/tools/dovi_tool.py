@@ -316,7 +316,7 @@ def inject_dolby_vision_layers(bl_path: Path, el_path: Path, output_bl_el: Optio
 
 
 def extract_enhancement_layer(
-    input_file: Path,
+    input_path: Path,
     output_el: Optional[Path] = None,
     total_frames: Optional[int] = None,
     duration: Optional[float] = None
@@ -337,7 +337,7 @@ def extract_enhancement_layer(
         RuntimeError: If Enhancement Layer extraction fails
     """
     if output_el is None:
-        output_el = input_file.with_name(f"{input_file.stem}_EL.hevc")
+        output_el = input_path.with_name(f"{input_path.stem}_EL.hevc")
 
     dovi_tool_exec = _get_dovi_tool_path()
 
@@ -353,7 +353,7 @@ def extract_enhancement_layer(
 
         # Execute pipeline using helper function
         returncode, stderr = run_ffmpeg_tool_pipeline(
-            input_path=input_file,
+            input_path=input_path,
             tool_cmd=dovi_cmd,
             process_name="Extracting Enhancement Layer:",
             total_frames=total_frames,

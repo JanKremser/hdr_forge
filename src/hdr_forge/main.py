@@ -3,7 +3,6 @@
 import sys
 from pathlib import Path
 
-from torch import export
 
 from hdr_forge.analyze.detect_logo import LogoDetector, MaskResult
 from hdr_forge.cli.args import pars_args, pars_encoder_settings
@@ -13,7 +12,9 @@ from hdr_forge.cli.encoder import print_encoding_params
 from hdr_forge.cli.video import print_video_infos
 from hdr_forge.core import config
 from hdr_forge.core.service import shutdown_system
+from hdr_forge.metadata_injector import MetadataInjector
 from hdr_forge.hdr_metadata_injector import HdrMetadataInjector
+from hdr_forge.tools import dovi_tool, hevc_hdr_editor
 from hdr_forge.typedefs.encoder_typing import EncoderSettings, LogoRemovalAutoDetectMode, LogoRemovalMode, LogoRemovelSettings
 from hdr_forge.encoder import Encoder
 from hdr_forge.video import Video
@@ -246,6 +247,84 @@ def process_inject_hdr_metadata_command(args) -> int:
 
     return 0 if success else 1
 
+def process_extract_metadata_command(args) -> int:
+    """Process the extract-dv-metadata subcommand."""
+    input_path = Path(args.input)
+    output_path: Path = Path(args.output) if args.output else input_path.parent
+
+    # Validate input
+    if not input_path.exists():
+        print(f"Error: Input path does not exist: {input_path}")
+        return 1
+
+    success: bool = False
+    try:
+        video = Video(filepath=input_path, with_out_rpu_extraction=True)
+
+        if video.is_hdr10_video():
+            hdr_file_path: Path = output_path / f"{input_path.stem}_hdr.json"
+            hevc_hdr_editor.create_config_json_for_hevc_hdr_editor(
+                hdr_metadata=video.get_hdr_metadata(),
+                output_json=hdr_file_path,
+            )
+
+        if video.is_dolby_vision_video():
+            rpu_file_path: Path = output_path / f"{input_path.stem}.rpu"
+            dovi_tool.extract_rpu(
+                input_path=video.get_filepath(),
+                output_rpu=rpu_file_path,
+                total_frames=video.get_total_frames(),
+                duration=video.get_duration_seconds(),
+            )
+            dv_info: dovi_tool.DolbyVisionRpuInfo = dovi_tool.get_rpu_info(
+                rpu_path=rpu_file_path,
+            )
+            if dv_info.profile_el:
+                el_file_path: Path = output_path / f"{input_path.stem}.hevc"
+                dovi_tool.extract_enhancement_layer(
+                    input_path=video.get_filepath(),
+                    output_el=el_file_path,
+                    total_frames=video.get_total_frames(),
+                    duration=video.get_duration_seconds(),
+                )
+    except Exception as e:
+        print_err(f"Error processing {input_path.name}: {e}")
+        return 1
+
+    return 0 if success else 1
+
+def process_inject_metadata_command(args) -> int:
+    """Process the inject-dv-metadata subcommand."""
+    input_path = Path(args.input)
+    output_path = Path(args.output)
+
+    # Validate input
+    if not input_path.exists():
+        print(f"Error: Input path does not exist: {input_path}")
+        return 1
+
+    success: bool = False
+    try:
+        video = Video(filepath=input_path, with_out_rpu_extraction=True)
+
+        rpu_path_str: str | None = getattr(args, 'rpu', None)
+        el_path_str: str | None = getattr(args, 'el', None)
+        hdr_path_str: str | None = getattr(args, 'hdr', None)
+
+        metadata_injector = MetadataInjector(
+            video=video,
+            target_file=output_path,
+            rpu_file=Path(rpu_path_str) if rpu_path_str else None,
+            el_file=Path(el_path_str) if el_path_str else None,
+            hdr_metadata=Path(hdr_path_str) if hdr_path_str else None,
+        )
+        success = metadata_injector.inject_metadata()
+    except Exception as e:
+        print_err(msg=f"Error processing {input_path.name}: {e}")
+        return 1
+
+    return 0 if success else 1
+
 def process_detect_logo_command(args) -> int:
     """Process the detect-logo subcommand."""
     input_path = Path(args.input)
@@ -294,6 +373,10 @@ def main() -> None:
         code = process_convert_command(args)
     elif args.command == 'inject-hdr-metadata':
         code = process_inject_hdr_metadata_command(args)
+    elif args.command == 'extract-metadata':
+        code = process_extract_metadata_command(args)
+    elif args.command == 'inject-metadata':
+        code = process_inject_metadata_command(args)
     elif args.command == 'detect-logo':
         code = process_detect_logo_command(args)
     elif args.command == 'calc_maxcll':

@@ -492,7 +492,7 @@ Only CPU-encoded videos can be retroactively assigned HDR metadata.
 
     inject_parser.add_argument(
         '-o', '--output',
-        required=False,
+        required=True,
         help='Output MKV video file with injected HDR metadata'
     )
 
@@ -516,6 +516,97 @@ Set custom MaxCLL and MaxFALL values for HDR10 videos. Format:
 
 Example:
     --max-cll "1000,400"
+"""
+    )
+
+    inject_parser.add_argument(
+        '-d', '--debug',
+        action='store_true',
+    )
+
+def _add_extract_dolby_vision_hdr_metadata_subcommand(parser: argparse._SubParsersAction) -> None:
+    """Add arguments for the 'extract_dv_metadata' subcommand.
+
+    Args:
+        parser: Argument parser to add arguments to
+    """
+    inject_parser: argparse.ArgumentParser = parser.add_parser('extract-metadata',
+        description="""
+Extract Dolby Vision and/or HDR10 metadata from a encoded video file.
+""",
+        help='Extract Dolby Vision metadata'
+    )
+
+    inject_parser.add_argument(
+        '-i', '--input',
+        required=True,
+        help='Input Video file'
+    )
+
+    inject_parser.add_argument(
+        '-o', '--output',
+        required=False,
+        help='Output folder for extracted HDR-JSON, RPU and EL files'
+    )
+
+    inject_parser.add_argument(
+        '-d', '--debug',
+        action='store_true',
+    )
+
+def _add_inject_dolby_vision_hdr_metadata_subcommand(parser: argparse._SubParsersAction) -> None:
+    """Add arguments for the 'inject_metadata' subcommand.
+
+    Args:
+        parser: Argument parser to add arguments to
+    """
+    inject_parser: argparse.ArgumentParser = parser.add_parser('inject-metadata',
+        description="""
+Inject Dolby Vision and/or HDR10 metadata into an existing HEVC video stream, without re-encoding.
+""",
+        help='Inject Dolby Vision metadata'
+    )
+
+    inject_parser.add_argument(
+        '-i', '--input',
+        required=True,
+        help='Input Video file'
+    )
+
+    inject_parser.add_argument(
+        '-o', '--output',
+        required=True,
+        help='Output MKV video file'
+    )
+
+    inject_parser.add_argument(
+        '--rpu',
+        required=False,
+        help="""
+Path to the RPU file containing Dolby Vision metadata to be injected.
+Example:
+    --rpu "path/to/dolby_vision.rpu"
+"""
+    )
+
+    inject_parser.add_argument(
+        '--el',
+        required=False,
+        help="""
+Path to the EL file containing Dolby Vision enhancement layer data to be injected.
+The “.hevc” extension is important; without this change, an error will occur.
+Example:
+    --el "path/to/dolby_vision.hevc"
+"""
+    )
+
+    inject_parser.add_argument(
+        '--hdr',
+        required=False,
+        help="""
+Path to HDR10 metadata JSON file to be injected.
+Example:
+    --hdr "path/to/hdr10_metadata.json"
 """
     )
 
@@ -549,6 +640,10 @@ def parse_args():
     _add_convert_subcommand(parser=subparsers)
 
     _add_inject_hdr_metadata_subcommand(parser=subparsers)
+
+    _add_extract_dolby_vision_hdr_metadata_subcommand(parser=subparsers)
+
+    _add_inject_dolby_vision_hdr_metadata_subcommand(parser=subparsers)
 
     _add_detect_logo_subcommand(parser=subparsers)
 

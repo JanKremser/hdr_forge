@@ -413,6 +413,14 @@ class Video:
             return 0, 0
         return None
 
+    def get_hdr_metadata(self) -> HdrMetadata:
+        """Get extracted HDR metadata.
+
+        Returns:
+            HdrMetadata object containing HDR metadata
+        """
+        return self._hdr_metadata
+
     def is_hdr_video(self) -> bool:
         """Check if video is HDR by detecting 10-bit pixel format.
 
@@ -433,7 +441,7 @@ class Video:
         master_display: MasterDisplayMetadata | None = self.get_master_display()
         if not master_display:
             return False
-        return self.is_hdr_video() and not self.is_dolby_vision_video()
+        return self.is_hdr_video()
 
     def get_bit_depth(self) -> int:
         """Get the bit depth of the video.

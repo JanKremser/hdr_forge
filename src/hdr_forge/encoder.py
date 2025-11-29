@@ -322,6 +322,8 @@ class Encoder:
             Effective ColorFormat
         """
         if self._video_codec_lib is None:
+            if self._video.get_hdr_sdr_format() == HdrSdrFormat.DOLBY_VISION and self._encoder_settings.hdr_sdr_format == HdrSdrFormat.HDR10:
+                return HdrSdrFormat.HDR10
             return self._video.get_hdr_sdr_format()
         return self._video_codec_lib.get_encoding_hdr_sdr_format()
 
@@ -488,7 +490,7 @@ class Encoder:
         if self._target_dv_el is not None:
             # start demux EL profile 7 for profile 7 encoding
             el_path: Path = dovi_tool.extract_enhancement_layer(
-                input_file=input_file,
+                input_path=input_file,
                 output_el=temp_dir / f"video_EL.hevc",
                 total_frames=total_frames,
                 duration=duration,
