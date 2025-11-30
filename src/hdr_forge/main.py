@@ -226,7 +226,7 @@ def process_extract_metadata_command(args) -> int:
         video = Video(filepath=input_path, with_out_rpu_extraction=True)
 
         if video.is_hdr10_video():
-            hdr_file_path: Path = output_path / f"{input_path.stem}_hdr.json"
+            hdr_file_path: Path = output_path / f"{input_path.stem}_hdr10.json"
             hevc_hdr_editor.create_config_json_for_hevc_hdr_editor(
                 hdr_metadata=video.get_hdr_metadata(),
                 output_json=hdr_file_path,
@@ -250,7 +250,7 @@ def process_extract_metadata_command(args) -> int:
                 rpu_path=rpu_file_path,
             )
             if dv_info.profile_el:
-                el_file_path: Path = output_path / f"{input_path.stem}.hevc"
+                el_file_path: Path = output_path / f"{input_path.stem}_el.hevc"
                 dovi_tool.extract_enhancement_layer(
                     input_path=video.get_filepath(),
                     output_el=el_file_path,

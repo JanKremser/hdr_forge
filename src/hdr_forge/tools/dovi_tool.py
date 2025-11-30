@@ -22,7 +22,7 @@ def _get_dovi_tool_path() -> str:
         Path to dovi_tool executable as string
     """
     # Get path to local dovi_tool (in project root)
-    dovi_tool_path: Path = Path(PROJECT_ROOT) / "dovi_tool"
+    dovi_tool_path: Path = Path(PROJECT_ROOT) / "lib/dovi_tool"
 
     # Fallback to system dovi_tool if local one doesn't exist
     if dovi_tool_path.exists():

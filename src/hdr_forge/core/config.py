@@ -1,12 +1,22 @@
 import os
 from pathlib import Path
+import sys
 
-
-debug_mode: bool = False
-
+from hdr_forge.cli.cli_output import print_warn
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-PROJECT_ROOT = os.path.abspath(os.path.join(CURRENT_DIR, "../../../"))
+
+def _get_project_root():
+    # 2) PyInstaller One-Folder oder One-File mit externen Daten:
+    if getattr(sys, 'frozen', False):
+        return os.path.dirname(sys.executable)
+
+    # 3) Normaler Python-Run:
+    return os.path.abspath(os.path.join(CURRENT_DIR, "../../../"))
+
+PROJECT_ROOT = _get_project_root()
+
+debug_mode: bool = False
 
 global_temp_dir: Path = Path(f"{PROJECT_ROOT}/.hdr_forge_temp")
 

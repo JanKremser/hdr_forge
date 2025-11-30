@@ -4,7 +4,7 @@ import threading
 from pathlib import Path
 from typing import Optional
 
-from hdr_forge.cli.cli_output import monitor_process_progress, print_debug
+from hdr_forge.cli.cli_output import monitor_process_progress, print_debug, print_warn
 from hdr_forge.core.config import PROJECT_ROOT
 from hdr_forge.core.service import build_cmd_array_to_str
 
@@ -18,12 +18,13 @@ def _get_hdr10plus_tool_path() -> str:
         Path to hdr10plus_tool executable as string
     """
     # Get path to local hdr10plus_tool (in project root)
-    hdr10plus_tool_path: Path = Path(PROJECT_ROOT) / "hdr10plus_tool"
+    hdr10plus_tool_path: Path = Path(PROJECT_ROOT) / "lib/hdr10plus_tool"
 
     # Fallback to system hdr10plus_tool if local one doesn't exist
     if hdr10plus_tool_path.exists():
         return str(hdr10plus_tool_path)
     else:
+        print_warn(f"{str(hdr10plus_tool_path)} not found, falling back to system hdr10plus_tool")
         return "hdr10plus_tool"
 
 def verify_hdr10plus(input_path: Path) -> bool:
@@ -62,8 +63,8 @@ def verify_hdr10plus(input_path: Path) -> bool:
         return True if "Dynamic HDR10+ metadata detected" in result.stdout else False
 
     except subprocess.CalledProcessError as e:
-        error_msg = e.stderr if e.stderr else str(e)
-        raise RuntimeError(f"hdr10plus_tool failed: {error_msg}")
+        #error_msg = e.stderr if e.stderr else str(e)
+        return False
     except FileNotFoundError as e:
         raise RuntimeError(
             f"Required tool not found: {e.filename}. "

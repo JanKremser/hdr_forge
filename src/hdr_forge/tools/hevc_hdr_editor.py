@@ -14,7 +14,7 @@ def _get_hevc_hdr_editor_path() -> str:
     Returns:
         Path to hevc_hdr_editor executable as string
     """
-    hevc_hdr_editor_path: Path = Path(PROJECT_ROOT) / "hevc_hdr_editor"
+    hevc_hdr_editor_path: Path = Path(PROJECT_ROOT) / "lib/hevc_hdr_editor"
 
     if hevc_hdr_editor_path.exists():
         return str(hevc_hdr_editor_path)
@@ -117,8 +117,8 @@ def create_config_json_for_hevc_hdr_editor(hdr_metadata: HdrMetadata, output_jso
                 int(master_display.b_y * 50000)
             ],
             "white_point": [
-                int(master_display.wp_x * 10000),
-                int(master_display.wp_y * 10000)
+                int(master_display.wp_x * 50000),
+                int(master_display.wp_y * 50000)
             ]
         }
 

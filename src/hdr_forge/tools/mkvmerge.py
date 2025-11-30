@@ -19,7 +19,7 @@ def _get_mkvmerge_path() -> str:
     Returns:
         Path to mkvmerge executable as string
     """
-    mkvmerge_path: Path = Path(PROJECT_ROOT) / "mkvmerge"
+    mkvmerge_path: Path = Path(PROJECT_ROOT) / "lib/mkvmerge"
 
     if mkvmerge_path.exists():
         return str(mkvmerge_path)
