@@ -107,14 +107,14 @@ def create_config_json_for_hevc_hdr_editor(hdr_metadata: HdrMetadata, output_jso
         primaries_json: dict = {
             # X, Y display primaries in RGB order as 16 bit integers
             "display_primaries_x": [
-                int(master_display.r_x * 50000),
                 int(master_display.g_x * 50000),
-                int(master_display.b_x * 50000)
+                int(master_display.b_x * 50000),
+                int(master_display.r_x * 50000),
             ],
             "display_primaries_y": [
-                int(master_display.r_y * 50000),
                 int(master_display.g_y * 50000),
-                int(master_display.b_y * 50000)
+                int(master_display.b_y * 50000),
+                int(master_display.r_y * 50000),
             ],
             "white_point": [
                 int(master_display.wp_x * 50000),
