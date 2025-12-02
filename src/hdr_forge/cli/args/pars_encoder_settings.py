@@ -593,8 +593,8 @@ def _get_hdr_forge_encoder_presets_from_args(args, encoder_override: EncoderOver
     """
     preset: HdrForgeEncodingPresets
     hw_preset: HdrForgeEncodingHardwarePresets
-    if args.preset is None:
-        preset = HdrForgeEncodingPresets.AUTO
+    if args.preset is None or args.preset.lower() == 'auto':
+        preset = HdrForgeEncodingPresets.FILM
     else:
         try:
             preset = HdrForgeEncodingPresets(args.preset)

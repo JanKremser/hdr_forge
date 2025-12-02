@@ -367,9 +367,18 @@ class Encoder:
                 'c:v': 'copy',
             })
 
+        metadata: list[str] = [
+            'hdr_forge_version=' + str(getattr(sys.modules['hdr_forge'], '__version__', 'unknown')),
+        ]
+
+        if 'metadata' in output_options:
+            output_options['metadata'].extend(metadata)
+        else:
+            output_options['metadata'] = metadata
+
         output_options.update({
             'c:a': 'copy',
-            'c:s': 'copy'
+            'c:s': 'copy',
         })
 
         return output_options

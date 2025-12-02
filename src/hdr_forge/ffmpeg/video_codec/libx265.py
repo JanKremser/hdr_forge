@@ -1,5 +1,5 @@
 from typing import Optional, Tuple
-from hdr_forge.ffmpeg.video_codec.service.presets import Hdr_Forge_X265_X264_Preset
+from hdr_forge.ffmpeg.video_codec.service.presets import Hdr_Forge_X265_X264_Preset, convert_preset_to_index
 from hdr_forge.ffmpeg.video_codec.video_codec_base import VideoCodecBase
 from hdr_forge.typedefs.encoder_typing import EncoderSettings, HdrForgeEncodingPresets, HdrSdrFormat, VideoEncoderLibrary, Libx265Params, X265Tune, x265_x264_Preset
 from hdr_forge.typedefs.video_typing import ContentLightLevelMetadata, HdrMetadata, MasterDisplayMetadata, build_master_display_string, build_max_cll_string
@@ -85,8 +85,15 @@ class Libx265Codec(VideoCodecBase):
 
     def get_ffmpeg_params(self, exist_params: dict) -> dict:
         output_options: dict = super().get_ffmpeg_params(exist_params=exist_params)
+
+        preset_value: str
+        if ":" in self._preset.value:
+            preset_value = self._preset.value.split(":")[0]
+        else:
+            preset_value = self._preset.value
+
         output_options.update({
-            "preset": self._preset.value,
+            "preset": preset_value,
             "crf": str(self._crf),
             "pix_fmt": self.get_pix_format_for_encoding(),
         })
@@ -103,10 +110,24 @@ class Libx265Codec(VideoCodecBase):
             x265_params: list[str] = self._build_sdr_x265_params()
             output_options['x265-params'] = ':'.join(x265_params)
 
+        metadata: list[str] = [
+            'hdr_forge_encoder_preset=' + self._preset.value,
+            'hdr_forge_encoder_crf=' + str(self._crf),
+        ]
+        if 'metadata' in output_options:
+            output_options['metadata'].extend(metadata)
+        else:
+            output_options['metadata'] = metadata
+
         return output_options
 
     def get_pix_format_for_encoding(self) -> str:
         bit_depth = self.get_bit_depth_for_encoding()
+
+        hdr_forge_preset: HdrForgeEncodingPresets = self._encoder_settings.hdr_forge_encoding_preset.preset
+        if hdr_forge_preset == HdrForgeEncodingPresets.BANDING:
+            return self.PIXEL_FORMAT_10BIT  # always use 10bit for banding reduction
+
         if bit_depth == 10:
             return self.PIXEL_FORMAT_10BIT
         elif bit_depth == 8:
@@ -154,6 +175,156 @@ class Libx265Codec(VideoCodecBase):
 
         return encoder_max_cll
 
+    def _build_default_x265_params(self) -> list[str]:
+        """Build default x265 parameters.
+
+        Returns:
+            list of x265 parameter strings
+        """
+        hdr_forge_preset: HdrForgeEncodingPresets = self._encoder_settings.hdr_forge_encoding_preset.preset
+        if hdr_forge_preset == HdrForgeEncodingPresets.VIDEO:
+            return []  # use x265 defaults for video preset
+
+        # default params
+        params: dict[str, str | None] = {
+            'aq-mode': None,
+            # default is 2
+            # x265 can distribute bits more “intelligently,” especially in complex scenes and dark areas.
+            # for almost all film types. This is one of the best AQ profiles for balanced quality.
+            'aq-strength': None,
+            # AQ only works within the selected "aq-mode"
+            # - Default is 1.0
+            # - 8–1.2 → very stable for most films, good compromise
+            #   1.0 → universal
+            #   1.5+ → very aggressive, sometimes for HDR or heavily textured content
+            #   >2.0 → hardly necessary, can create artifacts or significantly increase bitrate
+            'psy-rd': None, #psy-rd=1.5
+            # Sharper, but potentially slightly more artifacts (not noticeable at normal bitrates)
+            # - Default is 1.0
+            # - Values between 1.0 and 2.0 are common in quality profiles.
+            'psy-rdoq': None, #psy-rdoq=1.5
+            # psy-rdoq: More realistic textures, but slightly higher bitrate requirements
+            # - Default is 1.0
+            # - 0.8–1.2 for a good compromise.
+            'ref': None,
+            # Number of reference frames
+            # - default is 3 for medium preset, 4 for slow presets
+            # - 4 = optimal all-round value
+            #   5–6 = slight optimization, but slower
+            #   >6 = hardly any added value except for anime or very clean 4K masters
+            'bframes': '4',
+            # Number of B-frames
+            # - default is 4-8, depending on preset
+            # - 8 = optimal all-round value
+            'b-adapt': '2',
+            # B-frame adaptation mode
+            # - default is 2
+            # - 0 = disabled default by medium and lower presets
+            # - 1 = simple and fast
+            # - 2 = optimal all-round value, default by slow and higher presets
+            'rdoq-level': None,
+            # Makes fine dark details visibly better
+            # - 0 = disabled, default by medium, fast presets
+            # - 1 = -
+            # - 2 = better for films with a lot of dark scenes/details
+            #       2 is slower but gives better results in dark scenes
+            # - 3 = hardly any added value, not recommended
+            #       3 is very slow
+            'qcomp': '0.65',
+            # Balances contrast and motion scenes well
+            # - 0.5-1.0 is a rage
+            # - Prevents bitrate spikes
+            # - Default is 0.6
+            'rc-lookahead': '25',
+            # Better for most films with complex scenes
+            # - default is 15 for fast, 20 for medium, 25 for slow, 40 for veryslow
+            # - 40 = optimal all-round value
+            # - This is RAM intensive for very high-resolution videos (4K+)
+            'lookahead-slices': None,
+            # default is 4 for slow and 8 for medium
+        }
+
+        if self._preset == x265_x264_Preset.SLOW:
+            # optimize some params for slower preset
+            params.update({
+                # 'ref': '3', # 1 frame schneller bei 3
+                # 'aq-mode': None,
+                # 'bframes': None,
+                # 'rdoq-level': None,
+                # 'subme': '2', # default is 3 / 3-4 frame schneller bei 2
+                # 'me': 'hex', # default is star / 3 frame schneller bei hex
+            })
+        if self._preset == x265_x264_Preset.SLOW_PLUS:
+            # optimize some params for slower preset
+            params.update({
+                'aq-mode': '2', # 2 frame schneller bei 2
+                'ref': '4', # 1 frame schneller bei 3
+                'bframes': '8', # 4 frame schneller bei 4
+                'b-adapt': '2',
+                'rdoq-level': '2', # 1 frame schneller bei 1
+                'subme': '2', # default is 3 / 3-4 frame schneller bei 2
+                'me': 'hex', # default is star / 3 frame schneller bei hex
+                'lookahead-slices': '4', # default is 4
+            })
+        elif self._preset == x265_x264_Preset.MEDIUM_PLUS:
+            params.update({
+                'aq-mode': '2',
+                'ref': '4',
+                'bframes': '8',
+                'b-adapt': '2',
+                'rdoq-level': '1',# 8 frames slower as default 0
+                'lookahead-slices': '4',
+            })
+
+        if convert_preset_to_index(self._preset) <= convert_preset_to_index(x265_x264_Preset.FASTER):
+            # faster to veryfast presets benefit from resetting some params to default for speed
+            params.update({
+                'ref': None,
+                'bframes': None,
+                'b-adapt': None,
+                'rdoq-level': None,
+            }) # reset to defaults for faster preset
+
+        if hdr_forge_preset == HdrForgeEncodingPresets.ANIMATION:
+            params.update({
+                'aq-mode': '2',
+                'aq-strength': '1.1', # default by animation tune is 0.4
+                'psy-rd': '0.9', # default by animation tune is 0.4
+                'psy-rdoq': '0.9',
+                'ref': '6',
+                'bframes': '10',# for animation, more b-frames can help compression -> 8-16
+                'b-adapt': '2',
+                'rdoq-level': '2', # 1-2 is ok
+                'deblock': None, # default by animation tune is 1:1
+            })
+        elif (
+            hdr_forge_preset in [
+                HdrForgeEncodingPresets.FILM,
+                HdrForgeEncodingPresets.ACTION,
+            ]
+        ):
+            # default in x265 is psy-rd=1.0,psy-rdoq=1.0
+            # optimize psy settings for more optical quality
+            params.update({
+                'psy-rd': '1.2',
+                'psy-rdoq': '1.0',
+            })
+            pass
+        elif hdr_forge_preset == HdrForgeEncodingPresets.BANDING:
+            # reduce banding artifacts by enabling stronger deblocking and using 10bit encoding for SDR
+            params.update({
+                'aq-mode': '3',
+                'aq-strength': '1.2',
+                'psy-rd': '2.0',
+                'psy-rdoq': '1.2',
+                'deblock': '-1,-1',
+                'rdoq-level': '2',
+                'qcomp': '0.65',
+            })
+            pass
+
+        return list(f"{key}={value}" for key, value in params.items() if value is not None)
+
     def _build_hdr_x265_params(self) -> list[str]:
         """Build x265 parameters for HDR10 video encoding.
 
@@ -161,7 +332,7 @@ class Libx265Codec(VideoCodecBase):
             list of x265 parameter strings
         """
 
-        params: list[str] = []
+        params: list[str] = self._build_default_x265_params()
 
         encoding_hdr_sdr_format: HdrSdrFormat = self.get_encoding_hdr_sdr_format()
         if encoding_hdr_sdr_format == HdrSdrFormat.HDR:
@@ -189,7 +360,10 @@ class Libx265Codec(VideoCodecBase):
         Returns:
             list of x265 parameter strings
         """
-        params: list[str] = self.SDR_X265_PARAMS.copy()
+        params: list[str] = self._build_default_x265_params()
+
+        params.extend(self.SDR_X265_PARAMS.copy())
+
         if self._video.is_hdr_video():
             # remove HDR metadata if present
             params.append('master-display=G(0,0)B(0,0)R(0,0)WP(0,0)L(0,0)')

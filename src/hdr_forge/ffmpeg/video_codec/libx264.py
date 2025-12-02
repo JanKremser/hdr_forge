@@ -51,6 +51,15 @@ class Libx264Codec(VideoCodecBase):
         x264_params: list[str] = self.SDR_X264_PARAMS
         output_options['x264-params'] = ':'.join(x264_params)
 
+        metadata: list[str] = [
+            'hdr_forge_encoder_preset=' + self._preset.value,
+            'hdr_forge_encoder_crf=' + str(self._crf),
+        ]
+        if 'metadata' in output_options:
+            output_options['metadata'].extend(metadata)
+        else:
+            output_options['metadata'] = metadata
+
         return output_options
 
     def get_pix_format_for_encoding(self) -> str:

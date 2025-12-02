@@ -109,7 +109,9 @@ class x265_x264_Preset(Enum):
     FASTER = "faster"
     FAST = "fast"
     MEDIUM = "medium"
+    MEDIUM_PLUS = "medium:plus"
     SLOW = "slow"
+    SLOW_PLUS = "slow:plus"
     SLOWER = "slower"
     VERYSLOW = "veryslow"
 
@@ -164,8 +166,9 @@ class EncoderOverride(Enum):
     H264_NVENC = "h264_nvenc"
 
 class HdrForgeEncodingPresets(Enum):
-    AUTO = "auto"
+    VIDEO = "video"
     FILM = "film"
+    BANDING = "banding"
     ACTION = "action"
     ANIMATION = "animation"
 
@@ -201,7 +204,7 @@ class LogoRemovelSettings:
 
 @dataclass
 class HdrForgeEncodingPresetSettings:
-    preset: HdrForgeEncodingPresets = HdrForgeEncodingPresets.AUTO
+    preset: HdrForgeEncodingPresets = HdrForgeEncodingPresets.FILM
     hardware_preset: HdrForgeEncodingHardwarePresets = HdrForgeEncodingHardwarePresets.CPU_BALANCED
 
 @dataclass

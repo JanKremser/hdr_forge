@@ -89,7 +89,6 @@ class LogoDetector:
         self._result: MaskResult | None = None
         self._crop_mask_delogo_video: Path | None = None
 
-        self.temp_dir: Path = get_global_temp_directory(sub_folder="remove_logo")
     def _filter_logo_results(
         self,
         results: list[LogoDetectResult],
@@ -620,6 +619,7 @@ Total candidates: {len(results)}"""
         return results
 
     def _create_crop_video_by_mask_size(self, mask_result: MaskResult) -> Path | None:
+        temp_dir: Path = get_global_temp_directory(sub_folder="remove_logo")
         total_frames = self._video.get_total_frames()
         duration = self._video.get_duration_seconds()
 
@@ -638,7 +638,7 @@ Total candidates: {len(results)}"""
         output_options: dict = {
             'vf': f"crop=x={mask_result.x}:y={mask_result.y}:w={mask_result.width}:h={mask_result.height}"
         }
-        output_path: Path = self.temp_dir / "crop_video.mp4"
+        output_path: Path = temp_dir / "crop_video.mp4"
         success: bool = ffmpeg_wrapper.run_ffmpeg(
             input_file=self._video._filepath,
             output_file=output_path,
@@ -651,6 +651,7 @@ Total candidates: {len(results)}"""
         return output_path
 
     def _create_crop_delogo_video_by_mask(self, mask_result: MaskResult) -> Path | None:
+        temp_dir: Path = get_global_temp_directory(sub_folder="remove_logo")
         total_frames = self._video.get_total_frames()
         duration = self._video.get_duration_seconds()
 
@@ -676,7 +677,7 @@ Total candidates: {len(results)}"""
         output_options: dict[str, str] = {
             'vf': f"crop=x={mask_result.x}:y={mask_result.y}:w={mask_result.width}:h={mask_result.height},{delogo_str}"
         }
-        output_path: Path = self.temp_dir / "crop_delogo_video.mp4"
+        output_path: Path = temp_dir / "crop_delogo_video.mp4"
         success: bool = ffmpeg_wrapper.run_ffmpeg(
             input_file=self._video._filepath,
             output_file=output_path,
@@ -691,6 +692,7 @@ Total candidates: {len(results)}"""
 
     def _create_crop_video_with_mask_delogo(self, crop_video_path: Path,  delogo_path: Path, mask_path: Path) -> Path | None:
         #ffmpeg -i crop_video.mp4 -i delogo.mp4 -i mask.png -filter_complex "[2:v]format=yuva420p,scale=iw:ih[mask_alpha];[1:v][mask_alpha]alphamerge[replacement_masked];[0:v][replacement_masked]overlay" -c:a copy output.mp4
+        temp_dir: Path = get_global_temp_directory(sub_folder="remove_logo")
         total_frames = self._video.get_total_frames()
         duration = self._video.get_duration_seconds()
 
@@ -713,7 +715,7 @@ Total candidates: {len(results)}"""
             ],
             "filter_complex": "[2:v]format=yuva420p,scale=iw:ih[mask_alpha];[1:v][mask_alpha]alphamerge[replacement_masked];[0:v][replacement_masked]overlay"
         }
-        output_path: Path = self.temp_dir / "final_crop_video_delogo_mask.mp4"
+        output_path: Path = temp_dir / "final_crop_video_delogo_mask.mp4"
         success: bool = ffmpeg_wrapper.run_ffmpeg(
             input_file=crop_video_path,
             output_file=output_path,
@@ -1008,7 +1010,9 @@ Total candidates: {len(results)}"""
         return MaskResult(mask=centered_mask, x=new_x, y=new_y, width=new_w, height=new_h, region=None)
 
     def _create_mask_delogo(self, mask_result: MaskResult) -> None | Path:
-        mask_path: Path = self.temp_dir / "logo_mask.png"
+        temp_dir: Path = get_global_temp_directory(sub_folder="remove_logo")
+
+        mask_path: Path = temp_dir / "logo_mask.png"
         self.save_mask_image(output_path=mask_path, mask_result=mask_result, user_info=False)
 
         crop_video_path: Path | None = self._create_crop_video_by_mask_size(mask_result=mask_result)
@@ -1031,15 +1035,17 @@ Total candidates: {len(results)}"""
         return final_crop_video_path
 
     def _create_inpainted_mask_video(self, mask_result: MaskResult) -> None | Path:
+        temp_dir: Path = get_global_temp_directory(sub_folder="remove_logo")
+
         crop_video_path: Path | None = self._create_crop_video_by_mask_size(mask_result=mask_result)
         if crop_video_path is None:
             print_err("Could not create crop video.")
             return None
 
-        output_path: Path = self.temp_dir / "inpainted_logo_video.mp4"
+        output_path: Path = temp_dir / "inpainted_logo_video.mp4"
 
         invate_mask = cv2.bitwise_not(mask_result.mask)
-        mask_path: Path = self.temp_dir / "invate_mask.png"
+        mask_path: Path = temp_dir / "invate_mask.png"
         cv2.imwrite(str(mask_path), invate_mask)
 
         try:

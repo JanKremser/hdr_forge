@@ -79,6 +79,15 @@ class LibSvtAV1Codec(VideoCodecBase):
         #     x265_params: list[str] = self._build_sdr_x265_params()
         #     output_options['x265-params'] = ':'.join(x265_params)
 
+        metadata: list[str] = [
+            'hdr_forge_encoder_preset=' + str(self._preset),
+            'hdr_forge_encoder_crf=' + str(self._crf),
+        ]
+        if 'metadata' in output_options:
+            output_options['metadata'].extend(metadata)
+        else:
+            output_options['metadata'] = metadata
+
         return output_options
 
     def get_pix_format_for_encoding(self) -> str:

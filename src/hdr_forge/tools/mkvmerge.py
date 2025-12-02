@@ -66,6 +66,7 @@ def extract_hevc(
 
         ffmpeg_cmd.append(str(output_hevc))
 
+        print()
         print_debug(build_cmd_array_to_str(ffmpeg_cmd))
 
         # FFmpeg stderr is used for progress if available, otherwise DEVNULL
@@ -155,6 +156,7 @@ def mux_hevc_to_mkv(input_hevc_path: Path, input_mkv: Optional[Path] = None, out
             str(input_hevc_path),
         ])
 
+        print()
         print_debug(build_cmd_array_to_str(mkvmerge_cmd))
 
         # Execute mkvmerge to mux HEVC into MKV
@@ -214,6 +216,7 @@ def extract_container_info_json(input_mkv_mp4_ts_file: Path) -> MkvInfo:
             str(input_mkv_mp4_ts_file)
         ]
 
+        print()
         print_debug(build_cmd_array_to_str(mkvmerge_cmd))
 
         # Execute mkvmerge to extract JSON information

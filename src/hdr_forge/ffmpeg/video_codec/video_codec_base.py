@@ -115,6 +115,14 @@ class VideoCodecBase(ABC):
                 ],
             })
 
+        metadata: list[str] = [
+            'hdr_forge_encoder_codec=' + self.lib.value,
+        ]
+        if 'metadata' in output_options:
+            output_options['metadata'].extend(metadata)
+        else:
+            output_options['metadata'] = metadata
+
         return output_options
 
     @abstractmethod

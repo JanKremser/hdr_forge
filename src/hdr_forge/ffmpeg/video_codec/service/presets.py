@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from enum import Enum
 
-from hdr_forge.typedefs.encoder_typing import HdrForgeEncodingHardwarePresets, VideoEncoderLibrary
+from hdr_forge.typedefs.encoder_typing import HdrForgeEncodingHardwarePresets, VideoEncoderLibrary, x265_x264_Preset
 
 
 @dataclass
@@ -20,6 +20,7 @@ class Hdr_Forge_AV1_Preset:
     preset: int
 
 X265_X264_PRESET_SCALE: list[str] = ["ultrafast", "superfast", "veryfast", "faster", "fast", "medium", "slow", "slower", "veryslow"]
+X265_X264_PRESET_SCALE_NEW: list[str] = ["ultrafast", "superfast", "veryfast", "faster", "fast", "medium", "medium:plus", "slow", "slow:plus", "slower", "veryslow"]
 
 HEVC_NVENC_PRESET_SCALE: list[str] = ["default", "slow", "hq"] #, "llhq", "llhp"
 
@@ -180,6 +181,12 @@ def interpolate_preset(value, x1, x2, from_preset, to_preset):
     val = interpolate(value, x1, x2, i1, i2)
     return X265_X264_PRESET_SCALE[round(val)]
 
+def convert_preset_to_index(preset: x265_x264_Preset) -> int:
+    """Konvertiert ein Preset in seinen Indexwert."""
+    if preset.value in X265_X264_PRESET_SCALE_NEW:
+        return X265_X264_PRESET_SCALE_NEW.index(preset.value)
+    else:
+        raise ValueError(f"Unbekanntes Preset: {preset}")
 
 def calc_hw_prest_params(
     pixels,

@@ -66,6 +66,7 @@ def extract_base_layer(
             '-o', str(output_hevc)
         ]
 
+        print()
         # Execute pipeline using helper function
         returncode, stderr = run_ffmpeg_tool_pipeline(
             input_path=input_path,
@@ -123,6 +124,7 @@ def inject_rpu(input_path: Path, input_rpu: Path, output_hevc: Optional[Path] = 
             '-o', str(output_hevc)
         ]
 
+        print()
         print_debug(build_cmd_array_to_str(dovi_cmd))
 
         dovi_process = subprocess.Popen(
@@ -217,6 +219,8 @@ def extract_rpu(
             '-o', str(output_rpu)
         ])
 
+        print()
+
         # Execute pipeline using helper function
         returncode, stderr = run_ffmpeg_tool_pipeline(
             input_path=input_path,
@@ -274,6 +278,7 @@ def inject_dolby_vision_layers(bl_path: Path, el_path: Path, output_bl_el: Optio
             '-o', str(output_bl_el)
         ]
 
+        print()
         print_debug(build_cmd_array_to_str(dovi_cmd))
 
         dovi_process = subprocess.Popen(
@@ -350,6 +355,8 @@ def extract_enhancement_layer(
             '--el-only',
             '--el-out', str(output_el)
         ]
+
+        print()
 
         # Execute pipeline using helper function
         returncode, stderr = run_ffmpeg_tool_pipeline(
@@ -513,6 +520,7 @@ def get_rpu_info(rpu_path: Path) -> DolbyVisionRpuInfo:
             '--summary'
         ]
 
+        print()
         print_debug(build_cmd_array_to_str(dovi_cmd))
 
         result = subprocess.run(

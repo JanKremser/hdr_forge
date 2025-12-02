@@ -158,7 +158,7 @@ Video codec to use for encoding.
 
     convert_parser.add_argument(
         '-p', '--preset',
-        choices=["auto", "film", "action", "animation"],
+        choices=["auto", "film", "banding", "video", "action", "animation"],
         default="auto",
         help=f"""{sdr_dot} {hdr_dot} {dolby_vision_dot}
 HDR Forge encoding preset for simplified settings. Default is the automation mode. Not libx265/libx264 presets.
@@ -167,9 +167,13 @@ Examples:
     hdr_forge convert -i input.mkv -o output.mkv --preset auto
     hdr_forge convert -i input.mkv -o output.mkv --preset film
 Presets:
-    [auto]        : Automatic preset selection based on input video characteristics. This is the default.
+    [auto]        : Use a film preset as default.
 
-    [film]        : Optimized for film content with moderate motion
+    [film]        : Optimized for film content with moderate motion.
+    [banding]     : Similar to 'film' but with additional banding reduction techniques.
+                    This settings switch 8bit encoding for SDR to 10bit, reducing banding artifacts in challenging scenes.
+    [video]       : Optimized for general video content. This is a neutral preset for varied content.
+                    You use the default ffmpeg presets, without optimizations for specific content types.
     [action]      : Optimized for action-packed content with fast motion
     [animation]   : Optimized for animated content with vibrant colors\n
 """
@@ -217,18 +221,20 @@ This is overridden by encoder-specific parameters (--encoder-params).\n
 
     convert_parser.add_argument(
         '--speed',
-        choices=['ultrafast', 'superfast', 'veryfast', 'faster', 'fast', 'medium', 'slow', 'slower', 'veryslow'],
+        choices=['ultrafast', 'superfast', 'veryfast', 'faster', 'fast', 'medium', 'medium:plus', 'slow', 'slow:plus', 'slower', 'veryslow'],
         help=f"""{sdr_dot} {hdr_dot} {dolby_vision_dot}
 Universal speed preset. ONLY works with libx265/libx264 encoders.
-[ultrafast] : Fastest encoding, lowest compression
-[superfast] : Very fast encoding, very low compression
-[veryfast]  : Fast encoding, low compression
-[faster]    : Below average compression and speed
-[fast]      : Slightly below average compression and speed
-[medium]    : Balanced compression and speed
-[slow]      : Above average compression, slower encoding
-[slower]    : High compression, slow encoding
-[veryslow]  : Maximum compression, very slow encoding
+[ultrafast]   : Fastest encoding, lowest compression
+[superfast]   : Very fast encoding, very low compression
+[veryfast]    : Fast encoding, low compression
+[faster]      : Below average compression and speed
+[fast]        : Slightly below average compression and speed
+[medium]      : Balanced compression and speed
+[medium:plus] : Slightly better compression and quality than medium, with a moderate speed decrease
+[slow]        : Above average compression, slower encoding
+[slow:plus]   : better quality/speed tradeoff than slow
+[slower]      : High compression, slow encoding
+[veryslow]    : Maximum compression, very slow encoding
 
 Note: This parameter is NOT compatible with NVENC encoders. Use --encoder-params instead.\n
 """
@@ -382,6 +388,9 @@ Add custom FFmpeg video filters.
 If you want to overwrite settings, avoid using these arguments.
     --crop, --scale, --scale-mode, --hdr-sdr-format
 Otherwise, your filter will be placed at the beginning of the filter chain.
+
+For deinterlacing use:
+    bwdif=mode=send_frame:parity=auto:deint=all
 
 Format:
     filter1,filter2,filter3

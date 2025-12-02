@@ -10,8 +10,6 @@ from hdr_forge.video import Video
 class MetadataInjector:
 
     def __init__(self, video: Video, target_file: Path, rpu_file: Path | None = None, el_file: Path | None = None, hdr10plus_metadata: Path | None = None, hdr_metadata: Path | None = None):
-        self.temp_dir: Path = get_global_temp_directory()
-
         self._input_file: Path = video.get_filepath()
         self._video: Video = video
         self._target_file: Path = target_file
@@ -29,6 +27,8 @@ class MetadataInjector:
         Returns:
             True if injection succeeded, False otherwise
         """
+        temp_dir: Path = get_global_temp_directory()
+
         if self._dv_info and self._dv_info.profile_el and self._el_file is None:
             raise ValueError("EL file is required for Dolby Vision profiles with enhancement layer.")
 
@@ -39,7 +39,7 @@ class MetadataInjector:
             hevc_file = hevc_hdr_editor.inject_hdr_metadata(
                 input_path=self._input_file,
                 config_json=self._hdr_metadata,
-                output_hevc=self.temp_dir / "hdr10.hevc",
+                output_hevc=temp_dir / "hdr10.hevc",
                 total_frames=self._video.get_total_frames(),
                 duration=self._video.get_duration_seconds(),
             )
@@ -48,7 +48,7 @@ class MetadataInjector:
             # Extract HEVC from MKV if no HDR10 metadata injection was done
             hevc_file = dovi_tool.extract_base_layer(
                 input_path=self._input_file,
-                output_hevc=self.temp_dir / "extracted_video.hevc",
+                output_hevc=temp_dir / "extracted_video.hevc",
                 total_frames=self._video.get_total_frames(),
                 duration=self._video.get_duration_seconds(),
             )
@@ -59,7 +59,7 @@ class MetadataInjector:
             hdr10plus_hevc_file: Path = hdr10plus_tool.inject_hdr10plus_metadata(
                 input_path=hevc_file,
                 hdr10plus_metadata_path=self._hdr10plus_metadata,
-                output_path=self.temp_dir / "hdr10plus.hevc",
+                output_path=temp_dir / "hdr10plus.hevc",
             )
             hevc_file.unlink(missing_ok=True)
             hevc_file = hdr10plus_hevc_file
@@ -70,7 +70,7 @@ class MetadataInjector:
             hevc_file = dovi_tool.inject_rpu(
                 input_path=hevc_file,
                 input_rpu=self._rpu_file,
-                output_hevc=self.temp_dir / "dv_bl_rpu.hevc",
+                output_hevc=temp_dir / "dv_bl_rpu.hevc",
             )
 
         if self._el_file is not None:
@@ -79,7 +79,7 @@ class MetadataInjector:
             bl_el_rpu_hevc: Path = dovi_tool.inject_dolby_vision_layers(
                 bl_path=hevc_file,
                 el_path=self._el_file,
-                output_bl_el=self.temp_dir / "dv_bl_el_rpu.hevc",
+                output_bl_el=temp_dir / "dv_bl_el_rpu.hevc",
             )
             hevc_file.unlink(missing_ok=True)
             hevc_file = bl_el_rpu_hevc

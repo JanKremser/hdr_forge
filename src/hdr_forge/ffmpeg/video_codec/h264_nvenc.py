@@ -43,6 +43,16 @@ class H264NvencCodec(VideoCodecBase):
         if self._video.is_hdr_video():
             print_warn("H264_NVENC-SDR encoding does not support HDR metadata removal;")
 
+        metadata: list[str] = [
+            'hdr_forge_encoder_preset=' + self._preset.value,
+            'hdr_forge_encoder_cq=' + str(self._cq),
+            'hdr_forge_encoder_rc=' + self._nvenc_rc.value,
+        ]
+        if 'metadata' in output_options:
+            output_options['metadata'].extend(metadata)
+        else:
+            output_options['metadata'] = metadata
+
         return output_options
 
     def get_pix_format_for_encoding(self) -> str:
