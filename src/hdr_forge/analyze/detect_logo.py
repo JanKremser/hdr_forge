@@ -6,7 +6,6 @@ import sys
 import time
 from typing import List, Optional, Tuple
 import numpy as np
-from pyinpaint import Inpaint
 from collections import Counter
 
 from PIL import Image
@@ -805,136 +804,6 @@ Total candidates: {len(results)}"""
             height=h
         )
 
-    def _process_video_part(self, frames, mask_bin, ps, tmp_video_path, diff_threshold):
-        """
-        Bearbeitet einen Teil des Videos mit Masken-Reuse (für Multiprocessing)
-        """
-        height, width = frames[0].shape[:2]
-        fps = 30  # nur für VideoWriter
-        fourcc = cv2.VideoWriter.fourcc(*"mp4v")
-        writer = cv2.VideoWriter(str(tmp_video_path), fourcc, fps, (width, height))
-
-        prev_frame = None
-        prev_inpainted = None
-
-        tmp_mask = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
-        mask_uint8 = (mask_bin * 255).astype(np.uint8)  # True->255, False->0
-        Image.fromarray(mask_uint8).save(tmp_mask.name)
-
-        for frame in frames:
-            use_previous = False
-            if prev_frame is not None:
-                diff = cv2.absdiff(frame, prev_frame)
-                diff_ratio = np.mean(diff > 10)
-                if diff_ratio < diff_threshold and prev_inpainted is not None:
-                    use_previous = True
-
-            if use_previous and prev_inpainted is not None:
-                # Frame und vorheriges Inpaint in LAB
-                frame_lab = cv2.cvtColor(frame.astype(np.uint8), cv2.COLOR_BGR2LAB)
-                prev_lab = cv2.cvtColor(prev_inpainted.astype(np.uint8), cv2.COLOR_BGR2LAB)
-
-                # Maske: True = ersetzen (schwarz), False = behalten (weiß)
-                replace_mask = (mask_bin == 0)  # Schwarz = 0, soll ersetzt werden
-
-                # Nur die Schwarz-Pixel durch prev_inpainted übernehmen
-                frame_lab[..., 0][replace_mask] = prev_lab[..., 0][replace_mask]  # L-Kanal
-                frame_lab[..., 1][replace_mask] = prev_lab[..., 1][replace_mask]  # A-Kanal
-                frame_lab[..., 2][replace_mask] = prev_lab[..., 2][replace_mask]  # B-Kanal
-
-                # Zurück zu BGR
-                result_bgr = cv2.cvtColor(frame_lab, cv2.COLOR_LAB2BGR)
-            else:
-                # Inpainting ausführen
-                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                with tempfile.NamedTemporaryFile(suffix=".png") as tmp_frame:
-                    Image.fromarray(frame_rgb).save(tmp_frame.name)
-                    inpainter = Inpaint(tmp_frame.name, tmp_mask.name, ps)
-                    result_bgr = inpainter()
-
-                    result_uint8 = (result_bgr * 255).clip(0,255).astype(np.uint8)
-                    # RGB -> BGR für OpenCV
-                    result_bgr = cv2.cvtColor(result_uint8, cv2.COLOR_RGB2BGR)
-                    #result_bgr = np.clip(result_bgr, 0, 255).astype(np.uint8)
-            prev_inpainted = result_bgr.copy()
-
-            writer.write(result_bgr)
-            prev_frame = frame.copy()
-
-        writer.release()
-        tmp_mask.close()
-        return tmp_video_path
-
-    def _inpaint_video_multiprocess(self, input_path: Path, mask: np.ndarray, output_path: Path, ps: int = 7, processes: int = 14, diff_threshold: float = 0.15):
-        """
-        Multiprozess-Inpainting: Video wird in Partitions geteilt, jeder Prozess bearbeitet einen Part.
-        """
-        cap = cv2.VideoCapture(str(input_path))
-        if not cap.isOpened():
-            raise ValueError(f"Kann Video nicht öffnen: {input_path}")
-
-        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-        fps = cap.get(cv2.CAP_PROP_FPS)
-        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-
-        # Maske prüfen / konvertieren
-        if mask.shape[:2] != (height, width):
-            raise ValueError(f"Maskengröße stimmt nicht: {mask.shape[:2]} != {(height, width)}")
-        if len(mask.shape) == 3:
-            mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
-        mask_bin = (mask > 127) # 0/255 to bool
-
-        # Alle Frames laden
-        frames = []
-        while True:
-            ret, frame = cap.read()
-            if not ret:
-                break
-            frames.append(frame)
-        cap.release()
-
-        # Video in Parts aufteilen
-        part_size = (len(frames) + processes - 1) // processes
-        frame_parts = [frames[i*part_size:(i+1)*part_size] for i in range(processes)]
-
-        tmp_video_files = [tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) for _ in range(processes)]
-        tmp_paths = [f.name for f in tmp_video_files]
-
-        # --- Multiprocessing ---
-        with ProcessPoolExecutor(max_workers=processes) as executor:
-            futures = []
-            for i in range(processes):
-                if len(frame_parts[i]) > 0:
-                    futures.append(executor.submit(
-                        self._process_video_part,
-                        frame_parts[i],
-                        mask_bin,
-                        ps,
-                        tmp_paths[i],
-                        diff_threshold,
-                    ))
-            # Ergebnisse abwarten
-            for f in futures:
-                f.result()  # jeder Prozess erstellt sein temporäres Video
-
-        # --- Temporäre Videos zusammenführen ---
-        fourcc = cv2.VideoWriter.fourcc(*"mp4v")
-        writer = cv2.VideoWriter(str(output_path), fourcc, fps, (width, height))
-
-        for tmp_path in tmp_paths:
-            cap = cv2.VideoCapture(tmp_path)
-            while True:
-                ret, frame = cap.read()
-                if not ret:
-                    break
-                writer.write(frame)
-            cap.release()
-            os.remove(tmp_path)
-
-        writer.release()
-        print(f"Fertig! Video gespeichert unter: {output_path}")
-
     def _get_mask_info(self, mask):
         """Findet Position und Größe der Maske."""
         # Konturen finden
@@ -1034,32 +903,6 @@ Total candidates: {len(results)}"""
             return None
         return final_crop_video_path
 
-    def _create_inpainted_mask_video(self, mask_result: MaskResult) -> None | Path:
-        temp_dir: Path = get_global_temp_directory(sub_folder="remove_logo")
-
-        crop_video_path: Path | None = self._create_crop_video_by_mask_size(mask_result=mask_result)
-        if crop_video_path is None:
-            print_err("Could not create crop video.")
-            return None
-
-        output_path: Path = temp_dir / "inpainted_logo_video.mp4"
-
-        invate_mask = cv2.bitwise_not(mask_result.mask)
-        mask_path: Path = temp_dir / "invate_mask.png"
-        cv2.imwrite(str(mask_path), invate_mask)
-
-        try:
-            self._inpaint_video_multiprocess(
-                input_path=crop_video_path,
-                mask=invate_mask,
-                output_path=output_path,
-            )
-        except Exception as e:
-            print_err(f"Error during inpainting: {e}")
-            return None
-
-        return output_path
-
     def save_mask_image(self, output_path: Path, mask_result: MaskResult | None = None, user_info: bool = True) -> bool:
         """
         Save the generated mask image to a file.
@@ -1148,12 +991,6 @@ Total candidates: {len(results)}"""
                 sys.exit(1)
                 return
             self._crop_mask_delogo_video = final_mask_delogo_video
-        elif self._logo_removal_settings.mode == LogoRemovalMode.INPAINT:
-            inpainted_video_path: None | Path = self._create_inpainted_mask_video(mask_result=mask)
-            if inpainted_video_path is None:
-                sys.exit(1)
-                return
-            self._crop_mask_delogo_video = inpainted_video_path
 
     def get_result(self) -> MaskResult | None:
         """
