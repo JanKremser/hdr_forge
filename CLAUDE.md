@@ -94,7 +94,7 @@ Key methods:
 **Codec Implementations:**
 - `libx265.py` - Software HEVC (HDR10, SDR, DV base layer)
 - `libx264.py` - Software H.264 (SDR only)
-- `libsvtav1.py` - Software AV1 (HDR10, SDR, DV base layer) - **Beta**
+- `libsvtav1.py` - Software AV1 (SDR only) - **Beta** (HDR10/DV not yet implemented)
 - `hevc_nvenc.py` - Hardware HEVC (HDR10, SDR, DV base layer)
 - `h264_nvenc.py` - Hardware H.264 (SDR only)
 
@@ -278,7 +278,7 @@ Shows: FFmpeg commands, encoder parameter selection, format detection, filter ch
 4. **Upscaling:** Not supported (only downscaling)
 5. **Format Upgrades:** Not possible (SDR → HDR10, HDR10 → DV)
 6. **Hardware:** Only NVIDIA NVENC supported (no Intel QSV, AMD VCE, Apple VideoToolbox)
-7. **AV1 Beta:** AV1 encoding is in beta status - some advanced features may be refined in future releases
+7. **AV1 Beta:** AV1 encoding is in beta status - currently SDR only, HDR10/Dolby Vision not yet implemented
 
 ## External Dependencies
 

@@ -38,18 +38,18 @@ HDR Forge supports multiple encoders for different use cases:
 -   SDR content only
 
 #### libsvtav1 - AV1 Encoding (Beta)
--   **Best for:** Long-term archival, streaming, future-proof encoding
+-   **Best for:** SDR archival and streaming content
 -   **Performance:** Very slow encoding (2-5x slower than libx265)
 -   **Quality:** Excellent, superior to HEVC
--   **HDR Support:** Full (HDR10, Dolby Vision base layer)
+-   **HDR Support:** Not yet implemented (SDR only)
 -   **SDR Support:** Yes
--   **10-bit Support:** Yes
+-   **10-bit Support:** Yes (for SDR)
 -   **Special Features:** Next-generation codec, royalty-free, superior compression
--   **Status:** Beta feature
+-   **Status:** Beta feature (SDR only)
 
 **When to use:**
--   Long-term archival with smallest possible file sizes (20-40% smaller than HEVC)
--   Streaming content (YouTube, Netflix support)
+-   SDR content archival with smallest possible file sizes (20-40% smaller than HEVC)
+-   SDR streaming content (YouTube, Netflix support)
 -   Future-proof encoding for modern platforms
 -   When encoding time is not a constraint
 
@@ -57,12 +57,12 @@ HDR Forge supports multiple encoders for different use cases:
 -   20-40% smaller file sizes compared to HEVC at similar quality
 -   Royalty-free open-source codec
 -   Growing platform support (YouTube, Netflix, modern browsers)
--   Full HDR10 metadata preservation
 
 **Limitations:**
+-   **SDR Only:** HDR10 and Dolby Vision encoding not yet implemented
 -   Very slow encoding (slower than libx265)
 -   Limited device compatibility (requires recent hardware/software)
--   Beta status - some features may be refined in future releases
+-   Beta status - HDR support planned for future releases
 
 ### GPU Encoders (Hardware-Accelerated)
 

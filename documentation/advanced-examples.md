@@ -98,23 +98,21 @@ hdr_forge convert -i 4k_video.mkv -o 1080p_av1.mkv \
   --quality 23
 ```
 
-### AV1 HDR Encoding
+### AV1 with HDR Input
+
+**Note:** AV1 currently only supports SDR output. HDR10 and Dolby Vision encoding not yet implemented.
 
 ```bash
-# AV1 with HDR10 preservation
-hdr_forge convert -i hdr10_video.mkv -o hdr10_av1.mkv \
-  --encoder libsvtav1
-
-# Dolby Vision to HDR10 with AV1
-hdr_forge convert -i dolby_vision.mkv -o hdr10_av1.mkv \
-  --encoder libsvtav1 \
-  --hdr-sdr-format hdr10
-
-# HDR10 to SDR with AV1 (tone mapping)
+# Convert HDR10 to SDR with AV1 (tone mapping)
 hdr_forge convert -i hdr10_video.mkv -o sdr_av1.mkv \
   --encoder libsvtav1 \
   --hdr-sdr-format sdr \
   --quality 23
+
+# Dolby Vision to SDR with AV1
+hdr_forge convert -i dolby_vision.mkv -o sdr_av1.mkv \
+  --encoder libsvtav1 \
+  --hdr-sdr-format sdr
 ```
 
 ### AV1 Comparison with HEVC
@@ -148,7 +146,9 @@ hdr_forge convert -i ./videos -o ./av1_streams \
 - File size is critical (storage/bandwidth constraints)
 - Encoding time is not a constraint
 - Targeting modern platforms (YouTube, Netflix, etc.)
-- Creating long-term archival copies
+- Creating long-term SDR archival copies
+
+**Current Limitations:** AV1 only supports SDR output. HDR10/Dolby Vision encoding not yet implemented.
 
 ## Encoding Presets
 

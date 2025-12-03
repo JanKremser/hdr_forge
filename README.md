@@ -1,4 +1,4 @@
-# HDR Forge - SDR/HDR10/DolbyVision Video Converter
+# HDR Forge - SDR/HDR10/HDR10+/DolbyVision Video Converter
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -13,12 +13,12 @@ A powerful command-line tool for converting video files with hardware-accelerate
 -   **Multiple Format Support:** Convert between Dolby Vision, HDR10, and SDR formats
 -   **Format Conversion:** DV → HDR10 → SDR with tone mapping support
 -   **Dolby Vision Profiles:** Support for Profile 5, 7 (with EL), and 8
--   **HDR Metadata Injection:** Add or update HDR10 metadata without re-encoding
+-   **HDR Metadata Injection:** Add or update HDR10/HDR10+/Dolby Vision metadata without re-encoding
 -   **Advanced Cropping:** Automatic black bar detection, manual cropping, aspect ratio presets
 -   **Flexible Scaling:** Height-based and adaptive scaling modes
 -   **Grain Analysis:** Automatic grain detection with encoding optimization
 -   **Content-Aware Presets:** Film, banding, video, action, and animation-optimized encoding profiles
--   **Logo Removal:** Automatic logo detection and removal with multiple algorithms (delogo, mask, inpaint)
+-   **Logo Removal:** Automatic logo detection and removal with multiple algorithms (delogo, mask)
 -   **Hardware Presets:** CPU/GPU-specific encoding presets (balanced, quality)
 -   **Video Sampling:** Test encoding settings on short video samples
 -   **Intelligent Quality Control:** Resolution and content-based auto-optimization
@@ -65,11 +65,10 @@ hdr_forge inject-hdr-metadata -i video.mkv -o output.mkv \
 **Current: v0.7.11**
 
 ### New Features
--   **AV1 Encoding (Beta):** Full support for AV1 codec via libsvtav1 encoder
--   **Logo Removal:** Automatic logo detection and removal with three algorithms:
-    -   `delogo` - FFmpeg delogo filter
-    -   `mask` - Mask-based removal
-    -   `inpaint` - Experimental inpainting (best quality)
+-   **AV1 Encoding (Beta):** AV1 codec support via libsvtav1 encoder (SDR only, HDR10/Dolby Vision not yet supported)
+-   **Logo Removal:** Automatic logo detection and removal with two algorithms:
+    -   `delogo` - FFmpeg delogo filter (fast)
+    -   `mask` - Mask-based removal (better quality)
 -   **New Presets:**
     -   `banding` - Banding reduction preset (8-bit → 10-bit for SDR)
     -   `video` - Neutral preset for mixed content
@@ -83,7 +82,7 @@ hdr_forge inject-hdr-metadata -i video.mkv -o output.mkv \
 -   **New Subcommands:**
     -   `detect-logo` - Analyze and detect logos in videos
     -   `extract-metadata` - Extract Dolby Vision/HDR10/HDR10+ metadata
-    -   `inject-metadata` - Inject DV/HDR10/HDR10+ metadata without re-encoding
+    -   `inject-metadata` - Inject Dolby Vision/HDR10/HDR10+ metadata without re-encoding
 
 ### Improvements
 -   Master-display support for GPU encoded videos
@@ -115,10 +114,13 @@ HDR Forge now supports AV1 encoding via libsvtav1 (SVT-AV1 encoder). AV1 is a ne
 
 -   **Superior Compression:** 20-40% smaller file sizes compared to HEVC at similar quality
 -   **Royalty-Free:** Open-source codec with no licensing fees
--   **HDR Support:** Full HDR10 and SDR support with proper metadata preservation
 -   **Future-Proof:** Growing platform support (YouTube, Netflix, modern browsers)
 
-**Beta Status:** AV1 encoding is currently in beta. While the encoder is stable and produces excellent results, some advanced features may still be refined in future releases.
+**Beta Status and Current Limitations:**
+-   **SDR Only:** Currently only SDR encoding is supported
+-   **No HDR10/Dolby Vision:** HDR10 and Dolby Vision encoding not yet implemented
+-   **In Development:** Full HDR support planned for future releases
+-   The encoder is stable for SDR content and produces excellent results
 
 ```bash
 # Basic AV1 encoding
@@ -127,8 +129,10 @@ hdr_forge convert -i input.mkv -o output.mkv --encoder libsvtav1
 # AV1 with quality control
 hdr_forge convert -i input.mkv -o output.mkv --encoder libsvtav1 --quality 23
 
-# AV1 HDR encoding
-hdr_forge convert -i hdr_video.mkv -o output.mkv --encoder libsvtav1
+# Convert HDR to SDR with AV1 (HDR input, SDR output)
+hdr_forge convert -i hdr_video.mkv -o output.mkv \
+  --encoder libsvtav1 \
+  --hdr-sdr-format sdr
 ```
 
 **See [Encoder Guide - AV1](documentation/encoders.md#libsvtav1-av1) for detailed information.**
@@ -369,15 +373,15 @@ hdr_forge convert -i input.mkv -o output.mkv --remove-logo auto
 # Delogo filter (fast, good for simple logos)
 hdr_forge convert -i input.mkv -o output.mkv --remove-logo delogo:auto
 hdr_forge convert -i input.mkv -o output.mkv --remove-logo delogo:top-left
+hdr_forge convert -i input.mkv -o output.mkv --remove-logo delogo:bot-right
 
-# Mask-based removal (better quality)
+# Mask-based removal (better quality, recommended)
 hdr_forge convert -i input.mkv -o output.mkv --remove-logo mask:auto
 hdr_forge convert -i input.mkv -o output.mkv --remove-logo mask:top-right
-
-# Inpainting (experimental, best quality)
-hdr_forge convert -i input.mkv -o output.mkv --remove-logo inpaint:auto
-hdr_forge convert -i input.mkv -o output.mkv --remove-logo inpaint:bot-left
+hdr_forge convert -i input.mkv -o output.mkv --remove-logo mask:bot-left
 ```
+
+**Available positions:** `auto`, `top-left`, `top-right`, `bot-left`, `bot-right`
 
 **Note:** Logo removal is not supported for Dolby Vision encoding.
 
@@ -609,8 +613,8 @@ Cropping & Scaling:
 
 Content Analysis & Filtering:
   --grain MODE              Grain analysis: off, auto, cat1, cat2, cat3 (default: off)
-  --remove-logo MODE        Logo removal: off, auto, delogo:auto, mask:auto,
-                            inpaint:auto (default: off)
+  --remove-logo MODE        Logo removal: off, auto, delogo:auto, delogo:top-left,
+                            mask:auto, mask:top-left (default: off)
   --sample TIME             Process sample: auto or start:end in seconds
   --dar-ratio RATIO         Custom display aspect ratio (e.g., 16:9, cinema)
   --vfilter FILTERS         Custom FFmpeg video filters
