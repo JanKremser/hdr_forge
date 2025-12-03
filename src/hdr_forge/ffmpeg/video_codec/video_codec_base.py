@@ -141,7 +141,7 @@ class VideoCodecBase(ABC):
 
     @abstractmethod
     def get_pix_format_for_encoding(self) -> str:
-        return self._video.get_pix_fmt()
+        return self._video.get_pix_fmt(default="yuv420p") or "yuv420p"
 
     @abstractmethod
     def get_bit_depth_for_encoding(self) -> int:
@@ -170,6 +170,9 @@ class VideoCodecBase(ABC):
         if vf is not None:
             _filter: list[str] = vf.split(',')
             filters.extend(_filter)
+
+        if self._video.is_video_interlaced():
+            filters.append('bwdif=mode=send_frame:parity=auto:deint=all')
 
         delogo_filter: str | None = self._logo_remover.get_ffmpeg_delogo_filter()
         if delogo_filter:

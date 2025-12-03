@@ -68,7 +68,7 @@ class Libx264Codec(VideoCodecBase):
             return self.PIXEL_FORMAT_10BIT
         elif bit_depth == 8:
             return self.PIXEL_FORMAT_8BIT
-        return self._video.get_pix_fmt()  # fallback
+        return super().get_pix_format_for_encoding()
 
     def get_bit_depth_for_encoding(self) -> int:
         return super().get_bit_depth_for_encoding()

@@ -9,6 +9,7 @@ class DolbyVisionSiteDataInfo:
     dv_profile: Optional[int] = None
     dv_level: Optional[int] = None
     rpu_present_flag: int = 0
+    el_present_flag: int = 0
 
 
 @dataclass

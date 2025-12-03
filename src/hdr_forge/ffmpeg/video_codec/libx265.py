@@ -132,10 +132,16 @@ class Libx265Codec(VideoCodecBase):
             return self.PIXEL_FORMAT_10BIT
         elif bit_depth == 8:
             return self.PIXEL_FORMAT_8BIT
-        return self._video.get_pix_fmt()  # fallback
+        return super().get_pix_format_for_encoding()
 
     def get_bit_depth_for_encoding(self) -> int:
-        return super().get_bit_depth_for_encoding()
+        bit: int =  super().get_bit_depth_for_encoding()
+
+        hdr_forge_preset: HdrForgeEncodingPresets = self._encoder_settings.hdr_forge_encoding_preset.preset
+        if hdr_forge_preset == HdrForgeEncodingPresets.BANDING:
+            return 10
+
+        return bit
 
     def get_custom_lib_parameters(self) -> dict:
         masterdisplay: MasterDisplayMetadata | None = self._get_master_display_for_encoding()
@@ -306,6 +312,7 @@ class Libx265Codec(VideoCodecBase):
             # default in x265 is psy-rd=1.0,psy-rdoq=1.0
             # optimize psy settings for more optical quality
             params.update({
+                'aq-mode': '2',
                 'psy-rd': '1.2',
                 'psy-rdoq': '1.0',
             })

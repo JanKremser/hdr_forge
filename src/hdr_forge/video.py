@@ -4,24 +4,15 @@ import json
 import re
 import subprocess
 from pathlib import Path
-from typing import Dict, LiteralString, Optional, Tuple
+from typing import Dict, Optional, Tuple
 
 from hdr_forge.core.config import get_global_temp_directory
 from hdr_forge.tools import hdr10plus_tool, mkvmerge
 from hdr_forge.tools import dovi_tool
 from hdr_forge.typedefs.encoder_typing import HdrSdrFormat
 from hdr_forge.typedefs.dolby_vision_typing import DolbyVisionEnhancementLayer, DolbyVisionInfo, DolbyVisionProfile, DolbyVisionSiteDataInfo, DolbyVisionRpuInfo
-from hdr_forge.typedefs.video_typing import ContentLightLevelMetadata, HdrMetadata, MasterDisplayMetadata
+from hdr_forge.typedefs.video_typing import MASTER_DISPLAY_PRESETS, ContentLightLevelMetadata, HdrMetadata, MasterDisplayColorPrimaries, MasterDisplayMetadata
 from hdr_forge.typedefs.mkv_typing import MkvInfo, MkvTrack, MkvTrackType
-
-
-DEFAULT_MASTER_DISPLAY: LiteralString = (
-    f"G(13250,34500)"
-    f"B(7500,3000)"
-    f"R(34000,16000)"
-    f"WP(15635,16450)"
-    f"L(10000000,1)"
-)
 
 
 class Video:
@@ -82,6 +73,9 @@ class Video:
             stdout=subprocess.DEVNULL,
             text=True,
         )
+
+        #Dolby Vision Metadata Example:
+        #[Parsed_showinfo_0 @ 0x7f3e94003d00]   side data - Dolby Vision Metadata:     rpu_type=2; rpu_format=18; vdr_rpu_profile=1; vdr_rpu_level=0; chroma_resampling_explicit_filter_flag=0; coef_data_type=0; coef_log2_denom=23; vdr_rpu_normalized_idc=1; bl_video_full_range_flag=0; bl_bit_depth=10; el_bit_depth=10; vdr_bit_depth=12; spatial_resampling_filter_flag=0; el_spatial_resampling_filter_flag=1; disable_residual_flag=0
 
         mastering_data: MasterDisplayMetadata | None = None
         light_data: ContentLightLevelMetadata | None = None
@@ -176,6 +170,16 @@ class Video:
                 return stream
         return {}
 
+    def is_video_interlaced(self) -> bool:
+        """Check if the video is interlaced.
+
+        Returns:
+            True if interlaced, False otherwise
+        """
+        video_stream: dict = self._get_video_stream()
+        field_order = video_stream.get('field_order', 'progressive').lower()
+        return field_order in ['tt', 'bb', 'tb', 'bt']
+
     def get_filepath(self) -> Path:
         """Get the video file path.
 
@@ -200,37 +204,53 @@ class Video:
         """
         return self.height
 
-    def get_pix_fmt(self) -> str:
+    def get_video_profile(self) -> str | None:
+        """Get video codec profile.
+
+        Returns:
+            Video profile string (e.g., 'High 10' for H.264, Main 10 for H.265)
+        """
+        return self._get_video_stream().get('profile', None)
+
+    def get_pix_fmt(self, default: str | None = None) -> str | None:
         """Get pixel format of the video.
 
         Returns:
             Pixel format string (e.g., 'yuv420p10le' for HDR)
         """
-        return self._get_video_stream().get('pix_fmt', '')
+        return self._get_video_stream().get('pix_fmt', default)
 
-    def get_color_primaries(self) -> str:
+    def get_color_primaries(self, default: str | None = None) -> str | None:
         """Get color primaries information.
 
         Returns:
             Color primaries string
         """
-        return self._get_video_stream().get('color_primaries', '')
+        return self._get_video_stream().get('color_primaries', default)
 
-    def get_color_space(self) -> str:
+    def get_color_space(self, default: str | None = None) -> str | None:
         """Get color space information.
 
         Returns:
             Color space string
         """
-        return self._get_video_stream().get('color_space', '')
+        return self._get_video_stream().get('color_space', default)
 
-    def get_color_transfer(self) -> str:
+    def get_color_transfer(self, default: str | None = None) -> str | None:
         """Get color transfer characteristics.
 
         Returns:
             Color transfer string
         """
-        return self._get_video_stream().get('color_transfer', '')
+        return self._get_video_stream().get('color_transfer', default)
+
+    def get_color_range(self) -> str | None:
+        """Get color range information.
+
+        Returns:
+            Color range string
+        """
+        return self._get_video_stream().get('color_range', None)
 
     def get_container_type(self) -> str:
         """Get container format type.
@@ -278,7 +298,8 @@ class Video:
                 return DolbyVisionSiteDataInfo(
                     dv_profile=data.get('dv_profile'),
                     dv_level=data.get('dv_level'),
-                    rpu_present_flag=data.get('rpu_present_flag', 0)
+                    rpu_present_flag=data.get('rpu_present_flag', 0),
+                    el_present_flag=data.get('el_present_flag', 0),
                 )
 
         return None
@@ -395,6 +416,27 @@ class Video:
 
         return None
 
+    def get_mastering_display_color_primaries(self) -> None | MasterDisplayColorPrimaries:
+        """Check if the video uses Display P3 color primaries.
+
+        Returns:
+            True if color primaries indicate Display P3, False otherwise
+        """
+        md: MasterDisplayMetadata | None = self.get_master_display()
+        if md is None:
+            return None
+
+        presets: Dict[MasterDisplayColorPrimaries, MasterDisplayMetadata] = MASTER_DISPLAY_PRESETS
+
+        for primaries, preset_md in presets.items():
+            if (md.r_x == preset_md.r_x and md.r_y == preset_md.r_y) and \
+               (md.g_x == preset_md.g_x and md.g_y == preset_md.g_y) and \
+               (md.b_x == preset_md.b_x and md.b_y == preset_md.b_y) and \
+               (md.wp_x == preset_md.wp_x and md.wp_y == preset_md.wp_y):
+                return primaries
+
+        return None
+
     def get_content_light_level_metadata(self) -> Optional[ContentLightLevelMetadata]:
         return self._hdr_metadata.content_light_level_metadata
 
@@ -429,8 +471,8 @@ class Video:
         Returns:
             True if video is HDR (10-bit) and bt2020, False otherwise
         """
-        hdr_colors: bool = "bt2020" in self.get_color_primaries()
-        hdr_bit: bool = "10le" in self.get_pix_fmt()
+        hdr_colors: bool = "bt2020" in (self.get_color_primaries() or "")
+        hdr_bit: bool = "10le" in (self.get_pix_fmt() or "")
 
         return hdr_colors and hdr_bit
 
@@ -468,7 +510,7 @@ class Video:
         Returns:
             Bit depth as integer (e.g., 8, 10, 12)
         """
-        pix_fmt: str = self.get_pix_fmt()
+        pix_fmt: str = (self.get_pix_fmt() or "")
         match = re.search(r'(\d+)le', pix_fmt)
         if match:
             return int(match.group(1))

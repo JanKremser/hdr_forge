@@ -4,7 +4,7 @@ from typing import Optional
 from hdr_forge.cli.cli_output import print_debug
 from hdr_forge.core.config import PROJECT_ROOT
 from hdr_forge.tools.helper import run_ffmpeg_tool_pipeline
-from hdr_forge.typedefs.video_typing import ContentLightLevelMetadata, HdrMetadata, MasterDisplayMetadata
+from hdr_forge.typedefs.video_typing import ContentLightLevelMetadata, HdrMetadata, MasterDisplayColorPrimaries, MasterDisplayMetadata
 
 def _get_hevc_hdr_editor_path() -> str:
     """Get path to hevc_hdr_editor executable.
@@ -82,7 +82,7 @@ def inject_hdr_metadata(
     except Exception as e:
         raise RuntimeError(f"Failed to inject HDR metadata: {e}")
 
-def create_config_json_for_hevc_hdr_editor(hdr_metadata: HdrMetadata, output_json: Path) -> Path:
+def create_config_json_for_hevc_hdr_editor(hdr_metadata: HdrMetadata, output_json: Path, mastering_display_color_primaries: MasterDisplayColorPrimaries | None = None) -> Path:
         """Create a JSON configuration file for hevc_hdr_editor based on HdrMetadata.
 
         Args:
@@ -147,6 +147,12 @@ def create_config_json_for_hevc_hdr_editor(hdr_metadata: HdrMetadata, output_jso
             # Replace the Content light level metadata
             "cll": {**cll_json}
         }
+
+        if mastering_display_color_primaries is not None:
+            config_data["mdcv"]["preset"] = mastering_display_color_primaries.value
+            #del config_data["mdcv"]["primaries"]  # Use preset primaries
+        else:
+            del config_data["mdcv"]["preset"] # Use custom primaries only
 
         with open(output_json, 'w') as json_file:
             json.dump(config_data, json_file, indent=4)

@@ -389,9 +389,6 @@ If you want to overwrite settings, avoid using these arguments.
     --crop, --scale, --scale-mode, --hdr-sdr-format
 Otherwise, your filter will be placed at the beginning of the filter chain.
 
-For deinterlacing use:
-    bwdif=mode=send_frame:parity=auto:deint=all
-
 Format:
     filter1,filter2,filter3
 Example:
@@ -408,6 +405,9 @@ Expert Option:
 
 Example:
     --master-display "G(13250,34500)B(7500,30000)R(34000,16000)WP(15635,16450)L(1000,0.05)"
+    --master-display "display-p3"
+    --master-display "bt.2020"
+    --master-display "bt.709"
 
 Input Video Master Display metadata will be used if not specified.
 """

@@ -8,7 +8,7 @@ from hdr_forge import __version__
 from hdr_forge.cli.cli_output import print_err, print_warn
 from hdr_forge.typedefs.encoder_typing import CropMode, CropSettings, EncoderOverride, GrainMode, HEVC_NVENC_Preset, HdrForgeEncodingHardwarePresets, HdrForgeEncodingPresetSettings, HdrForgeEncodingPresets, HdrSdrFormat, EncoderSettings, LogoRemovalAutoDetectMode, LogoRemovalMode, LogoRemovelSettings, NvencParams, NvencRcMode, SampleSettings, ScaleMode, UniversalEncoderParams, VideoCodec, VideoEncoderLibrary, Libx264Params, X264Tune, Libx265Params, X265Tune, x265_x264_Preset
 from hdr_forge.typedefs.dolby_vision_typing import DolbyVisionProfileEncodingMode
-from hdr_forge.typedefs.video_typing import ContentLightLevelMetadata, HdrMetadata, MasterDisplayMetadata
+from hdr_forge.typedefs.video_typing import BT_2020_MASTER_DISPLAY, BT_709_MASTER_DISPLAY, DISPLAY_P3_MASTER_DISPLAY, ContentLightLevelMetadata, HdrMetadata, MasterDisplayMetadata
 
 # Resolution constants
 RESOLUTIONS: dict = {
@@ -312,6 +312,15 @@ def _get_master_display_from_string(md_str: str | None) -> MasterDisplayMetadata
     """
     if md_str is None:
         return None
+
+    if md_str.lower() == 'display-p3':
+        return DISPLAY_P3_MASTER_DISPLAY
+
+    if md_str.lower() == 'bt.2020':
+        return BT_2020_MASTER_DISPLAY
+
+    if md_str.lower() == 'bt.709':
+        return BT_709_MASTER_DISPLAY
 
     try:
         parts = md_str.split('L(')

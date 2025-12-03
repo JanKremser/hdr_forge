@@ -229,6 +229,7 @@ def process_extract_metadata_command(args) -> int:
             hdr_file_path: Path = output_path / f"{input_path.stem}_hdr10.json"
             hevc_hdr_editor.create_config_json_for_hevc_hdr_editor(
                 hdr_metadata=video.get_hdr_metadata(),
+                mastering_display_color_primaries=video.get_mastering_display_color_primaries(),
                 output_json=hdr_file_path,
             )
 
