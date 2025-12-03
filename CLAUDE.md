@@ -20,7 +20,7 @@ HDR Forge is a Python CLI tool for video conversion with HDR metadata preservati
 
 ## Technology Stack
 
-- **Language:** Python 3.7+
+- **Language:** Python 3.13+
 - **Video Processing:** ffmpeg, ffprobe
 - **Hardware Acceleration:** NVIDIA NVENC (HEVC/H.264)
 - **Video Codecs:** libx265 (HEVC), libx264 (H.264), libsvtav1 (AV1 - Beta), hevc_nvenc, h264_nvenc

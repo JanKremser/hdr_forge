@@ -143,14 +143,8 @@ hdr_forge convert -i hdr_video.mkv -o output.mkv \
 
 #### Software Requirements (Mandatory)
 
--   **Python 3.7 or higher**
+-   **Python 3.13 or higher**
 -   **[ffmpeg / ffprobe](https://ffmpeg.org/download.html)** with libx265, libx264, or libsvtav1 support
--   **[x265 >=4.1](https://github.com/videolan/x265)** for libx265
-    -   [Windows builds](http://msystem.waw.pl/x265/)
-    -   **Linux:** Available in the repositories
--   **[SVT-AV1](https://gitlab.com/AOMediaCodec/SVT-AV1)** for AV1 encoding (Beta)
-    -   **Linux:** Available in most repositories as `svt-av1` or `libsvtav1`
-    -   **Windows:** Included in recent FFmpeg builds
 
 #### Hardware Acceleration (Optional)
 
@@ -218,7 +212,6 @@ pip install hdr_forge
 hdr_forge --version
 ffmpeg -version
 ffprobe -version
-x265 --version
 
 # For AV1 support
 ffmpeg -hide_banner -encoders | grep svt_av1
@@ -268,13 +261,16 @@ HDR Forge supports multiple encoders:
 
 ```bash
 # CPU encoding (libx265) - highest quality
-hdr_forge convert -i input.mkv -o output.mkv --encoder libx265
+hdr_forge convert -i input.mkv -o output.mkv --video-codec h265
 
 # GPU encoding (NVENC) - 3-10x faster
-hdr_forge convert -i input.mkv -o output.mkv --encoder hevc_nvenc
+hdr_forge convert -i input.mkv -o output.mkv --video-codec h265 --hw-preset "gpu:balanced"
 
 # H.264 for maximum compatibility
-hdr_forge convert -i input.mkv -o output.mkv --encoder libx264
+hdr_forge convert -i input.mkv -o output.mkv --video-codec h264
+
+# GPU encoding (NVENC) - 3-10x faster
+hdr_forge convert -i input.mkv -o output.mkv --video-codec h264 --hw-preset "gpu:balanced"
 
 # AV1 for best compression (Beta)
 hdr_forge convert -i input.mkv -o output.mkv --encoder libsvtav1
@@ -315,14 +311,18 @@ hdr_forge convert -i input.mkv -o output.mkv --hw-preset cpu:quality
 
 ```bash
 # Content-aware presets
+
+# This is not the same as the preset from the video codec. Use the video preset for this.
 hdr_forge convert -i film.mkv -o output.mkv --preset film
+
 hdr_forge convert -i action.mkv -o output.mkv --preset action
+
 hdr_forge convert -i anime.mkv -o output.mkv --preset animation
 
-# Banding reduction (8-bit to 10-bit for SDR)
+# Banding reduction (and 8-bit to 10-bit for SDR)
 hdr_forge convert -i input.mkv -o output.mkv --preset banding
 
-# Neutral preset for mixed content
+# Neutral preset for mixed content (default prest from codec)
 hdr_forge convert -i input.mkv -o output.mkv --preset video
 
 # Combine with hardware presets
