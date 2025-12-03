@@ -245,11 +245,11 @@ Shows resolution, frame rate, color information, HDR metadata, and Dolby Vision 
 Convert a video with automatic settings:
 
 ```bash
-# Auto settings (keeps source format, auto crop)
+# Auto settings (keeps source format, no cropping by default)
 hdr_forge convert -i input.mkv -o output.mkv
 
-# Disable automatic cropping
-hdr_forge convert -i input.mkv -o output.mkv --crop off
+# Enable automatic cropping
+hdr_forge convert -i input.mkv -o output.mkv --crop auto
 ```
 
 ### Encoder Selection
