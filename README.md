@@ -189,21 +189,18 @@ hdr_forge convert -i hdr_video.mkv -o output.mkv \
     -   **Linux:** `sudo pacman -S mkvtoolnix` or `sudo apt install mkvtoolnix`
     -   **Windows/macOS:** Download installer from website
 
-**For MaxCLL Calculation:**
-
--   **numpy** - For parallel MaxCLL/MaxFALL calculation
-    -   Install via: `pip install numpy`
-
 ### Install HDR Forge
 
 ```bash
 # Install from source
 git clone https://github.com/JanKremser/hdr_forge.git
 cd hdr_forge
-pip install -e .
+pip install -r requirements.txt
 
-# Or install directly with pip (when published to PyPI)
-pip install hdr_forge
+./build.sh
+
+chmod +x ./dist/main
+mv ./dist/main ./hdr_forge
 ```
 
 ### Verify Installation
