@@ -168,9 +168,14 @@ hdr_forge convert -i hdr_video.mkv -o output.mkv \
     -   **for Arch Linux:** Available in the repositories
     -   **for others:** Download from releases and place in PATH or project root
 
-**For HDR Metadata Injection:**
+**For HDR10 Metadata:**
 
--   **[hevc_hdr_editor](https://github.com/quietvoid/hevc_hdr_editor)** - HDR metadata injection tool
+-   **[hevc_hdr_editor](https://github.com/quietvoid/hevc_hdr_editor)** - HDR10 metadata injection tool
+    -   Download from releases and place in PATH or project root
+
+**For HDR10+ Metadata:**
+
+-   **[hdr10plus_tool](https://github.com/quietvoid/hdr10plus_tool)** - HDR10+ metadata extraction and injection
     -   Download from releases and place in PATH or project root
 
 **For Container Operations:**
@@ -209,8 +214,11 @@ ffmpeg -hide_banner -encoders | grep svt_av1
 # For Dolby Vision support
 dovi_tool --help
 
-# For HDR metadata injection
+# For HDR10 metadata injection
 hevc_hdr_editor --help
+
+# For HDR10+ metadata
+hdr10plus_tool --help
 
 # Check available hardware encoders
 ffmpeg -hide_banner -encoders | grep nvenc

@@ -601,56 +601,6 @@ temp_dir/
 # - Final cleanup: shutil.rmtree(temp_dir)
 ```
 
-## Progress Tracking
-
-### FFmpeg Progress
-
-Uses python-ffmpeg library with progress callback:
-
-```python
-def progress_callback(progress_dict):
-    frame = progress_dict.get('frame', 0)
-    fps = progress_dict.get('fps', 0)
-    speed = progress_dict.get('speed', '0x')
-    bitrate = progress_dict.get('bitrate', '0kbits/s')
-
-    percent = (frame / total_frames) * 100
-    elapsed = time.time() - start_time
-    eta = calculate_eta(frame, total_frames, elapsed)
-
-    print(f"\rProgress: {percent:.1f}% | Frame: {frame}/{total_frames} | "
-          f"FPS: {fps:.1f} | Speed: {speed} | ETA: {eta}")
-```
-
-### Subprocess Progress
-
-For dovi_tool, hevc_hdr_editor, mkvmerge:
-
-```python
-def monitor_process_progress(process, prefix):
-    spinner = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
-    i = 0
-    while process.poll() is None:
-        print(f"\r{prefix} {spinner[i % len(spinner)]}", end='', flush=True)
-        time.sleep(0.1)
-        i += 1
-    print(f"\r{prefix} ✓")
-```
-
-### ETA Calculation
-
-```python
-def calculate_eta(current_frame, total_frames, elapsed_time):
-    if current_frame == 0:
-        return "Calculating..."
-
-    frames_per_second = current_frame / elapsed_time
-    remaining_frames = total_frames - current_frame
-    remaining_seconds = remaining_frames / frames_per_second
-
-    return format_time(remaining_seconds)  # HH:MM:SS
-```
-
 ## Video Sampling
 
 ### Sample Time Calculation

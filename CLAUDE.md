@@ -24,7 +24,7 @@ HDR Forge is a Python CLI tool for video conversion with HDR metadata preservati
 - **Video Processing:** ffmpeg, ffprobe
 - **Hardware Acceleration:** NVIDIA NVENC (HEVC/H.264)
 - **Video Codecs:** libx265 (HEVC), libx264 (H.264), libsvtav1 (AV1 - Beta), hevc_nvenc, h264_nvenc
-- **Key Dependencies:** python-ffmpeg, dovi_tool, hevc_hdr_editor, mkvmerge, numpy
+- **Key Dependencies:** ffmpeg, dovi_tool, hevc_hdr_editor, hdr10plus_tool, mkvmerge, numpy
 
 ## Project Structure
 
@@ -157,7 +157,7 @@ Key functions:
 
 **Inject Metadata Command:** `inject-metadata -i input.mkv -o output.mkv [--rpu/--el/--hdr10/--hdr10plus]`
 1. Extract HEVC stream
-2. Inject metadata (dovi_tool, hevc_hdr_editor)
+2. Inject metadata (dovi_tool, hevc_hdr_editor, hdr10plus_tool)
 3. Mux back with audio/subs
 
 ## CLI Quick Reference
@@ -291,7 +291,8 @@ Shows: FFmpeg commands, encoder parameter selection, format detection, filter ch
 **Required:** ffmpeg, ffprobe
 **Optional:**
 - dovi_tool (Dolby Vision processing)
-- hevc_hdr_editor (HDR metadata injection)
+- hevc_hdr_editor (HDR10 metadata injection)
+- hdr10plus_tool (HDR10+ metadata extraction and injection)
 - mkvmerge (MKVToolNix - container operations)
 - SVT-AV1 library (for AV1 encoding - Beta)
 **Hardware:** NVIDIA GPU with NVENC for hardware encoding
