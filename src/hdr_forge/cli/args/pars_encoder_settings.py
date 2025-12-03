@@ -229,8 +229,6 @@ def _get_logo_removal_mode_from_string(logo_str: str | None) -> LogoRemovelSetti
         return LogoRemovelSettings(mode=LogoRemovalMode.MASK, position=LogoRemovalAutoDetectMode.AUTO)
     elif logo_str == 'delogo':
         return LogoRemovelSettings(mode=LogoRemovalMode.DELOGO, position=LogoRemovalAutoDetectMode.AUTO)
-    elif logo_str == 'inpaint':
-        return LogoRemovelSettings(mode=LogoRemovalMode.INPAINT, position=LogoRemovalAutoDetectMode.AUTO)
 
     if ':' in logo_str:
         parts = logo_str.split(':')
@@ -246,8 +244,6 @@ def _get_logo_removal_mode_from_string(logo_str: str | None) -> LogoRemovelSetti
                 mode = LogoRemovalMode.DELOGO
             elif mode_part == 'mask':
                 mode = LogoRemovalMode.MASK
-            elif mode_part == 'inpaint':
-                mode = LogoRemovalMode.INPAINT
             else:
                 print_err(f"Invalid logo removal mode '{mode_part}', using 'off'")
                 sys.exit(1)

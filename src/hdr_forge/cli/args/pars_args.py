@@ -274,14 +274,7 @@ Examples:
 [mask:top-left]    : Automatically detect (top-left) logo and apply mask-based removal
 [mask:top-right]   : Automatically detect (top-right) logo and apply mask-based removal
 [mask:bot-left]    : Automatically detect (bottom-left) logo and apply mask-based removal
-[mask:bot-right]   : Automatically detect (bottom-right) logo and apply
-
-Expirimental inpaint-based removal:
-[inpaint:auto]     : Automatically detect logo and apply inpaint-based removal
-[inpaint:top-left] : Automatically detect (top-left) logo and apply inpaint-based removal
-[inpaint:top-right]: Automatically detect (top-right) logo and apply inpaint-based removal
-[inpaint:bot-left] : Automatically detect (bottom-left) logo and apply inpaint-based removal
-[inpaint:bot-right]: Automatically detect (bottom-right) logo and apply inpaint-based removal\n
+[mask:bot-right]   : Automatically detect (bottom-right) logo and apply\n
 """
     )
 
@@ -487,7 +480,7 @@ def _add_extract_dolby_vision_hdr_metadata_subcommand(parser: argparse._SubParse
     """
     inject_parser: argparse.ArgumentParser = parser.add_parser('extract-metadata',
         description="""
-Extract Dolby Vision and/or HDR10 metadata from a encoded video file.
+Extract Dolby Vision/HDR10 and/or HDR10Plus metadata from a encoded video file.
 """,
         help='Extract Dolby Vision metadata'
     )

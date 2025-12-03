@@ -1035,7 +1035,7 @@ Total candidates: {len(results)}"""
         if not self._result:
             return None
 
-        if self._logo_removal_settings.mode not in [LogoRemovalMode.MASK, LogoRemovalMode.INPAINT]:
+        if self._logo_removal_settings.mode not in [LogoRemovalMode.MASK]:
             return None
 
         # Here we would normally return the path to the generated overlay video
@@ -1054,7 +1054,7 @@ Total candidates: {len(results)}"""
         if not self._result:
             return None
 
-        if self._logo_removal_settings.mode not in [LogoRemovalMode.MASK, LogoRemovalMode.INPAINT]:
+        if self._logo_removal_settings.mode not in [LogoRemovalMode.MASK]:
             return None
 
         return f"[0:v][1:v]overlay=x={self._result.x}:y={self._result.y}"

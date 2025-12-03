@@ -17,7 +17,8 @@ A powerful command-line tool for converting video files with hardware-accelerate
 -   **Advanced Cropping:** Automatic black bar detection, manual cropping, aspect ratio presets
 -   **Flexible Scaling:** Height-based and adaptive scaling modes
 -   **Grain Analysis:** Automatic grain detection with encoding optimization
--   **Content-Aware Presets:** Film, action, and animation-optimized encoding profiles
+-   **Content-Aware Presets:** Film, banding, video, action, and animation-optimized encoding profiles
+-   **Logo Removal:** Automatic logo detection and removal with multiple algorithms (delogo, mask, inpaint)
 -   **Hardware Presets:** CPU/GPU-specific encoding presets (balanced, quality)
 -   **Video Sampling:** Test encoding settings on short video samples
 -   **Intelligent Quality Control:** Resolution and content-based auto-optimization
@@ -63,8 +64,31 @@ hdr_forge inject-hdr-metadata -i video.mkv -o output.mkv \
 
 **Current: v0.7.11**
 
--   **New:** AV1 encoding support (libsvtav1) - Beta feature
+### New Features
+-   **AV1 Encoding (Beta):** Full support for AV1 codec via libsvtav1 encoder
+-   **Logo Removal:** Automatic logo detection and removal with three algorithms:
+    -   `delogo` - FFmpeg delogo filter
+    -   `mask` - Mask-based removal
+    -   `inpaint` - Experimental inpainting (best quality)
+-   **New Presets:**
+    -   `banding` - Banding reduction preset (8-bit → 10-bit for SDR)
+    -   `video` - Neutral preset for mixed content
+-   **Enhanced Speed Control:**
+    -   `medium:plus` - Improved quality over medium
+    -   `slow:plus` - Better quality/speed tradeoff than slow
+-   **New Scale Options:**
+    -   `QHD+` (1800p) and `QHD` (540p) resolutions
+-   **Display Aspect Ratio:** Custom DAR with `--dar-ratio` parameter
+-   **Custom Filters:** Add FFmpeg video filters with `--vfilter`
+-   **New Subcommands:**
+    -   `detect-logo` - Analyze and detect logos in videos
+    -   `extract-metadata` - Extract Dolby Vision/HDR10/HDR10+ metadata
+    -   `inject-metadata` - Inject DV/HDR10/HDR10+ metadata without re-encoding
+
+### Improvements
 -   Master-display support for GPU encoded videos
+-   Extended metadata injection capabilities (HDR10+, Dolby Vision EL)
+-   Improved preset system with more granular control
 
 **v0.6.0**
 
@@ -271,6 +295,12 @@ hdr_forge convert -i film.mkv -o output.mkv --preset film
 hdr_forge convert -i action.mkv -o output.mkv --preset action
 hdr_forge convert -i anime.mkv -o output.mkv --preset animation
 
+# Banding reduction (8-bit to 10-bit for SDR)
+hdr_forge convert -i input.mkv -o output.mkv --preset banding
+
+# Neutral preset for mixed content
+hdr_forge convert -i input.mkv -o output.mkv --preset video
+
 # Combine with hardware presets
 hdr_forge convert -i film.mkv -o output.mkv \
   --preset film \
@@ -302,8 +332,9 @@ hdr_forge convert -i input.mkv -o output.mkv --crop off
 
 ```bash
 # Named resolutions
-hdr_forge convert -i 4k_video.mkv -o output.mkv --scale FHD  # 1920x1080
-hdr_forge convert -i 4k_video.mkv -o output.mkv --scale HD   # 1280x720
+hdr_forge convert -i 4k_video.mkv -o output.mkv --scale FHD   # 1920x1080
+hdr_forge convert -i 4k_video.mkv -o output.mkv --scale HD    # 1280x720
+hdr_forge convert -i 4k_video.mkv -o output.mkv --scale QHD+  # 1800p
 
 # Numeric height
 hdr_forge convert -i 4k_video.mkv -o output.mkv --scale 1080
@@ -313,7 +344,7 @@ hdr_forge convert -i input.mkv -o output.mkv --scale 1080 --scale-mode height   
 hdr_forge convert -i input.mkv -o output.mkv --scale 1920 --scale-mode adaptive  # Fit within bounds
 ```
 
-**Available resolutions:** FUHD (8K), UHD (4K), WQHD (1440p), FHD (1080p), HD (720p), SD (480p)
+**Available resolutions:** FUHD (8K), UHD (4K), QHD+ (1800p), WQHD (1440p), FHD (1080p), HD (720p), QHD (540p), SD (480p)
 
 **Note:** Only downscaling is supported. Not compatible with Dolby Vision preservation.
 
@@ -328,6 +359,27 @@ hdr_forge convert -i input.mkv -o output.mkv --grain cat1  # Light grain
 hdr_forge convert -i input.mkv -o output.mkv --grain cat2  # Medium grain
 hdr_forge convert -i input.mkv -o output.mkv --grain cat3  # Heavy grain
 ```
+
+### Logo Removal
+
+```bash
+# Automatic logo detection and removal
+hdr_forge convert -i input.mkv -o output.mkv --remove-logo auto
+
+# Delogo filter (fast, good for simple logos)
+hdr_forge convert -i input.mkv -o output.mkv --remove-logo delogo:auto
+hdr_forge convert -i input.mkv -o output.mkv --remove-logo delogo:top-left
+
+# Mask-based removal (better quality)
+hdr_forge convert -i input.mkv -o output.mkv --remove-logo mask:auto
+hdr_forge convert -i input.mkv -o output.mkv --remove-logo mask:top-right
+
+# Inpainting (experimental, best quality)
+hdr_forge convert -i input.mkv -o output.mkv --remove-logo inpaint:auto
+hdr_forge convert -i input.mkv -o output.mkv --remove-logo inpaint:bot-left
+```
+
+**Note:** Logo removal is not supported for Dolby Vision encoding.
 
 ### Dolby Vision
 
@@ -392,8 +444,10 @@ hdr_forge convert -i input.mkv -o sample_av1.mkv \
 # Universal quality parameter (all encoders)
 hdr_forge convert -i input.mkv -o output.mkv --quality 16
 
-# Speed preset (libx265/libx264 only)
+# Speed presets (libx265/libx264 only)
 hdr_forge convert -i input.mkv -o output.mkv --speed slow
+hdr_forge convert -i input.mkv -o output.mkv --speed slow:plus      # Better than slow
+hdr_forge convert -i input.mkv -o output.mkv --speed medium:plus    # Better than medium
 
 # Advanced: encoder-specific parameters
 hdr_forge convert -i input.mkv -o output.mkv \
@@ -403,6 +457,18 @@ hdr_forge convert -i input.mkv -o output.mkv \
 hdr_forge convert -i input.mkv -o output.mkv \
   --encoder hevc_nvenc \
   --encoder-params "preset=hq:cq=16:rc=vbr_hq"
+```
+
+### Advanced Options
+
+```bash
+# Custom display aspect ratio
+hdr_forge convert -i input.mkv -o output.mkv --dar-ratio 16:9
+hdr_forge convert -i input.mkv -o output.mkv --dar-ratio cinema
+
+# Custom FFmpeg video filters
+hdr_forge convert -i input.mkv -o output.mkv \
+  --vfilter "eq=contrast=1.2:brightness=0.05,unsharp=5:5:1.0"
 ```
 
 ### HDR Metadata Injection
@@ -464,6 +530,48 @@ Options:
   -d, --debug               Enable debug output
 ```
 
+### detect-logo Subcommand
+
+```
+hdr_forge detect-logo -i INPUT   Detect logos in video
+
+Options:
+  -i, --input INPUT         Input video file
+  -e, --export PATH         Export detected logo mask as PNG image
+  -d, --debug               Enable debug output
+```
+
+### extract-metadata Subcommand
+
+```
+hdr_forge extract-metadata -i INPUT   Extract DV/HDR10/HDR10+ metadata
+
+Options:
+  -i, --input INPUT         Input video file
+  -o, --output FOLDER       Output folder for metadata files
+  -d, --debug               Enable debug output
+```
+
+### inject-metadata Subcommand
+
+```
+hdr_forge inject-metadata -i INPUT -o OUTPUT   Inject DV/HDR10/HDR10+ metadata
+
+Description:
+  Inject Dolby Vision/HDR10/HDR10+ metadata into HEVC stream without re-encoding
+
+Required Arguments:
+  -i, --input INPUT         Input video file
+  -o, --output OUTPUT       Output video file
+
+Optional Arguments:
+  --rpu PATH                RPU file (Dolby Vision metadata)
+  --el PATH                 Enhancement Layer file (DV)
+  --hdr10 PATH              HDR10 metadata JSON file
+  --hdr10plus PATH          HDR10+ metadata JSON file
+  -d, --debug               Enable debug output
+```
+
 ### Convert Subcommand
 
 ```
@@ -479,26 +587,33 @@ Encoder Selection:
                             libsvtav1, hevc_nvenc, h264_nvenc (default: auto)
 
 Encoding Presets:
-  -p, --preset PRESET       Content preset: auto, film, action, animation (default: auto)
+  -p, --preset PRESET       Content preset: auto, film, banding, video, action,
+                            animation (default: auto)
   --hw-preset PRESET        Hardware preset: cpu:balanced, cpu:quality,
-                            gpu:balanced, gpu:quality (default: cpu:balanced)
+                            gpu:balanced, gpu:quality, balanced, quality
+                            (default: cpu:balanced)
 
 Quality Settings:
   --quality VALUE           Universal quality (0-51, lower = better)
   --speed PRESET            Speed preset (libx265/libx264 only):
                             ultrafast, superfast, veryfast, faster, fast,
-                            medium, slow, slower, veryslow
+                            medium, medium:plus, slow, slow:plus, slower, veryslow
 
 Cropping & Scaling:
   --crop MODE               Crop mode: off, auto, width:height:x:y,
-                            16:9, 21:9, cinema, cinema-modern (default: off)
-  --scale RESOLUTION        Target resolution: FUHD, UHD, WQHD, FHD, HD, SD,
-                            or numeric height
+                            16:9, 21:9, european, us-widescreen,
+                            cinema, cinema-modern (default: off)
+  --scale RESOLUTION        Target resolution: FUHD, UHD, QHD+, WQHD, FHD, HD,
+                            QHD, SD, or numeric height
   --scale-mode MODE         Scale mode: height, adaptive (default: height)
 
-Content Analysis:
+Content Analysis & Filtering:
   --grain MODE              Grain analysis: off, auto, cat1, cat2, cat3 (default: off)
+  --remove-logo MODE        Logo removal: off, auto, delogo:auto, mask:auto,
+                            inpaint:auto (default: off)
   --sample TIME             Process sample: auto or start:end in seconds
+  --dar-ratio RATIO         Custom display aspect ratio (e.g., 16:9, cinema)
+  --vfilter FILTERS         Custom FFmpeg video filters
 
 Format Conversion:
   --hdr-sdr-format FORMAT   Target format: auto, hdr10, sdr (default: auto)
@@ -514,24 +629,6 @@ Debug:
 ```
 
 **For detailed parameter explanations, see [Technical Details](documentation/technical-details.md).**
-
-### inject-hdr-metadata Subcommand
-
-```
-hdr_forge inject-hdr-metadata -i INPUT [OPTIONS]
-
-Description:
-  Inject HDR10 metadata into HEVC bitstream without re-encoding
-
-Required Arguments:
-  -i, --input INPUT                Input video file (MKV or HEVC)
-  --master-display METADATA        Master display metadata
-
-Optional Arguments:
-  -o, --output OUTPUT              Output MKV file (default: input.mkv)
-  --max-cll VALUES                 MaxCLL and MaxFALL values
-  -d, --debug                      Enable debug output
-```
 
 ### calc_maxcll Subcommand
 
