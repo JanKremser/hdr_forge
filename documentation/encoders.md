@@ -37,6 +37,33 @@ HDR Forge supports multiple encoders for different use cases:
 -   Targeting older devices without H.265 support
 -   SDR content only
 
+#### libsvtav1 - AV1 Encoding (Beta)
+-   **Best for:** Long-term archival, streaming, future-proof encoding
+-   **Performance:** Very slow encoding (2-5x slower than libx265)
+-   **Quality:** Excellent, superior to HEVC
+-   **HDR Support:** Full (HDR10, Dolby Vision base layer)
+-   **SDR Support:** Yes
+-   **10-bit Support:** Yes
+-   **Special Features:** Next-generation codec, royalty-free, superior compression
+-   **Status:** Beta feature
+
+**When to use:**
+-   Long-term archival with smallest possible file sizes (20-40% smaller than HEVC)
+-   Streaming content (YouTube, Netflix support)
+-   Future-proof encoding for modern platforms
+-   When encoding time is not a constraint
+
+**Advantages:**
+-   20-40% smaller file sizes compared to HEVC at similar quality
+-   Royalty-free open-source codec
+-   Growing platform support (YouTube, Netflix, modern browsers)
+-   Full HDR10 metadata preservation
+
+**Limitations:**
+-   Very slow encoding (slower than libx265)
+-   Limited device compatibility (requires recent hardware/software)
+-   Beta status - some features may be refined in future releases
+
 ### GPU Encoders (Hardware-Accelerated)
 
 #### hevc_nvenc - NVIDIA H.265/HEVC Encoding
@@ -105,6 +132,7 @@ HDR Forge automatically selects the best encoder based on:
 1. **`--video-codec` parameter:**
    - `h265` → libx265 (default), hevc_nvenc
    - `h264` → libx264, h264_nvenc
+   - `av1` → libsvtav1 (Beta)
    - `copy` → Stream copy mode
 
 2. **`--hw-preset` parameter:**
@@ -131,6 +159,9 @@ hdr_forge convert -i input.mkv -o output.mkv --encoder libx264
 
 # Force NVENC H.264
 hdr_forge convert -i input.mkv -o output.mkv --encoder h264_nvenc
+
+# Force AV1 (Beta)
+hdr_forge convert -i input.mkv -o output.mkv --encoder libsvtav1
 ```
 
 ## Performance Comparison
@@ -143,6 +174,7 @@ hdr_forge convert -i input.mkv -o output.mkv --encoder h264_nvenc
 |---------|-------|-----|-------|
 | libx265 (medium) | 0.3-0.5x | 0.1-0.2x | Baseline |
 | libx265 (fast) | 0.5-1.0x | 0.2-0.4x | Faster preset |
+| libsvtav1 (preset 6) | 0.1-0.2x | 0.03-0.08x | Beta - Very slow |
 | hevc_nvenc (default) | 3-5x | 1-2x | 3-10x faster |
 | hevc_nvenc (hq) | 2-4x | 0.8-1.5x | Quality mode |
 | libx264 (medium) | 0.4-0.6x | 0.15-0.25x | Similar to libx265 |
@@ -156,10 +188,13 @@ hdr_forge convert -i input.mkv -o output.mkv --encoder h264_nvenc
 
 | Encoder | File Size | Quality | Compression Efficiency |
 |---------|-----------|---------|----------------------|
-| libx265 | Smallest | Highest | Best (100%) |
+| libsvtav1 (Beta) | Smallest | Excellent | Best (120-140%) |
+| libx265 | Small | Highest | Excellent (100%) |
 | hevc_nvenc | +10-20% | Good | Good (85-90%) |
 | libx264 | +30-50% | High | Moderate (70-80%) |
 | h264_nvenc | +40-60% | Good | Moderate (65-75%) |
+
+**Note:** AV1 achieves 20-40% smaller file sizes compared to HEVC at similar quality.
 
 ### Power Consumption
 
@@ -311,11 +346,20 @@ hdr_forge convert -i input.mkv -o sample.mkv \
   --hw-preset gpu:quality
 ```
 
-### For Archival
+### For Archival (HEVC)
 ```bash
 hdr_forge convert -i input.mkv -o archive.mkv \
   --encoder libx265 \
   --encoder-params "preset=veryslow:crf=12:tune=grain" \
+  --crop auto
+```
+
+### For Archival (AV1 - Beta)
+```bash
+# Smallest file sizes with excellent quality
+hdr_forge convert -i input.mkv -o archive_av1.mkv \
+  --encoder libsvtav1 \
+  --quality 18 \
   --crop auto
 ```
 
@@ -327,6 +371,19 @@ hdr_forge convert -i input.mkv -o stream.mkv \
 ```
 
 ## Troubleshooting
+
+### AV1 Encoder Not Available
+
+**Problem:** `libsvtav1 encoder not available` error
+
+**Solutions:**
+1. Check if SVT-AV1 is installed: `ffmpeg -hide_banner -encoders | grep svt_av1`
+2. Install SVT-AV1 library:
+   - **Arch Linux:** `sudo pacman -S svt-av1`
+   - **Ubuntu/Debian:** `sudo apt install libsvtav1enc-dev`
+   - **Windows:** Update FFmpeg to a version with SVT-AV1 support
+3. Rebuild FFmpeg with `--enable-libsvtav1` flag if needed
+4. Verify installation: `ffmpeg -hide_banner -encoders | grep svt_av1`
 
 ### NVENC Not Available
 

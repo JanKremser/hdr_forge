@@ -6,7 +6,7 @@
 
 HDR Forge is a Python CLI tool for video conversion with HDR metadata preservation, hardware acceleration (NVIDIA NVENC), and advanced features like grain analysis, cropping, and Dolby Vision support.
 
-**Version:** Python v0.6.0
+**Version:** Python v0.7.11
 
 ## Documentation Structure
 
@@ -23,6 +23,7 @@ HDR Forge is a Python CLI tool for video conversion with HDR metadata preservati
 - **Language:** Python 3.7+
 - **Video Processing:** ffmpeg, ffprobe
 - **Hardware Acceleration:** NVIDIA NVENC (HEVC/H.264)
+- **Video Codecs:** libx265 (HEVC), libx264 (H.264), libsvtav1 (AV1 - Beta), hevc_nvenc, h264_nvenc
 - **Key Dependencies:** python-ffmpeg, dovi_tool, hevc_hdr_editor, mkvmerge, numpy
 
 ## Project Structure
@@ -35,7 +36,7 @@ src/hdr_forge/
 ├── hdr_metadata_injector.py       # HDR metadata injection without re-encoding
 ├── cli/                           # CLI output and argument parsing
 ├── typedefs/                      # Type definitions and enums
-├── ffmpeg/video_codec/            # Codec implementations (libx265, libx264, hevc_nvenc, h264_nvenc)
+├── ffmpeg/video_codec/            # Codec implementations (libx265, libx264, libsvtav1, hevc_nvenc, h264_nvenc)
 ├── tools/                         # External tools (dovi_tool, hevc_hdr_editor, mkvmerge)
 ├── analyze/                       # MaxCLL/MaxFALL calculation
 └── core/                          # Global configuration
@@ -55,8 +56,8 @@ Key methods:
 - `convert_dolby_vision_to_other_profile_without_re_encoding()` - DV profile conversion
 
 **Encoder Selection Priority:**
-1. `--encoder` flag (explicit: libx265, libx264, hevc_nvenc, h264_nvenc)
-2. `--hw-preset` + hardware availability (gpu:* → NVENC, cpu:* → libx265/libx264)
+1. `--encoder` flag (explicit: libx265, libx264, libsvtav1, hevc_nvenc, h264_nvenc)
+2. `--hw-preset` + hardware availability (gpu:* → NVENC, cpu:* → libx265/libx264/libsvtav1)
 3. Default: libx265 CPU encoding
 
 **Format Conversion Rules:**
@@ -93,6 +94,7 @@ Key methods:
 **Codec Implementations:**
 - `libx265.py` - Software HEVC (HDR10, SDR, DV base layer)
 - `libx264.py` - Software H.264 (SDR only)
+- `libsvtav1.py` - Software AV1 (HDR10, SDR, DV base layer) - **Beta**
 - `hevc_nvenc.py` - Hardware HEVC (HDR10, SDR, DV base layer)
 - `h264_nvenc.py` - Hardware H.264 (SDR only)
 
@@ -163,8 +165,11 @@ hdr_forge convert -i input.mkv -o output.mkv
 # GPU acceleration
 hdr_forge convert -i input.mkv -o output.mkv --hw-preset gpu:balanced
 
-# Explicit encoder
+# Explicit encoder (HEVC)
 hdr_forge convert -i input.mkv -o output.mkv --encoder hevc_nvenc
+
+# AV1 encoding (Beta)
+hdr_forge convert -i input.mkv -o output.mkv --encoder libsvtav1
 
 # Custom quality
 hdr_forge convert -i input.mkv -o output.mkv --quality 16
@@ -245,6 +250,7 @@ hdr_forge inject-hdr-metadata -i input.mkv -o output.mkv --master-display "..." 
 4. Add to `encoder.py` in `_get_video_codec_lib_instance()`
 5. Add enum to `typedefs/encoder_typing.py`
 6. Update CLI arguments
+7. Add preset configuration in `ffmpeg/video_codec/service/presets.py` if needed
 
 ### Modifying Auto-CRF Logic
 1. Edit `calc_hw_preset_settings()` in `ffmpeg/video_codec/service/presets.py`
@@ -272,9 +278,14 @@ Shows: FFmpeg commands, encoder parameter selection, format detection, filter ch
 4. **Upscaling:** Not supported (only downscaling)
 5. **Format Upgrades:** Not possible (SDR → HDR10, HDR10 → DV)
 6. **Hardware:** Only NVIDIA NVENC supported (no Intel QSV, AMD VCE, Apple VideoToolbox)
+7. **AV1 Beta:** AV1 encoding is in beta status - some advanced features may be refined in future releases
 
 ## External Dependencies
 
 **Required:** ffmpeg, ffprobe
-**Optional:** dovi_tool, hevc_hdr_editor, mkvmerge (MKVToolNix)
+**Optional:**
+- dovi_tool (Dolby Vision processing)
+- hevc_hdr_editor (HDR metadata injection)
+- mkvmerge (MKVToolNix - container operations)
+- SVT-AV1 library (for AV1 encoding - Beta)
 **Hardware:** NVIDIA GPU with NVENC for hardware encoding

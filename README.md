@@ -1,13 +1,14 @@
-# HDR Forge - SDR/HDR10/DolbyVision Video converter
+# HDR Forge - SDR/HDR10/DolbyVision Video Converter
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-A powerful command-line tool for converting video files with hardware-accelerated encoding (NVIDIA NVENC), intelligent HDR metadata preservation, automatic quality optimization, grain analysis, flexible cropping, and advanced format conversion (H.264, H.265/HEVC, Dolby Vision).
+A powerful command-line tool for converting video files with hardware-accelerated encoding (NVIDIA NVENC), intelligent HDR metadata preservation, automatic quality optimization, grain analysis, flexible cropping, and advanced format conversion (H.264, H.265/HEVC, AV1, Dolby Vision).
 
 ## Features
 
--   **Multiple Encoder Support:** CPU (libx265, libx264) and GPU-accelerated encoding (NVIDIA NVENC)
+-   **Multiple Encoder Support:** CPU (libx265, libx264, libsvtav1) and GPU-accelerated encoding (NVIDIA NVENC)
+-   **AV1 Encoding (Beta):** Next-generation codec with superior compression efficiency
 -   **Hardware Acceleration:** NVIDIA NVENC support for H.265/HEVC and H.264 encoding
 -   **Multiple Format Support:** Convert between Dolby Vision, HDR10, and SDR formats
 -   **Format Conversion:** DV → HDR10 → SDR with tone mapping support
@@ -40,24 +41,32 @@ hdr_forge convert -i input.mkv -o output.mkv --hw-preset gpu:balanced
 # High-quality CPU encoding
 hdr_forge convert -i input.mkv -o output.mkv --hw-preset cpu:quality
 
+# AV1 encoding (Beta - next-generation codec)
+hdr_forge convert -i input.mkv -o output.mkv --encoder libsvtav1
+
 # Convert Dolby Vision to HDR10
 hdr_forge convert -i dv.mkv -o output.mkv --hdr-sdr-format hdr10
 
 # Inject HDR metadata without re-encoding
 hdr_forge inject-hdr-metadata -i video.mkv -o output.mkv \
-  --master-display "G(13250,34500)B(7500,30000)R(34000,16000)WP(15635,16450)L(1000,0.05)"
+  --master-display "G(13250,34500)B(7500,3000)R(34000,16000)WP(15635,16450)L(1000,0.05)"
 ```
 
 ## Documentation
 
-- **[Encoder Guide](documentation/encoders.md)** - Comprehensive encoder information (libx265, libx264, NVENC)
+- **[Encoder Guide](documentation/encoders.md)** - Comprehensive encoder information (libx265, libx264, libsvtav1, NVENC)
 - **[Advanced Examples](documentation/advanced-examples.md)** - Complex encoding workflows and examples
 - **[Technical Details](documentation/technical-details.md)** - In-depth technical information
 - **[Troubleshooting](documentation/troubleshooting.md)** - Solutions to common problems
 
 ## Version History
 
-**Current: v0.6.0**
+**Current: v0.7.11**
+
+-   **New:** AV1 encoding support (libsvtav1) - Beta feature
+-   Master-display support for GPU encoded videos
+
+**v0.6.0**
 
 -   Master-display support for GPU encoded videos
 
@@ -74,6 +83,32 @@ hdr_forge inject-hdr-metadata -i video.mkv -o output.mkv \
 -   Video sampling for testing
 -   Enhanced CLI with comprehensive parameter support
 
+## What's New in v0.7.11
+
+### AV1 Support (Beta)
+
+HDR Forge now supports AV1 encoding via libsvtav1 (SVT-AV1 encoder). AV1 is a next-generation video codec that offers:
+
+-   **Superior Compression:** 20-40% smaller file sizes compared to HEVC at similar quality
+-   **Royalty-Free:** Open-source codec with no licensing fees
+-   **HDR Support:** Full HDR10 and SDR support with proper metadata preservation
+-   **Future-Proof:** Growing platform support (YouTube, Netflix, modern browsers)
+
+**Beta Status:** AV1 encoding is currently in beta. While the encoder is stable and produces excellent results, some advanced features may still be refined in future releases.
+
+```bash
+# Basic AV1 encoding
+hdr_forge convert -i input.mkv -o output.mkv --encoder libsvtav1
+
+# AV1 with quality control
+hdr_forge convert -i input.mkv -o output.mkv --encoder libsvtav1 --quality 23
+
+# AV1 HDR encoding
+hdr_forge convert -i hdr_video.mkv -o output.mkv --encoder libsvtav1
+```
+
+**See [Encoder Guide - AV1](documentation/encoders.md#libsvtav1-av1) for detailed information.**
+
 ## Installation
 
 ### Requirements
@@ -81,10 +116,13 @@ hdr_forge inject-hdr-metadata -i video.mkv -o output.mkv \
 #### Software Requirements (Mandatory)
 
 -   **Python 3.7 or higher**
--   **[ffmpeg / ffprobe](https://ffmpeg.org/download.html)** with libx265 or libx264 support
+-   **[ffmpeg / ffprobe](https://ffmpeg.org/download.html)** with libx265, libx264, or libsvtav1 support
 -   **[x265 >=4.1](https://github.com/videolan/x265)** for libx265
     -   [Windows builds](http://msystem.waw.pl/x265/)
     -   **Linux:** Available in the repositories
+-   **[SVT-AV1](https://gitlab.com/AOMediaCodec/SVT-AV1)** for AV1 encoding (Beta)
+    -   **Linux:** Available in most repositories as `svt-av1` or `libsvtav1`
+    -   **Windows:** Included in recent FFmpeg builds
 
 #### Hardware Acceleration (Optional)
 
@@ -137,6 +175,9 @@ ffmpeg -version
 ffprobe -version
 x265 --version
 
+# For AV1 support
+ffmpeg -hide_banner -encoders | grep svt_av1
+
 # For Dolby Vision support
 dovi_tool --help
 
@@ -187,6 +228,9 @@ hdr_forge convert -i input.mkv -o output.mkv --encoder hevc_nvenc
 # H.264 for maximum compatibility
 hdr_forge convert -i input.mkv -o output.mkv --encoder libx264
 
+# AV1 for best compression (Beta)
+hdr_forge convert -i input.mkv -o output.mkv --encoder libsvtav1
+
 # Stream copy (no re-encoding)
 hdr_forge convert -i input.mkv -o output.mkv --video-codec copy
 ```
@@ -207,14 +251,15 @@ hdr_forge convert -i input.mkv -o output.mkv --hw-preset cpu:balanced
 hdr_forge convert -i input.mkv -o output.mkv --hw-preset cpu:quality
 ```
 
-**GPU vs CPU Trade-offs:**
+**Encoder Comparison:**
 
-| Aspect | CPU (libx265) | GPU (NVENC) |
-|--------|---------------|-------------|
-| Speed | Slower | 3-10x faster |
-| Quality | Highest | Good (slightly lower) |
-| File Size | Smallest | Larger (10-20%) |
-| Best For | Archival, max quality | Fast encoding, testing |
+| Aspect | CPU (libx265) | GPU (NVENC) | AV1 (Beta) |
+|--------|---------------|-------------|------------|
+| Speed | Slower | 3-10x faster | Slowest |
+| Quality | Highest | Good (slightly lower) | Excellent |
+| File Size | Small | Larger (10-20%) | Smallest (20-40% smaller) |
+| Compatibility | Excellent | Excellent | Growing |
+| Best For | Archival, max quality | Fast encoding, testing | Long-term archival, streaming |
 
 **See [Encoder Guide - Performance Comparison](documentation/encoders.md#performance-comparison) for detailed benchmarks.**
 
@@ -334,6 +379,11 @@ hdr_forge convert -i input.mkv -o sample.mkv --sample 90:120
 hdr_forge convert -i input.mkv -o sample.mkv \
   --sample auto \
   --encoder hevc_nvenc
+
+# AV1 sample for quality comparison
+hdr_forge convert -i input.mkv -o sample_av1.mkv \
+  --sample auto \
+  --encoder libsvtav1
 ```
 
 ### Custom Quality Settings
@@ -362,11 +412,11 @@ Add or update HDR10 metadata without re-encoding (ultra-fast):
 ```bash
 # Inject master display metadata
 hdr_forge inject-hdr-metadata -i video.mkv -o output.mkv \
-  --master-display "G(13250,34500)B(7500,30000)R(34000,16000)WP(15635,16450)L(1000,0.05)"
+  --master-display "G(13250,34500)B(7500,3000)R(34000,16000)WP(15635,16450)L(1000,0.05)"
 
 # With MaxCLL/MaxFALL values
 hdr_forge inject-hdr-metadata -i video.mkv -o output.mkv \
-  --master-display "G(13250,34500)B(7500,30000)R(34000,16000)WP(15635,16450)L(1000,0.05)" \
+  --master-display "G(13250,34500)B(7500,3000)R(34000,16000)WP(15635,16450)L(1000,0.05)" \
   --max-cll "1000,400"
 ```
 
@@ -383,12 +433,17 @@ hdr_forge convert -i ./videos -o ./encoded \
   --hw-preset gpu:balanced \
   --crop auto \
   --scale FHD
+
+# Batch convert to AV1
+hdr_forge convert -i ./videos -o ./av1_encoded \
+  --encoder libsvtav1 \
+  --quality 23
 ```
 
 ### Supported Formats
 
 **Input:** `.mkv`, `.m2ts`, `.ts`, `.mp4`
-**Output:** `.mkv` (H.265/HEVC or H.264 video + original audio/subtitle streams)
+**Output:** `.mkv` (H.265/HEVC, H.264, or AV1 video + original audio/subtitle streams)
 
 ## Command Reference
 
@@ -419,9 +474,9 @@ Required Arguments:
   -o, --output OUTPUT       Output video file or folder
 
 Encoder Selection:
-  -v, --video-codec CODEC   Video codec: h265, h264, copy (default: h265)
+  -v, --video-codec CODEC   Video codec: h265, h264, av1, copy (default: h265)
   --encoder CODEC           Force specific encoder: auto, libx265, libx264,
-                            hevc_nvenc, h264_nvenc (default: auto)
+                            libsvtav1, hevc_nvenc, h264_nvenc (default: auto)
 
 Encoding Presets:
   -p, --preset PRESET       Content preset: auto, film, action, animation (default: auto)
@@ -494,16 +549,18 @@ HDR Forge automatically adjusts encoding parameters based on video resolution:
 
 ### CRF/CQ (Quality) - Lower = Better
 
-| Resolution | Pixel Count | CPU Balanced | GPU Balanced |
-|------------|-------------|--------------|--------------|
-| 4K+ | 6.1M+ | 13 | 15 |
-| Full HD | 2.1M | 18 | 20 |
-| HD | 1M-2.1M | 19 | 21 |
+| Resolution | Pixel Count | CPU Balanced | GPU Balanced | AV1 Balanced |
+|------------|-------------|--------------|--------------|--------------|
+| 4K+ | 6.1M+ | 13 | 15 | 25 |
+| Full HD | 2.1M | 18 | 20 | 23 |
+| HD | 1M-2.1M | 19 | 21 | 23 |
 
 **Adjustments:**
-- HDR10/DV: +1.0 CRF/CQ
-- Action preset: -2.0 CRF/CQ (weighted)
-- Grain: -1 to -3 CRF/CQ based on category
+- HDR10/DV: +1.0 CRF/CQ (libx265/libx264/NVENC only)
+- Action preset: -2.0 CRF/CQ (weighted, libx265/libx264/NVENC only)
+- Grain: -1 to -3 CRF/CQ based on category (libx265/libx264 only)
+
+**Note:** AV1 uses higher CRF values due to superior compression efficiency. CRF 25 in AV1 roughly equals CRF 18 in HEVC.
 
 **For detailed calculations, see [Technical Details - Auto-CRF Calculation](documentation/technical-details.md#auto-crfcq-calculation).**
 
@@ -517,6 +574,9 @@ hdr_forge convert -i input.mkv -o output.mkv --hw-preset cpu:quality
 
 # Fast GPU encoding
 hdr_forge convert -i input.mkv -o output.mkv --encoder hevc_nvenc
+
+# AV1 encoding for long-term archival
+hdr_forge convert -i input.mkv -o output.mkv --encoder libsvtav1 --quality 21
 
 # 4K to 1080p with auto crop
 hdr_forge convert -i 4k_video.mkv -o 1080p.mkv \
@@ -541,7 +601,13 @@ hdr_forge convert -i ./4k_videos -o ./1080p_videos \
   --crop auto \
   --scale FHD
 
-# Archival encoding
+# Archival encoding with AV1
+hdr_forge convert -i source.mkv -o archive.mkv \
+  --encoder libsvtav1 \
+  --quality 18 \
+  --crop auto
+
+# Maximum quality HEVC archival
 hdr_forge convert -i source.mkv -o archive.mkv \
   --encoder libx265 \
   --encoder-params "preset=veryslow:crf=12:tune=grain" \
@@ -560,6 +626,12 @@ hdr_forge convert -i source.mkv -o archive.mkv \
 ffmpeg -hide_banner -encoders | grep nvenc
 
 # Update drivers and reinstall FFmpeg with NVENC support
+```
+
+**AV1 encoder not found:**
+```bash
+# Check if SVT-AV1 is available
+ffmpeg -hide_banner -encoders | grep svt_av1
 ```
 
 **Slow crop detection:**
@@ -594,6 +666,7 @@ MIT License - See LICENSE file for details
 
 -   [FFmpeg](https://ffmpeg.org/) - Video processing
 -   [x265](https://www.videolan.org/developers/x265.html) - HEVC encoding
+-   [SVT-AV1](https://gitlab.com/AOMediaCodec/SVT-AV1) - AV1 encoding
 -   [NVIDIA NVENC](https://developer.nvidia.com/nvidia-video-codec-sdk) - Hardware-accelerated encoding
 -   [dovi_tool](https://github.com/quietvoid/dovi_tool) - Dolby Vision metadata handling
 -   [hevc_hdr_editor](https://github.com/quietvoid/hevc_hdr_editor) - HDR metadata injection

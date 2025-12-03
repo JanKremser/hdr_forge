@@ -5,6 +5,7 @@ This document provides comprehensive examples for complex encoding scenarios wit
 ## Table of Contents
 
 - [Hardware Acceleration](#hardware-acceleration)
+- [AV1 Encoding (Beta)](#av1-encoding-beta)
 - [Encoding Presets](#encoding-presets)
 - [Cropping Examples](#cropping-examples)
 - [Grain Analysis](#grain-analysis)
@@ -57,6 +58,97 @@ hdr_forge convert -i input.mkv -o gpu_output.mkv \
 # Compare file sizes and quality
 ls -lh *_output.mkv
 ```
+
+## AV1 Encoding (Beta)
+
+### Basic AV1 Encoding
+
+```bash
+# Basic AV1 encoding with default settings
+hdr_forge convert -i input.mkv -o output_av1.mkv --encoder libsvtav1
+
+# AV1 with custom quality (lower = better quality)
+hdr_forge convert -i input.mkv -o output_av1.mkv \
+  --encoder libsvtav1 \
+  --quality 23
+
+# High-quality AV1 for archival
+hdr_forge convert -i input.mkv -o archive_av1.mkv \
+  --encoder libsvtav1 \
+  --quality 18
+```
+
+### AV1 for Different Resolutions
+
+```bash
+# 4K AV1 encoding
+hdr_forge convert -i 4k_video.mkv -o 4k_av1.mkv \
+  --encoder libsvtav1 \
+  --quality 25
+
+# 1080p AV1 encoding
+hdr_forge convert -i 1080p_video.mkv -o 1080p_av1.mkv \
+  --encoder libsvtav1 \
+  --quality 23
+
+# 4K to 1080p with AV1
+hdr_forge convert -i 4k_video.mkv -o 1080p_av1.mkv \
+  --encoder libsvtav1 \
+  --scale FHD \
+  --quality 23
+```
+
+### AV1 HDR Encoding
+
+```bash
+# AV1 with HDR10 preservation
+hdr_forge convert -i hdr10_video.mkv -o hdr10_av1.mkv \
+  --encoder libsvtav1
+
+# Dolby Vision to HDR10 with AV1
+hdr_forge convert -i dolby_vision.mkv -o hdr10_av1.mkv \
+  --encoder libsvtav1 \
+  --hdr-sdr-format hdr10
+
+# HDR10 to SDR with AV1 (tone mapping)
+hdr_forge convert -i hdr10_video.mkv -o sdr_av1.mkv \
+  --encoder libsvtav1 \
+  --hdr-sdr-format sdr \
+  --quality 23
+```
+
+### AV1 Comparison with HEVC
+
+```bash
+# Encode with both codecs for comparison
+hdr_forge convert -i input.mkv -o output_hevc.mkv --encoder libx265
+hdr_forge convert -i input.mkv -o output_av1.mkv --encoder libsvtav1
+
+# Compare file sizes (AV1 typically 20-40% smaller)
+ls -lh output_hevc.mkv output_av1.mkv
+```
+
+### AV1 for Streaming
+
+```bash
+# AV1 optimized for YouTube/streaming platforms
+hdr_forge convert -i input.mkv -o stream_av1.mkv \
+  --encoder libsvtav1 \
+  --quality 25 \
+  --crop auto
+
+# Batch convert for streaming platform
+hdr_forge convert -i ./videos -o ./av1_streams \
+  --encoder libsvtav1 \
+  --quality 25 \
+  --scale FHD
+```
+
+**Note:** AV1 encoding is significantly slower than HEVC but produces smaller files. Use AV1 when:
+- File size is critical (storage/bandwidth constraints)
+- Encoding time is not a constraint
+- Targeting modern platforms (YouTube, Netflix, etc.)
+- Creating long-term archival copies
 
 ## Encoding Presets
 
