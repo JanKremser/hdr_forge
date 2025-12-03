@@ -30,7 +30,7 @@ HDR Forge is a Python CLI tool for video conversion with HDR metadata preservati
 
 ```
 src/hdr_forge/
-├── main.py                        # CLI entry point (info, convert, calc_maxcll, inject-hdr-metadata)
+├── main.py                        # CLI entry point (info, convert, calc_maxcll, extract-metadata, inject-metadata, detect-logo)
 ├── video.py                       # Video metadata extraction (Video class)
 ├── encoder.py                     # Encoder orchestration (Encoder class)
 ├── hdr_metadata_injector.py       # HDR metadata injection without re-encoding
@@ -148,13 +148,17 @@ Key functions:
 
 **Important:** DV format does NOT support cropping/scaling (RPU is frame-position dependent). Only supported when converting DV → HDR10/SDR.
 
-### HDR Metadata Injection
+### Metadata Management
 
-**Command:** `inject-hdr-metadata -i input.mkv --master-display "..." --max-cll "..."`
-1. Create JSON config
-2. Extract HEVC stream
-3. Inject metadata (hevc_hdr_editor)
-4. Mux back with audio/subs
+**Extract Metadata Command:** `extract-metadata -i input.mkv -o ./output_folder`
+1. Extract Dolby Vision RPU (dovi_tool)
+2. Extract Enhancement Layer if present
+3. Extract HDR10/HDR10+ metadata to JSON
+
+**Inject Metadata Command:** `inject-metadata -i input.mkv -o output.mkv [--rpu/--el/--hdr10/--hdr10plus]`
+1. Extract HEVC stream
+2. Inject metadata (dovi_tool, hevc_hdr_editor)
+3. Mux back with audio/subs
 
 ## CLI Quick Reference
 
@@ -201,7 +205,9 @@ hdr_forge convert -i input.mkv -o output.mkv --encoder libx265 --encoder-params 
 # Other commands
 hdr_forge info -i input.mkv
 hdr_forge calc_maxcll -i input.mkv
-hdr_forge inject-hdr-metadata -i input.mkv -o output.mkv --master-display "..." --max-cll "..."
+hdr_forge detect-logo -i input.mkv --export logo_mask.png
+hdr_forge extract-metadata -i input.mkv -o ./metadata
+hdr_forge inject-metadata -i input.mkv -o output.mkv --hdr10 metadata.json
 ```
 
 ## Key Technical Details

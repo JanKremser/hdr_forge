@@ -48,9 +48,9 @@ hdr_forge convert -i input.mkv -o output.mkv --encoder libsvtav1
 # Convert Dolby Vision to HDR10
 hdr_forge convert -i dv.mkv -o output.mkv --hdr-sdr-format hdr10
 
-# Inject HDR metadata without re-encoding
-hdr_forge inject-hdr-metadata -i video.mkv -o output.mkv \
-  --master-display "G(13250,34500)B(7500,3000)R(34000,16000)WP(15635,16450)L(1000,0.05)"
+# Inject metadata without re-encoding
+hdr_forge inject-metadata -i video.mkv -o output.mkv \
+  --hdr10 metadata_hdr10.json
 ```
 
 ## Documentation
@@ -475,22 +475,33 @@ hdr_forge convert -i input.mkv -o output.mkv \
   --vfilter "eq=contrast=1.2:brightness=0.05,unsharp=5:5:1.0"
 ```
 
-### HDR Metadata Injection
+### Metadata Management
 
-Add or update HDR10 metadata without re-encoding (ultra-fast):
+Extract and inject HDR/Dolby Vision metadata without re-encoding (ultra-fast):
 
 ```bash
-# Inject master display metadata
-hdr_forge inject-hdr-metadata -i video.mkv -o output.mkv \
-  --master-display "G(13250,34500)B(7500,3000)R(34000,16000)WP(15635,16450)L(1000,0.05)"
+# Extract metadata from video
+hdr_forge extract-metadata -i video.mkv -o ./metadata_folder
 
-# With MaxCLL/MaxFALL values
-hdr_forge inject-hdr-metadata -i video.mkv -o output.mkv \
-  --master-display "G(13250,34500)B(7500,3000)R(34000,16000)WP(15635,16450)L(1000,0.05)" \
-  --max-cll "1000,400"
+# Inject HDR10 metadata
+hdr_forge inject-metadata -i video.mkv -o output.mkv \
+  --hdr10 metadata_hdr10.json
+
+# Inject Dolby Vision RPU
+hdr_forge inject-metadata -i video.mkv -o output.mkv \
+  --rpu dolby_vision.rpu
+
+# Inject Dolby Vision with Enhancement Layer
+hdr_forge inject-metadata -i video.mkv -o output.mkv \
+  --rpu dolby_vision.rpu \
+  --el dolby_vision.hevc
+
+# Inject HDR10+ metadata
+hdr_forge inject-metadata -i video.mkv -o output.mkv \
+  --hdr10plus metadata_hdr10plus.json
 ```
 
-**See [Advanced Examples - HDR Metadata Injection](documentation/advanced-examples.md#hdr-metadata-injection) for common display presets.**
+**See [Advanced Examples - Metadata Injection](documentation/advanced-examples.md#metadata-injection) for detailed workflows.**
 
 ### Batch Processing
 

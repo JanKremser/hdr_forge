@@ -484,67 +484,79 @@ hdr_forge convert -i movie.mkv -o sample_action.mkv --sample 1800:1830
 hdr_forge convert -i movie.mkv -o sample_ending.mkv --sample 7170:7200
 ```
 
-## HDR Metadata Injection
+## Metadata Management
 
-### Basic Injection
+### Extract Metadata
 
 ```bash
-# Inject master display metadata
-hdr_forge inject-hdr-metadata -i video.mkv -o output.mkv \
-  --master-display "G(13250,34500)B(7500,30000)R(34000,16000)WP(15635,16450)L(1000,0.05)"
+# Extract all metadata (Dolby Vision, HDR10, HDR10+)
+hdr_forge extract-metadata -i video.mkv -o ./metadata_output
 
-# With MaxCLL/MaxFALL
-hdr_forge inject-hdr-metadata -i video.mkv -o output.mkv \
-  --master-display "G(13250,34500)B(7500,30000)R(34000,16000)WP(15635,16450)L(1000,0.05)" \
-  --max-cll "1000,400"
+# Extract from Dolby Vision source
+hdr_forge extract-metadata -i dolby_vision.mkv -o ./dv_metadata
 ```
 
-### Common Display Metadata Presets
+### Inject HDR10 Metadata
 
 ```bash
-# Standard BT.2020 / DCI-P3 D65
-hdr_forge inject-hdr-metadata -i video.mkv -o output.mkv \
-  --master-display "G(13250,34500)B(7500,3000)R(34000,16000)WP(15635,16450)L(1000,0.05)" \
-  --max-cll "1000,400"
+# Inject HDR10 metadata JSON
+hdr_forge inject-metadata -i video.mkv -o output.mkv \
+  --hdr10 metadata_hdr10.json
 
-# LG OLED C9 Display
-hdr_forge inject-hdr-metadata -i video.mkv -o output.mkv \
-  --master-display "G(13250,34500)B(7500,3000)R(34000,16000)WP(15635,16450)L(850,0.0001)" \
-  --max-cll "800,400"
-
-# Sony X900H Display
-hdr_forge inject-hdr-metadata -i video.mkv -o output.mkv \
-  --master-display "G(13250,34500)B(7500,3000)R(34000,16000)WP(15635,16450)L(1100,0.01)" \
-  --max-cll "1100,450"
+# Inject HDR10+ metadata
+hdr_forge inject-metadata -i video.mkv -o output.mkv \
+  --hdr10plus metadata_hdr10plus.json
 ```
 
-### Injection During Encoding
+### Inject Dolby Vision Metadata
 
 ```bash
-# Inject metadata while encoding
+# Inject RPU only
+hdr_forge inject-metadata -i video.mkv -o output.mkv \
+  --rpu dolby_vision.rpu
+
+# Inject RPU with Enhancement Layer (Profile 7)
+hdr_forge inject-metadata -i video.mkv -o output.mkv \
+  --rpu dolby_vision.rpu \
+  --el enhancement_layer.hevc
+
+# Inject multiple metadata types
+hdr_forge inject-metadata -i video.mkv -o output.mkv \
+  --rpu dolby_vision.rpu \
+  --hdr10 metadata_hdr10.json
+```
+
+### Metadata During Encoding
+
+**Note:** Use `--master-display` and `--max-cll` during encoding for CPU encoders only.
+
+```bash
+# Inject metadata while encoding (libx265/libx264 only)
 hdr_forge convert -i input.mkv -o output.mkv \
+  --encoder libx265 \
   --master-display "G(13250,34500)B(7500,30000)R(34000,16000)WP(15635,16450)L(1000,0.05)" \
   --max-cll "1000,400"
 
 # With quality settings
 hdr_forge convert -i input.mkv -o output.mkv \
+  --encoder libx265 \
   --quality 16 \
   --master-display "G(13250,34500)B(7500,30000)R(34000,16000)WP(15635,16450)L(1000,0.05)" \
   --max-cll "1000,400"
 ```
 
-### Updating Existing Metadata
+### Workflow: Extract and Re-inject
 
 ```bash
-# Replace incorrect metadata (no re-encoding)
-hdr_forge inject-hdr-metadata -i wrong_metadata.mkv -o fixed.mkv \
-  --master-display "G(13250,34500)B(7500,30000)R(34000,16000)WP(15635,16450)L(1000,0.05)" \
-  --max-cll "1000,400"
+# 1. Extract metadata from source
+hdr_forge extract-metadata -i source_with_metadata.mkv -o ./metadata
 
-# Update only MaxCLL values
-hdr_forge inject-hdr-metadata -i video.mkv -o output.mkv \
-  --master-display "G(13250,34500)B(7500,30000)R(34000,16000)WP(15635,16450)L(1000,0.05)" \
-  --max-cll "1200,500"
+# 2. Encode without metadata
+hdr_forge convert -i source_with_metadata.mkv -o encoded.mkv
+
+# 3. Re-inject extracted metadata
+hdr_forge inject-metadata -i encoded.mkv -o final.mkv \
+  --hdr10 ./metadata/hdr10_metadata.json
 ```
 
 ## Dolby Vision
