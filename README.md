@@ -162,26 +162,38 @@ hdr_forge convert -i hdr_video.mkv -o output.mkv \
 
 #### Optional Tools for Advanced Features
 
+**Important:** All external tools must be either:
+1. Available globally in system PATH, OR
+2. Located in the `lib/` directory next to the HDR Forge executable/project
+
 **For Dolby Vision:**
 
 -   **[dovi_tool](https://github.com/quietvoid/dovi_tool)** - RPU/EL extraction and injection
-    -   **for Arch Linux:** Available in the repositories
-    -   **for others:** Download from releases and place in PATH or project root
+    -   **Arch Linux:** `sudo pacman -S dovi-tool`
+    -   **Others:** Download from releases and place in:
+        -   System PATH (recommended), OR
+        -   `lib/` directory in project root
 
 **For HDR10 Metadata:**
 
 -   **[hevc_hdr_editor](https://github.com/quietvoid/hevc_hdr_editor)** - HDR10 metadata injection tool
-    -   Download from releases and place in PATH or project root
+    -   Download from releases and place in:
+        -   System PATH (recommended), OR
+        -   `lib/` directory in project root
 
 **For HDR10+ Metadata:**
 
 -   **[hdr10plus_tool](https://github.com/quietvoid/hdr10plus_tool)** - HDR10+ metadata extraction and injection
-    -   Download from releases and place in PATH or project root
+    -   **Arch Linux:** `sudo pacman -S hdr10plus-tool`
+    -   **Others:** Download from releases and place in:
+        -   System PATH (recommended), OR
+        -   `lib/` directory in project root
 
 **For Container Operations:**
 
 -   **[mkvmerge](https://mkvtoolnix.download/)** (part of MKVToolNix) - MKV muxing/demuxing
-    -   Usually available in system repositories
+    -   **Linux:** `sudo pacman -S mkvtoolnix` or `sudo apt install mkvtoolnix`
+    -   **Windows/macOS:** Download installer from website
 
 **For MaxCLL Calculation:**
 

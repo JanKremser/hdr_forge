@@ -289,10 +289,17 @@ Shows: FFmpeg commands, encoder parameter selection, format detection, filter ch
 ## External Dependencies
 
 **Required:** ffmpeg, ffprobe
-**Optional:**
+
+**Optional Tools:** Must be in system PATH or `lib/` directory
 - dovi_tool (Dolby Vision processing)
 - hevc_hdr_editor (HDR10 metadata injection)
 - hdr10plus_tool (HDR10+ metadata extraction and injection)
 - mkvmerge (MKVToolNix - container operations)
 - SVT-AV1 library (for AV1 encoding - Beta)
+
 **Hardware:** NVIDIA GPU with NVENC for hardware encoding
+
+**Tool Locations:**
+External tools (dovi_tool, hevc_hdr_editor, hdr10plus_tool) must be either:
+1. Available in system PATH (recommended)
+2. Located in `lib/` directory in project root or next to executable
