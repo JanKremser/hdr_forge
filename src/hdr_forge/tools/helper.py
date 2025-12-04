@@ -99,7 +99,7 @@ def _ffmpeg_progress_reader_thread(
                 # Exit on "progress=end"
                 if line == 'progress=end':
                     break
-    except Exception:
+    except Exception as e:
         # Silently ignore errors in reader thread to avoid crashing main process
         pass
     finally:
@@ -222,9 +222,8 @@ def run_ffmpeg_tool_pipeline(
     _stdout, stderr = tool_process.communicate()
 
     # Wait for progress thread to finish
-    if total_frames and duration:
-        if ffmpeg_process.stderr:
-            reader_thread.join(timeout=1.0)
+    if total_frames and duration and ffmpeg_process.stderr:
+        reader_thread.join(timeout=1.0)
     else:
         monitor_thread.join(timeout=1.0)
 

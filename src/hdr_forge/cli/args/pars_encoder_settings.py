@@ -6,7 +6,8 @@ from typing import Tuple
 
 from hdr_forge import __version__
 from hdr_forge.cli.cli_output import print_err, print_warn
-from hdr_forge.typedefs.encoder_typing import CropMode, CropSettings, EncoderOverride, GrainMode, HEVC_NVENC_Preset, HdrForgeEncodingHardwarePresets, HdrForgeEncodingPresetSettings, HdrForgeEncodingPresets, HdrSdrFormat, EncoderSettings, LogoRemovalAutoDetectMode, LogoRemovalMode, LogoRemovelSettings, NvencParams, NvencRcMode, SampleSettings, ScaleMode, UniversalEncoderParams, VideoCodec, VideoEncoderLibrary, Libx264Params, X264Tune, Libx265Params, X265Tune, x265_x264_Preset
+from hdr_forge.typedefs.codec_typing import HEVC_NVENC_Preset, VideoEncoderLibrary, x265_x264_Preset
+from hdr_forge.typedefs.encoder_typing import CropMode, CropSettings, EncoderOverride, GrainMode, HdrForgeEncodingHardwarePresets, HdrForgeEncodingPresetSettings, HdrForgeEncodingTuningPresets, HdrForgeSpeedPreset, HdrSdrFormat, EncoderSettings, LogoRemovalAutoDetectMode, LogoRemovalMode, LogoRemovelSettings, NvencParams, NvencRcMode, SampleSettings, ScaleMode, UniversalEncoderParams, VideoCodec, Libx264Params, X264Tune, Libx265Params, X265Tune
 from hdr_forge.typedefs.dolby_vision_typing import DolbyVisionProfileEncodingMode
 from hdr_forge.typedefs.video_typing import BT_2020_MASTER_DISPLAY, BT_709_MASTER_DISPLAY, DISPLAY_P3_MASTER_DISPLAY, ContentLightLevelMetadata, HdrMetadata, MasterDisplayMetadata
 
@@ -323,7 +324,7 @@ def _get_master_display_from_string(md_str: str | None) -> MasterDisplayMetadata
         lum_part = parts[1].rstrip(')')
         max_lum, min_lum = map(float, lum_part.split(','))
 
-        md_values = parts[0]
+        md_values: str = parts[0]
         r_x = float(md_values.split('R(')[1].split(',')[0]) / 50000
         r_y = float(md_values.split('R(')[1].split(')')[0].split(',')[1]) / 50000
         g_x = float(md_values.split('G(')[1].split(',')[0]) / 50000
@@ -527,7 +528,7 @@ def _get_universal_params_from_args(args) -> UniversalEncoderParams:
     speed = None
     if speed_str is not None:
         try:
-            speed = x265_x264_Preset(speed_str)
+            speed = HdrForgeSpeedPreset(speed_str)
         except ValueError:
             print_err(msg=f"Invalid speed value '{speed_str}'")
             sys.exit(1)
@@ -596,13 +597,13 @@ def _get_hdr_forge_encoder_presets_from_args(args, encoder_override: EncoderOver
     Returns:
         HdrForgeEncodingPresetSettings object with preset and hardware preset
     """
-    preset: HdrForgeEncodingPresets
+    preset: HdrForgeEncodingTuningPresets
     hw_preset: HdrForgeEncodingHardwarePresets
     if args.preset is None or args.preset.lower() == 'auto':
-        preset = HdrForgeEncodingPresets.FILM
+        preset = HdrForgeEncodingTuningPresets.FILM
     else:
         try:
-            preset = HdrForgeEncodingPresets(args.preset)
+            preset = HdrForgeEncodingTuningPresets(args.preset)
         except ValueError:
             print_err(msg=f"Invalid preset value '{args.preset}'")
             sys.exit(1)

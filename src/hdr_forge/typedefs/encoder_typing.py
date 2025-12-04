@@ -4,6 +4,8 @@ from typing import Optional
 
 
 
+
+from hdr_forge.typedefs.codec_typing import HEVC_NVENC_Preset, HdrForgeSpeedPreset, x265_x264_Preset
 from hdr_forge.typedefs.dolby_vision_typing import DolbyVisionProfileEncodingMode
 from hdr_forge.typedefs.video_typing import HdrMetadata
 
@@ -48,16 +50,6 @@ class VideoCodec(Enum):
     H264 = "h264"
     COPY = "copy"
 
-
-class VideoEncoderLibrary(Enum):
-    """Video encoder library for FFmpeg."""
-    LIBX265 = "libx265"
-    LIBX264 = "libx264"
-    LIBSVTAV1 = "libsvtav1"
-    HEVC_NVENC = "hevc_nvenc"
-    H264_NVENC = "h264_nvenc"
-    COPY = "copy"
-
 class ScaleMode(Enum):
     """Scaling mode for video resizing after cropping."""
     ADAPTIVE = "adaptive"
@@ -94,26 +86,6 @@ class SampleSettings:
     enabled: bool = False
     start_time: Optional[float] = None  # in seconds
     end_time: Optional[float] = None    # in seconds
-
-class HEVC_NVENC_Preset(Enum):
-    DEFAULT = "default"
-    SLOW = "slow"
-    HQ = "hq"
-    LLHQ = "llhq"
-    LLHP = "llhp"
-
-class x265_x264_Preset(Enum):
-    ULTRAFAST = "ultrafast"
-    SUPERFAST = "superfast"
-    VERYFAST = "veryfast"
-    FASTER = "faster"
-    FAST = "fast"
-    MEDIUM = "medium"
-    MEDIUM_PLUS = "medium:plus"
-    SLOW = "slow"
-    SLOW_PLUS = "slow:plus"
-    SLOWER = "slower"
-    VERYSLOW = "veryslow"
 
 class X265Tune(Enum):
     ANIMATION = "animation"
@@ -154,7 +126,7 @@ class NvencParams:
 class UniversalEncoderParams:
     """Universal encoder parameters that work across all encoders."""
     quality: Optional[int] = None  # Maps to CRF/CQ depending on encoder
-    speed: Optional[x265_x264_Preset] = None  # Only for libx265/libx264, not NVENC
+    speed: Optional[HdrForgeSpeedPreset] = None  # Only for libx265/libx264, not NVENC
 
 class EncoderOverride(Enum):
     """Encoder override for manual encoder selection."""
@@ -165,7 +137,7 @@ class EncoderOverride(Enum):
     HEVC_NVENC = "hevc_nvenc"
     H264_NVENC = "h264_nvenc"
 
-class HdrForgeEncodingPresets(Enum):
+class HdrForgeEncodingTuningPresets(Enum):
     VIDEO = "video"
     FILM = "film"
     BANDING = "banding"
@@ -203,7 +175,7 @@ class LogoRemovelSettings:
 
 @dataclass
 class HdrForgeEncodingPresetSettings:
-    preset: HdrForgeEncodingPresets = HdrForgeEncodingPresets.FILM
+    preset: HdrForgeEncodingTuningPresets = HdrForgeEncodingTuningPresets.FILM
     hardware_preset: HdrForgeEncodingHardwarePresets = HdrForgeEncodingHardwarePresets.CPU_BALANCED
 
 @dataclass

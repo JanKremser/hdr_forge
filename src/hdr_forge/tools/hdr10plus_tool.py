@@ -51,7 +51,6 @@ def verify_hdr10plus(input_path: Path) -> bool:
             str(input_path)
         ]
 
-        print()
         print_debug(build_cmd_array_to_str(tool_cmd))
 
         result = subprocess.run(
@@ -98,7 +97,6 @@ def extract_hdr10plus_metadata(input_path: Path, output_path: Path) -> Path:
             '-o', f"{str(output_path)}",
         ]
 
-        print()
         print_debug(build_cmd_array_to_str(tool_cmd))
 
         tool_process = subprocess.Popen(
@@ -170,7 +168,6 @@ def inject_hdr10plus_metadata(input_path: Path, hdr10plus_metadata_path: Path, o
             '-o', str(output_path),
         ]
 
-        print()
         print_debug(build_cmd_array_to_str(tool_cmd))
 
         tool_process = subprocess.Popen(

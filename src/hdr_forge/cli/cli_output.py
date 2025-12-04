@@ -335,14 +335,6 @@ def print_progress_info_minimal(process_name: str, first_update: bool, current_f
     # Create progress bar
     progress_bar: str = create_progress_bar_with_percent(percent=percent)
 
-    # Calculate time_seconds if not provided
-    time_seconds = calculate_time_seconds(
-        current_frame=current_frame,
-        total_frames=total_frames,
-        duration_seconds=duration_seconds,
-        time_seconds=time_seconds,
-    )
-
     process_time_str: str = format_time(seconds=process_time_seconds)
 
     bar_len = 70
@@ -351,7 +343,7 @@ def print_progress_info_minimal(process_name: str, first_update: bool, current_f
     info_line: str = f"""
 {color_str(f"-- {process_name} " + ("-" * bar_len), ANSI_GREEN)}
 Frame         : {color_str(current_frame, ANSI_GREEN)}/{total_frames}
-ETA           : {color_str(eta, ANSI_GREEN)}
+ETA           : {color_str(eta, color=ANSI_GREEN)}
 Process Time  : {color_str(process_time_str, ANSI_GREEN)}
 {progress_bar}
 {color_str("-" * 70, ANSI_GREEN)}"""

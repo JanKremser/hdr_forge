@@ -18,7 +18,8 @@ from hdr_forge.ffmpeg.video_codec.libx264 import Libx264Codec
 from hdr_forge.ffmpeg.video_codec.libx265 import Libx265Codec
 from hdr_forge.ffmpeg.video_codec.libsvtav1 import LibSvtAV1Codec
 from hdr_forge.tools import dovi_tool
-from hdr_forge.typedefs.encoder_typing import EncoderOverride, HdrSdrFormat, EncoderSettings, SampleSettings, VideoCodec, VideoEncoderLibrary
+from hdr_forge.typedefs.codec_typing import VideoEncoderLibrary
+from hdr_forge.typedefs.encoder_typing import EncoderOverride, HdrSdrFormat, EncoderSettings, SampleSettings, VideoCodec
 from hdr_forge.typedefs.dolby_vision_typing import DolbyVisionEnhancementLayer, DolbyVisionProfile, DolbyVisionProfileEncodingMode
 from hdr_forge.video import Video
 

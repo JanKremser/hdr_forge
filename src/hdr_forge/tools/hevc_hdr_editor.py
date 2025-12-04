@@ -54,7 +54,6 @@ def inject_hdr_metadata(
             '-o', str(output_hevc)
         ]
 
-        print()
         # Execute pipeline using helper function
         returncode, stderr = run_ffmpeg_tool_pipeline(
             input_path=input_path,

@@ -1,8 +1,9 @@
 from typing import Optional, Tuple
-from hdr_forge.ffmpeg.video_codec.service.presets import Hdr_Forge_AV1_Preset, Hdr_Forge_X265_X264_Preset
+from hdr_forge.ffmpeg.video_codec.service.presets import Hdr_Forge_AV1_Preset
 from hdr_forge.ffmpeg.video_codec.video_codec_base import VideoCodecBase
-from hdr_forge.typedefs.encoder_typing import EncoderSettings, HdrForgeEncodingPresets, HdrSdrFormat, VideoEncoderLibrary, Libx265Params, X265Tune, x265_x264_Preset
+from hdr_forge.typedefs.encoder_typing import EncoderSettings, HdrForgeSpeedPreset, HdrSdrFormat
 from hdr_forge.typedefs.video_typing import ContentLightLevelMetadata, HdrMetadata, MasterDisplayMetadata, build_master_display_string, build_max_cll_string
+from hdr_forge.typedefs.codec_typing import VideoEncoderLibrary
 from hdr_forge.video import Video
 
 class LibSvtAV1Codec(VideoCodecBase):
@@ -197,8 +198,9 @@ class LibSvtAV1Codec(VideoCodecBase):
         #     return universal_params.speed
 
         # Priority 3: Auto-detection from hw_preset
-        preset = hw_preset.preset
-        return preset
+        preset: HdrForgeSpeedPreset = hw_preset.preset
+
+        return 6
 
     def _get_auto_crf(self, hw_preset: Hdr_Forge_AV1_Preset) -> int:
         """Calculate optimal CRF value based on parameter priority.

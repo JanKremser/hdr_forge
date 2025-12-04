@@ -9,7 +9,8 @@ from hdr_forge.analyze.detect_logo import LogoDetector
 from hdr_forge.analyze.grain_score import GrainAnalyzer
 from hdr_forge.cli.cli_output import print_err, print_warn
 from hdr_forge.ffmpeg.video_codec.service.presets import calc_hw_prest_params
-from hdr_forge.typedefs.encoder_typing import EncoderSettings, HdrSdrFormat, ScaleMode, VideoEncoderLibrary
+from hdr_forge.typedefs.codec_typing import HDR_FORGE_SPEED_PRESET, CodecPreset, VideoEncoderLibrary
+from hdr_forge.typedefs.encoder_typing import EncoderSettings, HdrForgeSpeedPreset, HdrSdrFormat, ScaleMode, UniversalEncoderParams
 from hdr_forge.typedefs.video_typing import HdrMetadata
 from hdr_forge.video import Video
 
@@ -155,6 +156,35 @@ class VideoCodecBase(ABC):
 
         # keep original bit depth for SDR source videos
         return self._video.get_bit_depth()
+
+    @abstractmethod
+    def _get_auto_preset(self, calc_preset: HdrForgeSpeedPreset) -> CodecPreset:
+        """Select optimal encoding preset based on parameter priority.
+
+        Priority:
+            1. universal_params.speed (from --speed)
+            2. calc_preset (auto-detection)
+
+        Returns:
+            CodecPreset value
+        """
+        # Priority 2: universal_params from --speed
+        universal_params: UniversalEncoderParams = self._encoder_settings.universal_params
+
+        speed_preset: list[CodecPreset] | None = None
+        if universal_params.speed is not None:
+            speed_preset = HDR_FORGE_SPEED_PRESET[universal_params.speed]
+
+        # Priority 3: Auto-detection from hw_preset
+        if speed_preset is None:
+            speed_preset = HDR_FORGE_SPEED_PRESET[calc_preset]
+
+        assert speed_preset is not None
+        for s_preset in speed_preset:
+            if self.lib in s_preset.codec_libs:
+                return s_preset
+
+        raise ValueError(f"No valid preset found for {self.lib.value} codec.")
 
     def get_name(self) -> str:
         return self.lib.value

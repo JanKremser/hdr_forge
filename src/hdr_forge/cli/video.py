@@ -62,9 +62,9 @@ def print_video_infos(video: Video) -> None:
     print(f"  Aspect Ratio: {color_str(aspect_ratio, color)}")
     print(f"  Frame Rate: {color_str(float("{:.3f}".format(video.get_fps())), color)}")
     print(f"  Interlaced: {color_str('Yes' if video.is_video_interlaced() else 'No', color)}")
-    print(f"  Color Primaries: {color_str(video.get_color_primaries("-"), color)}")
-    print(f"  Color Transfer: {color_str(video.get_color_transfer("-"), color)}")
-    print(f"  Color Space: {color_str(video.get_color_space("-"), color)}")
+    print(f"  Color Primaries: {color_str(video.get_color_primaries() or "-", color)}")
+    print(f"  Color Transfer: {color_str(video.get_color_transfer() or "-", color)}")
+    print(f"  Color Space: {color_str(video.get_color_space() or "-", color)}")
     print(f"  Color Range: {color_str(video.get_color_range() or '-', color)}")
     print(f"  Bit depth: {color_str(video.get_bit_depth(), color)}")
 

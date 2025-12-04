@@ -930,7 +930,7 @@ Total candidates: {len(results)}"""
             print_err(f"Error saving mask image: {e}")
             return False
 
-    def _find_valid_mask(self, detect_logos: List[LogoDetectResult], index: int = 0) -> MaskResult | None:
+    def _find_valid_mask(self, detect_logos: list[LogoDetectResult], index: int = 0) -> MaskResult | None:
         try:
             detect_logo: LogoDetectResult = detect_logos[index]
             mask_crop: MaskResult = self._create_mask_from_video(

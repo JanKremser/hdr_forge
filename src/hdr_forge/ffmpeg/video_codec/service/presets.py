@@ -1,28 +1,36 @@
 from dataclasses import dataclass
 from enum import Enum
 
-from hdr_forge.typedefs.encoder_typing import HdrForgeEncodingHardwarePresets, VideoEncoderLibrary, x265_x264_Preset
+from hdr_forge.typedefs.encoder_typing import HdrForgeEncodingHardwarePresets, HdrForgeSpeedPreset
+from hdr_forge.typedefs.codec_typing import VideoEncoderLibrary
 
 
 @dataclass
 class Hdr_Forge_X265_X264_Preset:
     crf: float
-    preset: str
+    preset: HdrForgeSpeedPreset
 
 @dataclass
 class Hdr_Forge_HEVC_H264_NVENC_Preset:
     cq: float
-    preset: str
+    preset: HdrForgeSpeedPreset
 
 @dataclass
 class Hdr_Forge_AV1_Preset:
     crf: float
-    preset: int
+    preset: HdrForgeSpeedPreset
 
-X265_X264_PRESET_SCALE: list[str] = ["ultrafast", "superfast", "veryfast", "faster", "fast", "medium", "slow", "slower", "veryslow"]
-X265_X264_PRESET_SCALE_NEW: list[str] = ["ultrafast", "superfast", "veryfast", "faster", "fast", "medium", "medium:plus", "slow", "slow:plus", "slower", "veryslow"]
-
-HEVC_NVENC_PRESET_SCALE: list[str] = ["default", "slow", "hq"] #, "llhq", "llhp"
+SPEED_PRESET_SCALE: list[str] = [
+    "ultrafast",
+    "superfast",
+    "veryfast",
+    "faster",
+    "fast",
+    "medium",
+    "slow",
+    "slower",
+    "veryslow",
+]
 
 class RESOLUTION_PRESETS(Enum):
     """Vordefinierte Auflösungen für die Skalierung."""
@@ -115,52 +123,52 @@ HW_PRESET: dict = {
         {
             "from_pixel": RESOLUTION_PRESETS.NONE.value,
             "to_pixel": RESOLUTION_PRESETS.HD.value,
-            VideoEncoderLibrary.HEVC_NVENC: {"from_CQ": 22, "to_CQ": 20, "preset": "slow"},
-            VideoEncoderLibrary.H264_NVENC: {"from_CQ": 20, "to_CQ": 18, "preset": "slow"},
+            VideoEncoderLibrary.HEVC_NVENC: {"from_CQ": 22, "to_CQ": 20, "from_preset": "slow", "to_preset": "slow"},
+            VideoEncoderLibrary.H264_NVENC: {"from_CQ": 20, "to_CQ": 18, "from_preset": "slow", "to_preset": "slow"},
         },
         {
             "from_pixel": RESOLUTION_PRESETS.HD.value + 1,
             "to_pixel": RESOLUTION_PRESETS.FHD.value,
-            VideoEncoderLibrary.HEVC_NVENC: {"from_CQ": 20, "to_CQ": 19, "preset": "slow"},
-            VideoEncoderLibrary.H264_NVENC: {"from_CQ": 18, "to_CQ": 17, "preset": "slow"},
+            VideoEncoderLibrary.HEVC_NVENC: {"from_CQ": 20, "to_CQ": 19, "from_preset": "slow", "to_preset": "slow"},
+            VideoEncoderLibrary.H264_NVENC: {"from_CQ": 18, "to_CQ": 17, "from_preset": "slow", "to_preset": "slow"},
         },
         {
             "from_pixel": RESOLUTION_PRESETS.FHD.value + 1,
             "to_pixel": RESOLUTION_PRESETS.UHD.value,
-            VideoEncoderLibrary.HEVC_NVENC: {"from_CQ": 19, "to_CQ": 15, "preset": "slow"},
-            VideoEncoderLibrary.H264_NVENC: {"from_CQ": 17, "to_CQ": 14, "preset": "slow"},
+            VideoEncoderLibrary.HEVC_NVENC: {"from_CQ": 19, "to_CQ": 15, "from_preset": "slow", "to_preset": "slow"},
+            VideoEncoderLibrary.H264_NVENC: {"from_CQ": 17, "to_CQ": 14, "from_preset": "slow", "to_preset": "slow"},
         },
         {
             "from_pixel": RESOLUTION_PRESETS.UHD.value + 1,
             "to_pixel": RESOLUTION_PRESETS.FUHD.value,
-            VideoEncoderLibrary.HEVC_NVENC: {"from_CQ": 15, "to_CQ": 13, "preset": "slow"},
-            VideoEncoderLibrary.H264_NVENC: {"from_CQ": 14, "to_CQ": 12, "preset": "slow"},
+            VideoEncoderLibrary.HEVC_NVENC: {"from_CQ": 15, "to_CQ": 13, "from_preset": "slow", "to_preset": "slow"},
+            VideoEncoderLibrary.H264_NVENC: {"from_CQ": 14, "to_CQ": 12, "from_preset": "slow", "to_preset": "slow"},
         },
     ],
     HdrForgeEncodingHardwarePresets.GPU_QUALITY: [
         {
             "from_pixel": RESOLUTION_PRESETS.NONE.value,
             "to_pixel": RESOLUTION_PRESETS.HD.value,
-            VideoEncoderLibrary.HEVC_NVENC: {"from_CQ": 22, "to_CQ": 20, "preset": "hq"},
-            VideoEncoderLibrary.H264_NVENC: {"from_CQ": 20, "to_CQ": 18, "preset": "hq"},
+            VideoEncoderLibrary.HEVC_NVENC: {"from_CQ": 22, "to_CQ": 20, "from_preset": "slow", "to_preset": "slow"},
+            VideoEncoderLibrary.H264_NVENC: {"from_CQ": 20, "to_CQ": 18, "from_preset": "slow", "to_preset": "slow"},
         },
         {
             "from_pixel": RESOLUTION_PRESETS.HD.value + 1,
             "to_pixel": RESOLUTION_PRESETS.FHD.value,
-            VideoEncoderLibrary.HEVC_NVENC: {"from_CQ": 20, "to_CQ": 19, "preset": "hq"},
-            VideoEncoderLibrary.H264_NVENC: {"from_CQ": 18, "to_CQ": 17, "preset": "hq"},
+            VideoEncoderLibrary.HEVC_NVENC: {"from_CQ": 20, "to_CQ": 19, "from_preset": "slow", "to_preset": "slow"},
+            VideoEncoderLibrary.H264_NVENC: {"from_CQ": 18, "to_CQ": 17, "from_preset": "slow", "to_preset": "slow"},
         },
         {
             "from_pixel": RESOLUTION_PRESETS.FHD.value + 1,
             "to_pixel": RESOLUTION_PRESETS.UHD.value,
-            VideoEncoderLibrary.HEVC_NVENC: {"from_CQ": 19, "to_CQ": 15, "preset": "hq"},
-            VideoEncoderLibrary.H264_NVENC: {"from_CQ": 17, "to_CQ": 14, "preset": "hq"},
+            VideoEncoderLibrary.HEVC_NVENC: {"from_CQ": 19, "to_CQ": 15, "from_preset": "slow", "to_preset": "slow"},
+            VideoEncoderLibrary.H264_NVENC: {"from_CQ": 17, "to_CQ": 14, "from_preset": "slow", "to_preset": "slow"},
         },
         {
             "from_pixel": RESOLUTION_PRESETS.UHD.value + 1,
             "to_pixel": RESOLUTION_PRESETS.FUHD.value,
-            VideoEncoderLibrary.HEVC_NVENC: {"from_CQ": 15, "to_CQ": 13, "preset": "hq"},
-            VideoEncoderLibrary.H264_NVENC: {"from_CQ": 14, "to_CQ": 12, "preset": "hq"},
+            VideoEncoderLibrary.HEVC_NVENC: {"from_CQ": 15, "to_CQ": 13, "from_preset": "slow", "to_preset": "slow"},
+            VideoEncoderLibrary.H264_NVENC: {"from_CQ": 14, "to_CQ": 12, "from_preset": "slow", "to_preset": "slow"},
         },
     ],
 }
@@ -176,17 +184,10 @@ def interpolate_preset(value, x1, x2, from_preset, to_preset):
     """Interpoliert das Preset basierend auf PRESET_SCALE."""
     if from_preset == to_preset:
         return from_preset
-    i1 = X265_X264_PRESET_SCALE.index(from_preset)
-    i2 = X265_X264_PRESET_SCALE.index(to_preset)
+    i1 = SPEED_PRESET_SCALE.index(from_preset)
+    i2 = SPEED_PRESET_SCALE.index(to_preset)
     val = interpolate(value, x1, x2, i1, i2)
-    return X265_X264_PRESET_SCALE[round(val)]
-
-def convert_preset_to_index(preset: x265_x264_Preset) -> int:
-    """Konvertiert ein Preset in seinen Indexwert."""
-    if preset.value in X265_X264_PRESET_SCALE_NEW:
-        return X265_X264_PRESET_SCALE_NEW.index(preset.value)
-    else:
-        raise ValueError(f"Unbekanntes Preset: {preset}")
+    return SPEED_PRESET_SCALE[round(val)]
 
 def calc_hw_prest_params(
     pixels,
@@ -213,7 +214,7 @@ def calc_hw_prest_params(
                     pixels, r["from_pixel"], r["to_pixel"],
                     r[lib]["from_preset"], r[lib]["to_preset"]
                 )
-                params["preset"] = preset
+                params["preset"] = HdrForgeSpeedPreset(preset)
 
             if lib == VideoEncoderLibrary.LIBSVTAV1:
                 from_crf = r[lib]["from_CRF"]
@@ -233,7 +234,7 @@ def calc_hw_prest_params(
                     r[lib]["from_preset"],
                     r[lib]["to_preset"]
                 ))
-                params["preset"] = preset
+                params["preset"] = HdrForgeSpeedPreset(preset)
 
             if lib in [VideoEncoderLibrary.HEVC_NVENC, VideoEncoderLibrary.H264_NVENC]:
                 from_cq = r[lib]["from_CQ"]
@@ -246,8 +247,11 @@ def calc_hw_prest_params(
                     to_cq
                 ), 2)
                 params["cq"] = cq
-
-                params["preset"] = r[lib]["preset"]
+                preset = interpolate_preset(
+                    pixels, r["from_pixel"], r["to_pixel"],
+                    r[lib]["from_preset"], r[lib]["to_preset"]
+                )
+                params["preset"] = HdrForgeSpeedPreset(preset)
 
 
             return params

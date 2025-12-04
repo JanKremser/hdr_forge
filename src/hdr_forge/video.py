@@ -212,37 +212,37 @@ class Video:
         """
         return self._get_video_stream().get('profile', None)
 
-    def get_pix_fmt(self, default: str | None = None) -> str | None:
+    def get_pix_fmt(self) -> str | None:
         """Get pixel format of the video.
 
         Returns:
             Pixel format string (e.g., 'yuv420p10le' for HDR)
         """
-        return self._get_video_stream().get('pix_fmt', default)
+        return self._get_video_stream().get('pix_fmt', None)
 
-    def get_color_primaries(self, default: str | None = None) -> str | None:
+    def get_color_primaries(self) -> str | None:
         """Get color primaries information.
 
         Returns:
             Color primaries string
         """
-        return self._get_video_stream().get('color_primaries', default)
+        return self._get_video_stream().get('color_primaries', None)
 
-    def get_color_space(self, default: str | None = None) -> str | None:
+    def get_color_space(self) -> str | None:
         """Get color space information.
 
         Returns:
             Color space string
         """
-        return self._get_video_stream().get('color_space', default)
+        return self._get_video_stream().get('color_space', None)
 
-    def get_color_transfer(self, default: str | None = None) -> str | None:
+    def get_color_transfer(self) -> str | None:
         """Get color transfer characteristics.
 
         Returns:
             Color transfer string
         """
-        return self._get_video_stream().get('color_transfer', default)
+        return self._get_video_stream().get('color_transfer', None)
 
     def get_color_range(self) -> str | None:
         """Get color range information.
