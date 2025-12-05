@@ -3,7 +3,7 @@ from hdr_forge.ffmpeg.video_codec.service.presets import Hdr_Forge_AV1_Preset
 from hdr_forge.ffmpeg.video_codec.video_codec_base import VideoCodecBase
 from hdr_forge.typedefs.encoder_typing import EncoderSettings, HdrForgeSpeedPreset, HdrSdrFormat
 from hdr_forge.typedefs.video_typing import ContentLightLevelMetadata, HdrMetadata, MasterDisplayMetadata, build_master_display_string, build_max_cll_string
-from hdr_forge.typedefs.codec_typing import VideoEncoderLibrary
+from hdr_forge.typedefs.codec_typing import PIXEL_FORMAT_YUV420_10_BIT, PIXEL_FORMAT_YUV420_8_BIT, VideoEncoderLibrary
 from hdr_forge.video import Video
 
 class LibSvtAV1Codec(VideoCodecBase):
@@ -48,9 +48,6 @@ class LibSvtAV1Codec(VideoCodecBase):
         'colormatrix=bt709',
     ]
 
-    PIXEL_FORMAT_10BIT = 'yuv420p10le'
-    PIXEL_FORMAT_8BIT = 'yuv420p'
-
     def __init__(self, encoder_settings: EncoderSettings, video: Video, scale: Tuple[int, int]):
         super().__init__(
             lib=VideoEncoderLibrary.LIBSVTAV1,
@@ -68,8 +65,11 @@ class LibSvtAV1Codec(VideoCodecBase):
         output_options.update({
             "preset": str(self._preset), # kleiner gleich langsamer (0-13)
             "crf": str(self._crf), # kann um 7 größer sein las x265
-            "pix_fmt": self.get_pix_format_for_encoding(),
         })
+
+        pix_fmt: str | None = self.get_pix_format_for_encoding()
+        if pix_fmt is not None:
+            output_options["pix_fmt"] = pix_fmt
 
         # encoding_hdr_sdr_format: HdrSdrFormat = self.get_encoding_hdr_sdr_format()
 
@@ -80,23 +80,14 @@ class LibSvtAV1Codec(VideoCodecBase):
         #     x265_params: list[str] = self._build_sdr_x265_params()
         #     output_options['x265-params'] = ':'.join(x265_params)
 
-        metadata: list[str] = [
-            'hdr_forge_encoder_preset=' + str(self._preset),
-            'hdr_forge_encoder_crf=' + str(self._crf),
-        ]
-        if 'metadata' in output_options:
-            output_options['metadata'].extend(metadata)
-        else:
-            output_options['metadata'] = metadata
-
         return output_options
 
-    def get_pix_format_for_encoding(self) -> str:
+    def get_pix_format_for_encoding(self) -> str | None:
         bit_depth = self.get_bit_depth_for_encoding()
         if bit_depth == 10:
-            return self.PIXEL_FORMAT_10BIT
+            return PIXEL_FORMAT_YUV420_10_BIT
         elif bit_depth == 8:
-            return self.PIXEL_FORMAT_8BIT
+            return PIXEL_FORMAT_YUV420_8_BIT
         return super().get_pix_format_for_encoding()
 
     def get_bit_depth_for_encoding(self) -> int:

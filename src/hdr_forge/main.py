@@ -89,7 +89,9 @@ def convert_video(
     video_file: Path,
     target_file: Path,
     settings: EncoderSettings,
-) -> bool:
+    count_video_file: int | None = None,
+    total_video_files: int | None = None,
+) -> bool | None:
     """Convert SDR or HDR10 video using ffmpeg with libx265.
 
     Args:
@@ -112,6 +114,11 @@ def convert_video(
         )
         print_encoding_params(encoder=encoder)
 
+        if count_video_file is not None and total_video_files is not None and not (
+            total_video_files == 1 and count_video_file == 1
+        ):
+            print(f"Processing file {count_video_file} of {total_video_files}...")
+
         success: bool = encoder.convert()
 
         if success:
@@ -122,7 +129,7 @@ def convert_video(
     except KeyboardInterrupt:
         print("\n" * 3)
         print_warn("Encoding cancelled by user.")
-        return False
+        return None
     except Exception as e:
         print(f"Error processing {video.get_filepath().name}: {e}")
         return False
@@ -163,24 +170,32 @@ def process_convert_command(args) -> int:
     # Process each video file
     success_count = 0
     fail_count = 0
+    count_video_file = 0
+    len_video_files: int = len(video_files)
 
     for video_file in video_files:
+        count_video_file += 1
         # Determine output file
         out_file: Path = determine_output_file(video_file=video_file, output_path=output_path, is_batch=is_batch)
         out_file.parent.mkdir(parents=True, exist_ok=True)
 
-        success: bool = convert_video(
+        success: bool | None = convert_video(
             video_file=video_file,
             target_file=out_file,
             settings=settings,
+            count_video_file=count_video_file,
+            total_video_files=len_video_files,
         )
+        if success is None:
+            # Conversion was cancelled
+            break
 
         if success:
             success_count += 1
         else:
             fail_count += 1
 
-    print_conversion_summary(success_count, fail_count)
+    print_conversion_summary(success_count=success_count, fail_count=fail_count)
 
     return 0 if fail_count == 0 else 1
 

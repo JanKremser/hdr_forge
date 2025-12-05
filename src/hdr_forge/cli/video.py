@@ -66,6 +66,7 @@ def print_video_infos(video: Video) -> None:
     print(f"  Color Transfer: {color_str(video.get_color_transfer() or "-", color)}")
     print(f"  Color Space: {color_str(video.get_color_space() or "-", color)}")
     print(f"  Color Range: {color_str(video.get_color_range() or '-', color)}")
+    print(f"  PIX Format: {color_str(video.get_pix_fmt() or '-', color)}")
     print(f"  Bit depth: {color_str(video.get_bit_depth(), color)}")
 
     hdr_formats_str: str = ', '.join([fmt.value.upper() for fmt in video.get_hdr_sdr_format()])

@@ -1,6 +1,9 @@
 from dataclasses import dataclass
 from enum import Enum
 
+PIXEL_FORMAT_YUV420_10_BIT = 'yuv420p10le'
+PIXEL_FORMAT_YUV420_8_BIT = 'yuv420p'
+
 class HdrForgeSpeedPreset(Enum):
     ULTRAFAST = "ultrafast"
     SUPERFAST = "superfast"

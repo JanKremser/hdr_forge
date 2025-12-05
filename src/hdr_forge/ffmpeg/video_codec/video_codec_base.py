@@ -141,8 +141,8 @@ class VideoCodecBase(ABC):
         pass
 
     @abstractmethod
-    def get_pix_format_for_encoding(self) -> str:
-        return self._video.get_pix_fmt(default="yuv420p") or "yuv420p"
+    def get_pix_format_for_encoding(self) -> str | None:
+        return self._video.get_pix_fmt()
 
     @abstractmethod
     def get_bit_depth_for_encoding(self) -> int:

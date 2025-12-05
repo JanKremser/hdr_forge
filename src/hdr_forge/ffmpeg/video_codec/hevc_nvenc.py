@@ -3,7 +3,7 @@ from hdr_forge.cli.cli_output import print_warn
 from hdr_forge.ffmpeg.video_codec.service.presets import Hdr_Forge_HEVC_H264_NVENC_Preset
 from hdr_forge.ffmpeg.video_codec.video_codec_base import VideoCodecBase
 from hdr_forge.typedefs.encoder_typing import EncoderSettings, HdrForgeEncodingTuningPresets, HdrForgeSpeedPreset, HdrSdrFormat, NvencParams, NvencRcMode
-from hdr_forge.typedefs.codec_typing import CodecPreset, VideoEncoderLibrary
+from hdr_forge.typedefs.codec_typing import PIXEL_FORMAT_YUV420_8_BIT, CodecPreset, VideoEncoderLibrary
 from hdr_forge.typedefs.video_typing import ContentLightLevelMetadata, HdrMetadata, MasterDisplayMetadata, build_master_display_string, build_max_cll_string
 from hdr_forge.video import Video
 
@@ -17,7 +17,6 @@ class HevcNvencCodec(VideoCodecBase):
     ]
 
     PIXEL_FORMAT_10BIT = 'p010le' # 'yuv420p10le'
-    PIXEL_FORMAT_8BIT = 'yuv420p'
 
     HDR_PROFILE = 'main10'
     SDR_PROFILE = 'main'
@@ -42,8 +41,11 @@ class HevcNvencCodec(VideoCodecBase):
             "rc": self._nvenc_rc.value,
             "preset": self._preset.codec_preset,
             "cq": str(self._cq),
-            "pix_fmt": self.get_pix_format_for_encoding(),
         })
+
+        pix_fmt: str | None = self.get_pix_format_for_encoding()
+        if pix_fmt is not None:
+            output_options["pix_fmt"] = pix_fmt
 
         encoding_hdr_sdr_format: HdrSdrFormat = self.get_encoding_hdr_sdr_format()
 
@@ -55,28 +57,18 @@ class HevcNvencCodec(VideoCodecBase):
             if self._video.is_hdr_video():
                 print_warn(msg="HEVC_NVENC-SDR encoding does not support HDR metadata removal;")
 
-        metadata: list[str] = [
-            'hdr_forge_encoder_preset=' + self._preset.codec_preset,
-            'hdr_forge_encoder_cq=' + str(self._cq),
-            'hdr_forge_encoder_rc=' + self._nvenc_rc.value,
-        ]
-        if 'metadata' in output_options:
-            output_options['metadata'].extend(metadata)
-        else:
-            output_options['metadata'] = metadata
-
         ffmpeg_root_params = self._preset.ffmpeg_params.get('root', {})
         if ffmpeg_root_params and isinstance(ffmpeg_root_params, dict):
             output_options.update(ffmpeg_root_params)
 
         return output_options
 
-    def get_pix_format_for_encoding(self) -> str:
+    def get_pix_format_for_encoding(self) -> str | None:
         bit_depth = self.get_bit_depth_for_encoding()
         if bit_depth == 10:
             return self.PIXEL_FORMAT_10BIT
         elif bit_depth == 8:
-            return self.PIXEL_FORMAT_8BIT
+            return PIXEL_FORMAT_YUV420_8_BIT
         return super().get_pix_format_for_encoding()
 
     def get_bit_depth_for_encoding(self) -> int:

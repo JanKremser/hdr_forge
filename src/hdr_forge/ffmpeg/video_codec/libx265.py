@@ -3,7 +3,7 @@ from hdr_forge.ffmpeg.video_codec.service.presets import Hdr_Forge_X265_X264_Pre
 from hdr_forge.ffmpeg.video_codec.video_codec_base import VideoCodecBase
 from hdr_forge.typedefs.encoder_typing import EncoderSettings, HdrForgeEncodingTuningPresets, HdrForgeSpeedPreset, HdrSdrFormat, Libx265Params, X265Tune
 from hdr_forge.typedefs.video_typing import ContentLightLevelMetadata, HdrMetadata, MasterDisplayMetadata, build_master_display_string, build_max_cll_string
-from hdr_forge.typedefs.codec_typing import BT_2020_FLAGS, BT_709_FLAGS, CodecPreset, VideoEncoderLibrary
+from hdr_forge.typedefs.codec_typing import BT_2020_FLAGS, BT_709_FLAGS, PIXEL_FORMAT_YUV420_10_BIT, PIXEL_FORMAT_YUV420_8_BIT, CodecPreset, VideoEncoderLibrary
 from hdr_forge.video import Video
 
 class Libx265Codec(VideoCodecBase):
@@ -45,21 +45,18 @@ class Libx265Codec(VideoCodecBase):
 
     HDR_X265_PARAMS: list[str] = [
         'profile=main10',
-        'hdr-opt=0',
-        'hdr10=0',
-        'no-hdr10-opt=1',
     ]
 
     # SDR x265 parameters
     SDR_X265_PARAMS: list[str] = [
         'profile=main',
+    ]
+
+    REMOVE_HDR_FLAGS: list[str] = [
         'hdr-opt=0',
         'hdr10=0',
         'no-hdr10-opt=1',
     ]
-
-    PIXEL_FORMAT_10BIT = 'yuv420p10le'
-    PIXEL_FORMAT_8BIT = 'yuv420p'
 
     def __init__(self, encoder_settings: EncoderSettings, video: Video, scale: Tuple[int, int]):
         super().__init__(
@@ -80,36 +77,30 @@ class Libx265Codec(VideoCodecBase):
         output_options.update({
             "preset": self._preset.codec_preset,
             "crf": str(self._crf),
-            "pix_fmt": self.get_pix_format_for_encoding(),
         })
+
+        pix_fmt: str | None = self.get_pix_format_for_encoding()
+        if pix_fmt is not None:
+            output_options["pix_fmt"] = pix_fmt
 
         if self._tune is not None:
             output_options['tune'] = self._tune.value
 
         output_options['x265-params'] = self._build_x265_params()
 
-        metadata: list[str] = [
-            'hdr_forge_encoder_preset=' + self._preset.codec_preset,
-            'hdr_forge_encoder_crf=' + str(self._crf),
-        ]
-        if 'metadata' in output_options:
-            output_options['metadata'].extend(metadata)
-        else:
-            output_options['metadata'] = metadata
-
         return output_options
 
-    def get_pix_format_for_encoding(self) -> str:
+    def get_pix_format_for_encoding(self) -> str | None:
         bit_depth = self.get_bit_depth_for_encoding()
 
         hdr_forge_preset: HdrForgeEncodingTuningPresets = self._encoder_settings.hdr_forge_encoding_preset.preset
         if hdr_forge_preset == HdrForgeEncodingTuningPresets.BANDING:
-            return self.PIXEL_FORMAT_10BIT  # always use 10bit for banding reduction
+            return PIXEL_FORMAT_YUV420_10_BIT  # always use 10bit for banding reduction
 
         if bit_depth == 10:
-            return self.PIXEL_FORMAT_10BIT
+            return PIXEL_FORMAT_YUV420_10_BIT
         elif bit_depth == 8:
-            return self.PIXEL_FORMAT_8BIT
+            return PIXEL_FORMAT_YUV420_8_BIT
         return super().get_pix_format_for_encoding()
 
     def get_bit_depth_for_encoding(self) -> int:
@@ -305,6 +296,7 @@ class Libx265Codec(VideoCodecBase):
             params.extend(self.HDR_X265_PARAMS.copy())
 
             # remove HDR10 metadata if present
+            params.extend(self.REMOVE_HDR_FLAGS.copy())
             params.append('master-display=G(0,0)B(0,0)R(0,0)WP(0,0)L(0,0)')
             params.append('max-cll=0,0')
             return params
@@ -333,6 +325,7 @@ class Libx265Codec(VideoCodecBase):
 
         if self._video.is_hdr_video():
             # remove HDR metadata if present
+            params.extend(self.REMOVE_HDR_FLAGS.copy())
             params.append('master-display=G(0,0)B(0,0)R(0,0)WP(0,0)L(0,0)')
             params.append('max-cll=0,0')
 

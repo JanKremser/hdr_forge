@@ -3,7 +3,7 @@ from hdr_forge.cli.cli_output import print_warn
 from hdr_forge.ffmpeg.video_codec.service.presets import Hdr_Forge_HEVC_H264_NVENC_Preset
 from hdr_forge.ffmpeg.video_codec.video_codec_base import VideoCodecBase
 from hdr_forge.typedefs.encoder_typing import EncoderSettings, HdrForgeEncodingTuningPresets, HdrForgeSpeedPreset, HdrSdrFormat, NvencParams, NvencRcMode
-from hdr_forge.typedefs.codec_typing import CodecPreset, VideoEncoderLibrary
+from hdr_forge.typedefs.codec_typing import PIXEL_FORMAT_YUV420_8_BIT, CodecPreset, VideoEncoderLibrary
 from hdr_forge.typedefs.video_typing import HdrMetadata
 from hdr_forge.video import Video
 
@@ -12,8 +12,6 @@ class H264NvencCodec(VideoCodecBase):
     HDR_SDR_SUPPORT: list[HdrSdrFormat] = [
         HdrSdrFormat.SDR,
     ]
-
-    PIXEL_FORMAT_8BIT = 'yuv420p'
 
     SDR_PROFILE = 'high'
 
@@ -36,23 +34,16 @@ class H264NvencCodec(VideoCodecBase):
         output_options.update({
             "rc": self._nvenc_rc.value,
             "profile:v": self.get_pix_format_for_encoding(),
-            "pix_fmt": self.PIXEL_FORMAT_8BIT,
             "preset": self._preset.codec_preset,
             "cq": str(self._cq)
         })
 
+        pix_fmt: str | None = self.get_pix_format_for_encoding()
+        if pix_fmt is not None:
+            output_options["pix_fmt"] = pix_fmt
+
         if self._video.is_hdr_video():
             print_warn("H264_NVENC-SDR encoding does not support HDR metadata removal;")
-
-        metadata: list[str] = [
-            'hdr_forge_encoder_preset=' + self._preset.codec_preset,
-            'hdr_forge_encoder_cq=' + str(self._cq),
-            'hdr_forge_encoder_rc=' + self._nvenc_rc.value,
-        ]
-        if 'metadata' in output_options:
-            output_options['metadata'].extend(metadata)
-        else:
-            output_options['metadata'] = metadata
 
         ffmpeg_root_params = self._preset.ffmpeg_params.get('root', {})
         if ffmpeg_root_params and isinstance(ffmpeg_root_params, dict):
@@ -61,7 +52,7 @@ class H264NvencCodec(VideoCodecBase):
         return output_options
 
     def get_pix_format_for_encoding(self) -> str:
-        return self.PIXEL_FORMAT_8BIT
+        return PIXEL_FORMAT_YUV420_8_BIT
 
     def get_bit_depth_for_encoding(self) -> int:
         return 8

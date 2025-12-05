@@ -3,7 +3,7 @@ from hdr_forge.ffmpeg.video_codec.service.presets import Hdr_Forge_X265_X264_Pre
 from hdr_forge.ffmpeg.video_codec.video_codec_base import VideoCodecBase
 from hdr_forge.typedefs.encoder_typing import EncoderSettings, HdrForgeEncodingTuningPresets, HdrForgeSpeedPreset, HdrSdrFormat, Libx264Params, X264Tune
 from hdr_forge.typedefs.video_typing import HdrMetadata
-from hdr_forge.typedefs.codec_typing import BT_709_FLAGS, CodecPreset, VideoEncoderLibrary
+from hdr_forge.typedefs.codec_typing import BT_709_FLAGS, PIXEL_FORMAT_YUV420_10_BIT, PIXEL_FORMAT_YUV420_8_BIT, CodecPreset, VideoEncoderLibrary
 from hdr_forge.video import Video
 
 class Libx264Codec(VideoCodecBase):
@@ -11,9 +11,6 @@ class Libx264Codec(VideoCodecBase):
     HDR_SDR_SUPPORT: list[HdrSdrFormat] = [
         HdrSdrFormat.SDR,
     ]
-
-    PIXEL_FORMAT_10BIT = 'yuv420p10le'
-    PIXEL_FORMAT_8BIT = 'yuv420p'
 
     SDR_PROFILE = 'high'
 
@@ -34,24 +31,18 @@ class Libx264Codec(VideoCodecBase):
         output_options: dict = super().get_ffmpeg_params(exist_params=exist_params)
         output_options.update({
             "profile:v": self.SDR_PROFILE,
-            "pix_fmt": self.get_pix_format_for_encoding(),
             "preset": self._preset.codec_preset,
             "crf": str(self._crf),
         })
+
+        pix_fmt: str | None = self.get_pix_format_for_encoding()
+        if pix_fmt is not None:
+            output_options["pix_fmt"] = pix_fmt
 
         if self._tune is not None:
             output_options['tune'] = self._tune.value
 
         output_options['x264-params'] = self._build_x264_params()
-
-        metadata: list[str] = [
-            'hdr_forge_encoder_preset=' + self._preset.codec_preset,
-            'hdr_forge_encoder_crf=' + str(self._crf),
-        ]
-        if 'metadata' in output_options:
-            output_options['metadata'].extend(metadata)
-        else:
-            output_options['metadata'] = metadata
 
         return output_options
 
@@ -179,12 +170,12 @@ class Libx264Codec(VideoCodecBase):
         x264_params_str: str = ':'.join(params)
         return x264_params_str
 
-    def get_pix_format_for_encoding(self) -> str:
+    def get_pix_format_for_encoding(self) -> str | None:
         bit_depth = self.get_bit_depth_for_encoding()
         if bit_depth == 10:
-            return self.PIXEL_FORMAT_10BIT
+            return PIXEL_FORMAT_YUV420_10_BIT
         elif bit_depth == 8:
-            return self.PIXEL_FORMAT_8BIT
+            return PIXEL_FORMAT_YUV420_8_BIT
         return super().get_pix_format_for_encoding()
 
     def get_bit_depth_for_encoding(self) -> int:
