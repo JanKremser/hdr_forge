@@ -6,7 +6,7 @@ from pathlib import Path
 
 from hdr_forge.analyze.detect_logo import LogoDetector, MaskResult
 from hdr_forge.cli.args import pars_args, pars_encoder_settings
-from hdr_forge.cli.cli_output import print_conversion_summary, print_debug, print_err, print_warn
+from hdr_forge.cli.cli_output import create_progress_bar, print_conversion_summary, print_debug, print_err, print_warn
 from hdr_forge.cli.detect_logo import print_mask_infos
 from hdr_forge.cli.encoder import print_encoding_params
 from hdr_forge.cli.video import print_video_infos
@@ -117,7 +117,13 @@ def convert_video(
         if count_video_file is not None and total_video_files is not None and not (
             total_video_files == 1 and count_video_file == 1
         ):
-            print(f"Processing file {count_video_file} of {total_video_files}...")
+            procent: float = (count_video_file / total_video_files) * 100
+            bar = create_progress_bar(
+                percent=procent,
+                text=f"Processing file {count_video_file} of {total_video_files}..."
+            )
+            print(bar)
+            print()
 
         success: bool = encoder.convert()
 
