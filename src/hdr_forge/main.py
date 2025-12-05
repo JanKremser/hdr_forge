@@ -266,7 +266,6 @@ def process_extract_metadata_command(args) -> int:
                 input_path=video.get_filepath(),
                 output_rpu=rpu_file_path,
                 total_frames=video.get_total_frames(),
-                duration=video.get_duration_seconds(),
             )
             dv_info: dovi_tool.DolbyVisionRpuInfo = dovi_tool.get_rpu_info(
                 rpu_path=rpu_file_path,
@@ -277,7 +276,6 @@ def process_extract_metadata_command(args) -> int:
                     input_path=video.get_filepath(),
                     output_el=el_file_path,
                     total_frames=video.get_total_frames(),
-                    duration=video.get_duration_seconds(),
                 )
     except Exception as e:
         print_err(f"Error processing {input_path.name}: {e}")

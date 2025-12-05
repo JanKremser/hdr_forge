@@ -50,7 +50,6 @@ class Video:
                 output_rpu=temp_dir / "RPU.rpu",
                 dv_profile_source=self.get_dolby_vision_profile(),
                 total_frames=self.get_total_frames(),
-                duration=self.get_duration_seconds(),
                 use_cache=False,
             )
             self._dolby_vision_rpu_info = dovi_tool.get_rpu_info(

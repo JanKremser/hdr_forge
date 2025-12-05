@@ -129,7 +129,6 @@ def run_ffmpeg_tool_pipeline(
     tool_cmd: list[str],
     process_name: str,
     total_frames: Optional[int] = None,
-    duration: Optional[float] = None
 ) -> tuple[int, bytes]:
     """Execute FFmpeg→Tool pipeline with optional progress tracking.
 
@@ -144,7 +143,6 @@ def run_ffmpeg_tool_pipeline(
         tool_cmd: Complete tool command list (starting with tool executable)
         process_name: Display name for progress tracking (e.g., "Extracting RPU metadata:")
         total_frames: Total number of frames for progress tracking (optional)
-        duration: Video duration in seconds for progress tracking (optional)
 
     Returns:
         Tuple of (returncode, stderr_bytes) from tool process
@@ -161,8 +159,8 @@ def run_ffmpeg_tool_pipeline(
         '-f', 'hevc',
     ]
 
-    # Add progress reporting if we have frame/duration info
-    if total_frames and duration:
+    # Add progress reporting if we have frame info
+    if total_frames:
         ffmpeg_cmd.extend(['-progress', 'pipe:2'])
 
     ffmpeg_cmd.append('-')
@@ -171,7 +169,7 @@ def run_ffmpeg_tool_pipeline(
 
     # Create pipeline: ffmpeg | tool
     # FFmpeg stderr is used for progress if available, otherwise DEVNULL
-    ffmpeg_stderr = subprocess.PIPE if (total_frames and duration) else subprocess.DEVNULL
+    ffmpeg_stderr = subprocess.PIPE if total_frames else subprocess.DEVNULL
 
     ffmpeg_process = subprocess.Popen(
         ffmpeg_cmd,
@@ -192,12 +190,11 @@ def run_ffmpeg_tool_pipeline(
     if ffmpeg_process.stdout:
         ffmpeg_process.stdout.close()
 
-    # Start progress tracking if we have frame/duration info
-    if total_frames and duration and ffmpeg_process.stderr:
+    # Start progress tracking if we have frame info
+    if total_frames and ffmpeg_process.stderr:
         process_start_time = time.time()
         progress_callback = create_ffmpeg_minimal_progress_handler(
             total_frames=total_frames,
-            duration=duration,
             process_start_time=process_start_time,
             process_name=process_name
         )
@@ -222,7 +219,7 @@ def run_ffmpeg_tool_pipeline(
     _stdout, stderr = tool_process.communicate()
 
     # Wait for progress thread to finish
-    if total_frames and duration and ffmpeg_process.stderr:
+    if total_frames and ffmpeg_process.stderr:
         reader_thread.join(timeout=1.0)
     else:
         monitor_thread.join(timeout=1.0)

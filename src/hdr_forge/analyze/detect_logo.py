@@ -632,6 +632,7 @@ Total candidates: {len(results)}"""
                 total_frames=total_frames,
                 process_start_time=process_start_time,
                 video_fps=self._video.get_fps(),
+                process_name="Creating crop video:",
             )
 
         output_options: dict = {
@@ -664,6 +665,7 @@ Total candidates: {len(results)}"""
                 total_frames=total_frames,
                 process_start_time=process_start_time,
                 video_fps=self._video.get_fps(),
+                process_name="Creating crop+delogo video:",
             )
 
         mask_info: dict | None = self._get_mask_info(mask_result.mask)
@@ -705,6 +707,7 @@ Total candidates: {len(results)}"""
                 total_frames=total_frames,
                 process_start_time=process_start_time,
                 video_fps=self._video.get_fps(),
+                process_name="Creating crop video with mask delogo:",
             )
 
         output_options: dict = {

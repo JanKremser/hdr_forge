@@ -583,6 +583,10 @@ def _validate_hw_preset_with_encoder(hw_preset_str: str, encoder_override: Encod
         # Prefix is valid or encoder is AUTO
         return hw_preset_str
 
+    if hw_preset_str in ['gpu', 'cpu']:
+        # Only prefix provided, default to balanced
+        return f"{hw_preset_str}:balanced"
+
     # Prefix-free preset - add appropriate prefix based on encoder
     prefix = 'gpu' if is_gpu_encoder else 'cpu'
     return f"{prefix}:{hw_preset_str}"

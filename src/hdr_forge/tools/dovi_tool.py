@@ -35,7 +35,6 @@ def extract_base_layer(
     input_path: Path,
     output_hevc: Optional[Path] = None,
     total_frames: Optional[int] = None,
-    duration: Optional[float] = None
 ) -> Path:
     """Extract Dolby Vision base layer (HEVC without RPU).
 
@@ -44,7 +43,6 @@ def extract_base_layer(
         output_hevc: Optional path for HEVC output file. If None, generates
                     filename based on input (input.mkv -> input.hevc)
         total_frames: Total number of frames in the video (for progress tracking)
-        duration: Total duration of the video in seconds (for progress tracking)
 
     Returns:
         Path to the extracted base layer HEVC file
@@ -72,7 +70,6 @@ def extract_base_layer(
             tool_cmd=dovi_cmd,
             process_name="Extracting HDR10 Base Layer:",
             total_frames=total_frames,
-            duration=duration
         )
 
         if returncode != 0:
@@ -166,7 +163,6 @@ def extract_rpu(
     dv_profile_source: Optional[DolbyVisionProfile] = None,
     dv_profile_encoding: Optional[DolbyVisionProfile] = None,
     total_frames: Optional[int] = None,
-    duration: Optional[float] = None,
     use_cache: bool = False,
 ) -> Path:
     """Extract Dolby Vision RPU (Reference Processing Unit) metadata.
@@ -178,7 +174,6 @@ def extract_rpu(
         dv_profile_source: Source Dolby Vision profile
         dv_profile_encoding: Target Dolby Vision profile for encoding
         total_frames: Total number of frames in the video (for progress tracking)
-        duration: Total duration of the video in seconds (for progress tracking)
 
     Returns:
         Path to the extracted RPU file
@@ -223,7 +218,6 @@ def extract_rpu(
             tool_cmd=dovi_cmd,
             process_name="Extracting RPU metadata:",
             total_frames=total_frames,
-            duration=duration
         )
 
         if returncode != 0:
@@ -319,7 +313,6 @@ def extract_enhancement_layer(
     input_path: Path,
     output_el: Optional[Path] = None,
     total_frames: Optional[int] = None,
-    duration: Optional[float] = None
 ) -> Path:
     """Extract Dolby Vision Enhancement Layer (EL).
 
@@ -328,7 +321,6 @@ def extract_enhancement_layer(
         output_el: Optional path for EL output file. If None, generates
                    filename based on input (input.mkv -> input_EL.hevc)
         total_frames: Total number of frames in the video (for progress tracking)
-        duration: Total duration of the video in seconds (for progress tracking)
 
     Returns:
         Path to the extracted Enhancement Layer file
@@ -357,7 +349,6 @@ def extract_enhancement_layer(
             tool_cmd=dovi_cmd,
             process_name="Extracting Enhancement Layer:",
             total_frames=total_frames,
-            duration=duration
         )
 
         if returncode != 0:

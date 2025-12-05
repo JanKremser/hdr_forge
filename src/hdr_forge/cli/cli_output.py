@@ -248,7 +248,7 @@ def estimate_final_size(current_size_bytes: int | None, current_frame: int, tota
     return estimated_size
 
 
-def print_progress_info(first_update: bool, current_frame: int, total_frames: int, duration_seconds: float, process_time_seconds: float, fps: float, speed: float | None, time_seconds: float | None, bitrate_kbs: float | None, size_bytes: int | None, video_fps: float | None) -> None:
+def print_progress_info(first_update: bool, current_frame: int, total_frames: int, duration_seconds: float, process_time_seconds: float, fps: float, speed: float | None, time_seconds: float | None, bitrate_kbs: float | None, size_bytes: int | None, video_fps: float | None, process_name: str | None) -> None:
     #fix current_frame
     if current_frame > total_frames:
         current_frame = total_frames
@@ -299,9 +299,17 @@ def print_progress_info(first_update: bool, current_frame: int, total_frames: in
         estimated_size_kb_str: str = f"{estimated_size_bytes / 1024:.2f}"
         estimated_size_gb_str: str = f"{estimated_size_bytes / 1024 / 1024 / 1024:.2f}"
 
+    bar_len = 70
+    bar_str: str = color_str("-" * 70, ANSI_GREEN)
+    if process_name is not None:
+        word_len = len(process_name)
+        if word_len >= bar_len - 4:
+            process_name = process_name[:bar_len - 10] + "..."
+        new_bar_len: int = bar_len - (len(process_name) + 4)
+        bar_str = color_str(f"-- {process_name} " + ("-" * new_bar_len), ANSI_GREEN)
     # Format for multi-line output
     info_line: str = f"""
-{color_str("-" * 70, ANSI_GREEN)}
+{bar_str}
 Frame         : {color_str(current_frame, ANSI_GREEN)}/{total_frames}
 Speed         : {color_str(speed_str, ANSI_GREEN)}x | {color_str(fps, ANSI_GREEN)} FPS
 
@@ -313,13 +321,13 @@ Bitrate       : {color_str(bitrate_str, ANSI_GREEN)} kb/s
 Size          : {color_str(size_kb_str, ANSI_GREEN)} KB ~> {color_str(size_gb_str, ANSI_GREEN)} GB
 Final size    : {color_str(estimated_size_kb_str, ANSI_GREEN)} KB ~> {color_str(estimated_size_gb_str, ANSI_GREEN)} GB
 {progress_bar}
-{color_str("-" * 70, ANSI_GREEN)}"""
+{color_str("-" * bar_len, ANSI_GREEN)}"""
 
     # For the first output, we only need to print both lines
     print(clear_lines(14) if first_update is False else "", end="")
     print(info_line, end="", flush=True)
 
-def print_progress_info_minimal(process_name: str, first_update: bool, current_frame: int, total_frames: int, duration_seconds: float, process_time_seconds: float, fps: float, time_seconds: float | None) -> None:
+def print_progress_info_minimal(process_name: str, first_update: bool, current_frame: int, total_frames: int, process_time_seconds: float, fps: float) -> None:
     #fix current_frame
     if current_frame > total_frames:
         current_frame = total_frames
@@ -353,7 +361,7 @@ Process Time  : {color_str(process_time_str, ANSI_GREEN)}
     print(info_line, end="", flush=True)
 
 
-def create_ffmpeg_progress_handler(duration: float, total_frames: int, process_start_time: float, video_fps: float | None) -> Callable[[FfmpegProgressInfo], None]:
+def create_ffmpeg_progress_handler(duration: float, total_frames: int, process_start_time: float, video_fps: float | None = None, process_name: str | None = None) -> Callable[[FfmpegProgressInfo], None]:
     """Create a progress handler for ffmpeg encoding.
 
     Args:
@@ -392,6 +400,7 @@ def create_ffmpeg_progress_handler(duration: float, total_frames: int, process_s
             bitrate_kbs=progress.bitrate,
             size_bytes=progress.size,
             video_fps=video_fps,
+            process_name=process_name,
         )
         if first_update:
             first_update = False
@@ -399,7 +408,7 @@ def create_ffmpeg_progress_handler(duration: float, total_frames: int, process_s
     return on_progress
 
 
-def create_ffmpeg_minimal_progress_handler(total_frames: int, duration: float, process_start_time: float, process_name: str) -> Callable[[FfmpegMiniProgressInfo], None]:
+def create_ffmpeg_minimal_progress_handler(total_frames: int, process_start_time: float, process_name: str) -> Callable[[FfmpegMiniProgressInfo], None]:
     """Create a progress handler for dovi_tool operations.
 
     Args:
@@ -423,20 +432,13 @@ def create_ffmpeg_minimal_progress_handler(total_frames: int, duration: float, p
             process_start_time=process_start_time
         )
 
-        # Calculate time_seconds based on frame progress
-        time_seconds: float | None = None
-        if total_frames > 0 and duration > 0 and current_frame >= 0:
-            time_seconds = (current_frame / total_frames) * duration
-
         print_progress_info_minimal(
             process_name=process_name,
             first_update=first_update,
             current_frame=current_frame,
             total_frames=total_frames,
-            duration_seconds=duration,
             process_time_seconds=process_time_seconds,
             fps=fps,
-            time_seconds=time_seconds,
         )
         if first_update:
             first_update = False

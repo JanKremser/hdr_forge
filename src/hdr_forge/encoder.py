@@ -402,6 +402,7 @@ class Encoder:
                 total_frames=total_frames,
                 process_start_time=process_start_time,
                 video_fps=self._video.get_fps(),
+                process_name=f"Encoding Video: {target_file.name}",
             )
 
         try:
@@ -454,14 +455,12 @@ class Encoder:
 
         input_file: Path = self._video.get_filepath()
         total_frames: int = self._video.get_total_frames()
-        duration: int = self._video.get_total_frames()
 
         # Step 1: Extract base layer (HEVC without EL+RPU) from original video
         base_layer_hevc_path: Path = dovi_tool.extract_base_layer(
             input_path=input_file,
             output_hevc=temp_dir / f"video_BL.hevc",
             total_frames=total_frames,
-            duration=duration,
         )
 
         # Step 2: Mux base layer HEVC with original audio/subtitles into final MKV
@@ -484,7 +483,6 @@ class Encoder:
         temp_dir: Path = get_global_temp_directory()
 
         total_frames: int = self._video.get_total_frames()
-        duration: int = self._video.get_total_frames()
 
         # Step 1: Extract RPU metadata from original Dolby Vision video
         rpu_file_path: Path = dovi_tool.extract_rpu(
@@ -493,7 +491,6 @@ class Encoder:
             dv_profile_source=source_dv_profile,
             dv_profile_encoding=target_dv_profile,
             total_frames=total_frames,
-            duration=duration,
             use_cache=True,
         )
 
@@ -505,7 +502,6 @@ class Encoder:
                 input_path=input_file,
                 output_el=temp_dir / f"video_EL.hevc",
                 total_frames=total_frames,
-                duration=duration,
             )
             bl_el_hevc: Path = dovi_tool.inject_dolby_vision_layers(
                 bl_path=hevc_bl,
@@ -529,7 +525,6 @@ class Encoder:
     ) -> bool:
         input_file: Path = self._video.get_filepath()
         total_frames: int = self._video.get_total_frames()
-        duration: int = self._video.get_total_frames()
 
         # Create temporary directory for all intermediate files
         temp_dir: Path = get_global_temp_directory()
@@ -539,7 +534,6 @@ class Encoder:
             input_path=input_file,
             output_hevc=temp_dir / f"video_BL.hevc",
             total_frames=total_frames,
-            duration=duration,
         )
 
         # Step 2: Convert Dolby Vision profile by injecting RPU into base layer HEVC
@@ -588,7 +582,6 @@ class Encoder:
 
         input_file: Path = self._video.get_filepath()
         total_frames: int = self._video.get_total_frames()
-        duration: int = self._video.get_total_frames()
 
         # Create temporary directory for all intermediate files
         temp_dir: Path = get_global_temp_directory()
@@ -598,7 +591,6 @@ class Encoder:
             input_path=input_file,
             output_hevc=temp_dir / f"video_BL.hevc",
             total_frames=total_frames,
-            duration=duration,
         )
 
         # Step 2: Mux base layer HEVC with original audio/subtitles into temporary MKV
@@ -640,7 +632,6 @@ class Encoder:
             input_path=encoded_base_layer_mkv,
             output_hevc=temp_dir / f"video_encoded_BL.hevc",
             total_frames=total_frames,
-            duration=duration,
         )
 
         # Step 5: Convert Dolby Vision profile by injecting RPU into encoded base layer HEVC

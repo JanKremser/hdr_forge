@@ -181,7 +181,7 @@ Presets:
 
     convert_parser.add_argument(
         '--hw-preset',
-        choices=["cpu:balanced", "cpu:quality", "gpu:balanced", "gpu:quality", "balanced", "quality"],
+        choices=["cpu:balanced", "cpu:quality", "gpu:balanced", "gpu:quality", "cpu", "gpu", "balanced", "quality"],
         default="cpu:balanced",
         help=f"""{sdr_dot} {hdr_dot} {dolby_vision_dot}
 HDR Forge hardware preset for encoding optimization. Not libx265/libx264 presets.
@@ -190,8 +190,10 @@ When using prefix-free presets (balanced, quality), the hardware is automaticall
 
 Examples:
     hdr_forge convert -i input.mkv -o output.mkv --hw-preset quality
-    hdr_forge convert -i input.mkv -o output.mkv --encoder hevc_nvenc --hw-preset balanced
+    hdr_forge convert -i input.mkv -o output.mkv --hw-preset cpu
     hdr_forge convert -i input.mkv -o output.mkv --hw-preset cpu:quality
+    hdr_forge convert -i input.mkv -o output.mkv --hw-preset gpu
+    hdr_forge convert -i input.mkv -o output.mkv --hw-preset gpu:quality
 
 Prefix-free presets (hardware derived from encoder):
     [balanced] : Balanced speed and quality (default)

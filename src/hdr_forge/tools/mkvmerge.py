@@ -31,7 +31,6 @@ def extract_hevc(
     input_path: Path,
     output_hevc: Optional[Path] = None,
     total_frames: Optional[int] = None,
-    duration: Optional[float] = None
 ) -> Path:
     """Extract HEVC bitstream from video file.
 
@@ -39,7 +38,6 @@ def extract_hevc(
         input_path: Path to input video file
         output_hevc: Path to output HEVC file. If None, generates filename based on input
         total_frames: Total number of frames in the video (for progress tracking)
-        duration: Total duration of the video in seconds (for progress tracking)
 
     Returns:
         Path to the extracted HEVC file
@@ -61,7 +59,7 @@ def extract_hevc(
         ]
 
         # Add progress reporting if we have frame/duration info
-        if total_frames and duration:
+        if total_frames:
             ffmpeg_cmd.extend(['-progress', 'pipe:2'])
 
         ffmpeg_cmd.append(str(output_hevc))
@@ -69,7 +67,7 @@ def extract_hevc(
         print_debug(build_cmd_array_to_str(ffmpeg_cmd))
 
         # FFmpeg stderr is used for progress if available, otherwise DEVNULL
-        ffmpeg_stderr = subprocess.PIPE if (total_frames and duration) else subprocess.DEVNULL
+        ffmpeg_stderr = subprocess.PIPE if (total_frames) else subprocess.DEVNULL
 
         # Execute ffmpeg to extract HEVC
         ffmpeg_process = subprocess.Popen(
@@ -81,11 +79,10 @@ def extract_hevc(
         )
 
         # Start progress tracking if we have frame/duration info
-        if total_frames and duration and ffmpeg_process.stderr:
+        if total_frames and ffmpeg_process.stderr:
             process_start_time = time.time()
             progress_callback = create_ffmpeg_minimal_progress_handler(
                 total_frames=total_frames,
-                duration=duration,
                 process_start_time=process_start_time,
                 process_name="Extracting HEVC:"
             )
@@ -110,7 +107,7 @@ def extract_hevc(
         ffmpeg_process.wait()
 
         # Wait for progress thread to finish
-        if total_frames and duration:
+        if total_frames:
             if ffmpeg_process.stderr:
                 reader_thread.join(timeout=1.0)
         else:

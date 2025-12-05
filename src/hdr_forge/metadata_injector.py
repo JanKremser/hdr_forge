@@ -41,7 +41,6 @@ class MetadataInjector:
                 config_json=self._hdr_metadata,
                 output_hevc=temp_dir / "hdr10.hevc",
                 total_frames=self._video.get_total_frames(),
-                duration=self._video.get_duration_seconds(),
             )
 
         if hevc_file is None:
@@ -50,7 +49,6 @@ class MetadataInjector:
                 input_path=self._input_file,
                 output_hevc=temp_dir / "extracted_video.hevc",
                 total_frames=self._video.get_total_frames(),
-                duration=self._video.get_duration_seconds(),
             )
 
         if self._hdr10plus_metadata is not None:

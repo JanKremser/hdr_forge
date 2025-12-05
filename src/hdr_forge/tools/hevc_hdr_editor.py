@@ -26,7 +26,6 @@ def inject_hdr_metadata(
     config_json: Path,
     output_hevc: Optional[Path] = None,
     total_frames: Optional[int] = None,
-    duration: Optional[float] = None
 ) -> Path:
     """Inject HDR metadata into an HEVC bitstream using hevc_hdr_editor.
 
@@ -35,7 +34,6 @@ def inject_hdr_metadata(
         config_json: Path to hevc_hdr_editor JSON config file
         output_hevc: Path to the output HEVC file. If None, appends '.hevc' to input_path
         total_frames: Total number of frames in the video (for progress tracking)
-        duration: Total duration of the video in seconds (for progress tracking)
 
     Returns:
         Path to the HEVC file with injected HDR metadata
@@ -60,7 +58,6 @@ def inject_hdr_metadata(
             tool_cmd=hevc_hdr_editor_cmd,
             process_name="Injecting HDR metadata:",
             total_frames=total_frames,
-            duration=duration
         )
 
         if returncode != 0:
