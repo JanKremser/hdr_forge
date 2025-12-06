@@ -2,11 +2,10 @@ import os
 import subprocess
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Callable, Counter, Optional, Tuple
+from typing import Counter, Optional, Tuple
 from dataclasses import dataclass
-from hdr_forge.cli.cli_output import print_err, print_warn
-from hdr_forge.cli.video_codec_base import callback_handler_crop_video
-from hdr_forge.typedefs.encoder_typing import CropHandler, CropMode, CropSettings, HdrSdrFormat
+from hdr_forge.cli.cli_output import ProgressBarSpinner, print_err, print_warn
+from hdr_forge.typedefs.encoder_typing import CropMode, CropSettings, HdrSdrFormat
 from hdr_forge.video import Video
 
 @dataclass
@@ -68,14 +67,9 @@ class VideoCropper:
         self,
         check_samples: int = 10,
         max_workers: int = 16,
-        callback: Optional[Callable[[CropHandler], None]] = None,
     ) -> Optional[Tuple[int, int, int, int]]:
-        if callback:
-            callback(CropHandler(
-                finish_progress=False,
-                completed_samples=0,
-                total_samples=check_samples,
-            ))
+        progressbar = ProgressBarSpinner(description="Detecting crop")
+        progressbar.start()
 
         duration: float = self._video.get_duration_seconds()
         if duration <= 0:
@@ -98,27 +92,22 @@ class VideoCropper:
                     crop_results.append(result)
                 completed += 1
 
-                if callback:
-                    callback(CropHandler(
-                        finish_progress=False,
-                        completed_samples=completed,
-                        total_samples=check_samples,
-                    ))
-
-        if callback:
-            callback(CropHandler(
-                finish_progress=True,
-                completed_samples=completed,
-                total_samples=check_samples,
-            ))
+                progressbar.update(percent=(completed / check_samples * 100))
 
         if not crop_results:
             return None
 
         crop_counter = Counter(crop_results)
-        return crop_counter.most_common(1)[0][0]
 
-    def process_crop(
+        crop: Tuple[int, int, int, int] = crop_counter.most_common(1)[0][0]
+
+        progressbar.stop(
+            text="Crop detection completed",
+            long_info_text=f"Detected crop: width={crop[0]}, height={crop[1]}, x={crop[2]}, y={crop[3]}"
+        )
+        return crop
+
+    def detect_crop(
         self,
     ) -> None:
         if self._crop_settings.mode == CropMode.OFF:
@@ -133,7 +122,6 @@ class VideoCropper:
             crop_result = self._detect_crop_auto(
                 check_samples=self._crop_settings.check_samples,
                 max_workers=cpu_kerne,
-                callback=callback_handler_crop_video,
             )
             if crop_result is None:
                 print_warn("Auto crop detection failed or no crop needed.")

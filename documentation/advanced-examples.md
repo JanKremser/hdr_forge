@@ -5,6 +5,7 @@ This document provides comprehensive examples for complex encoding scenarios wit
 ## Table of Contents
 
 - [Hardware Acceleration](#hardware-acceleration)
+- [AV1 Encoding (Beta)](#av1-encoding-beta)
 - [Encoding Presets](#encoding-presets)
 - [Cropping Examples](#cropping-examples)
 - [Grain Analysis](#grain-analysis)
@@ -57,6 +58,97 @@ hdr_forge convert -i input.mkv -o gpu_output.mkv \
 # Compare file sizes and quality
 ls -lh *_output.mkv
 ```
+
+## AV1 Encoding (Beta)
+
+### Basic AV1 Encoding
+
+```bash
+# Basic AV1 encoding with default settings
+hdr_forge convert -i input.mkv -o output_av1.mkv --encoder libsvtav1
+
+# AV1 with custom quality (lower = better quality)
+hdr_forge convert -i input.mkv -o output_av1.mkv \
+  --encoder libsvtav1 \
+  --quality 23
+
+# High-quality AV1 for archival
+hdr_forge convert -i input.mkv -o archive_av1.mkv \
+  --encoder libsvtav1 \
+  --quality 18
+```
+
+### AV1 for Different Resolutions
+
+```bash
+# 4K AV1 encoding
+hdr_forge convert -i 4k_video.mkv -o 4k_av1.mkv \
+  --encoder libsvtav1 \
+  --quality 25
+
+# 1080p AV1 encoding
+hdr_forge convert -i 1080p_video.mkv -o 1080p_av1.mkv \
+  --encoder libsvtav1 \
+  --quality 23
+
+# 4K to 1080p with AV1
+hdr_forge convert -i 4k_video.mkv -o 1080p_av1.mkv \
+  --encoder libsvtav1 \
+  --scale FHD \
+  --quality 23
+```
+
+### AV1 with HDR Input
+
+**Note:** AV1 currently only supports SDR output. HDR10 and Dolby Vision encoding not yet implemented.
+
+```bash
+# Convert HDR10 to SDR with AV1 (tone mapping)
+hdr_forge convert -i hdr10_video.mkv -o sdr_av1.mkv \
+  --encoder libsvtav1 \
+  --hdr-sdr-format sdr \
+  --quality 23
+
+# Dolby Vision to SDR with AV1
+hdr_forge convert -i dolby_vision.mkv -o sdr_av1.mkv \
+  --encoder libsvtav1 \
+  --hdr-sdr-format sdr
+```
+
+### AV1 Comparison with HEVC
+
+```bash
+# Encode with both codecs for comparison
+hdr_forge convert -i input.mkv -o output_hevc.mkv --encoder libx265
+hdr_forge convert -i input.mkv -o output_av1.mkv --encoder libsvtav1
+
+# Compare file sizes (AV1 typically 20-40% smaller)
+ls -lh output_hevc.mkv output_av1.mkv
+```
+
+### AV1 for Streaming
+
+```bash
+# AV1 optimized for YouTube/streaming platforms
+hdr_forge convert -i input.mkv -o stream_av1.mkv \
+  --encoder libsvtav1 \
+  --quality 25 \
+  --crop auto
+
+# Batch convert for streaming platform
+hdr_forge convert -i ./videos -o ./av1_streams \
+  --encoder libsvtav1 \
+  --quality 25 \
+  --scale FHD
+```
+
+**Note:** AV1 encoding is significantly slower than HEVC but produces smaller files. Use AV1 when:
+- File size is critical (storage/bandwidth constraints)
+- Encoding time is not a constraint
+- Targeting modern platforms (YouTube, Netflix, etc.)
+- Creating long-term SDR archival copies
+
+**Current Limitations:** AV1 only supports SDR output. HDR10/Dolby Vision encoding not yet implemented.
 
 ## Encoding Presets
 
@@ -392,67 +484,79 @@ hdr_forge convert -i movie.mkv -o sample_action.mkv --sample 1800:1830
 hdr_forge convert -i movie.mkv -o sample_ending.mkv --sample 7170:7200
 ```
 
-## HDR Metadata Injection
+## Metadata Management
 
-### Basic Injection
+### Extract Metadata
 
 ```bash
-# Inject master display metadata
-hdr_forge inject-hdr-metadata -i video.mkv -o output.mkv \
-  --master-display "G(13250,34500)B(7500,30000)R(34000,16000)WP(15635,16450)L(1000,0.05)"
+# Extract all metadata (Dolby Vision, HDR10, HDR10+)
+hdr_forge extract-metadata -i video.mkv -o ./metadata_output
 
-# With MaxCLL/MaxFALL
-hdr_forge inject-hdr-metadata -i video.mkv -o output.mkv \
-  --master-display "G(13250,34500)B(7500,30000)R(34000,16000)WP(15635,16450)L(1000,0.05)" \
-  --max-cll "1000,400"
+# Extract from Dolby Vision source
+hdr_forge extract-metadata -i dolby_vision.mkv -o ./dv_metadata
 ```
 
-### Common Display Metadata Presets
+### Inject HDR10 Metadata
 
 ```bash
-# Standard BT.2020 / DCI-P3 D65
-hdr_forge inject-hdr-metadata -i video.mkv -o output.mkv \
-  --master-display "G(13250,34500)B(7500,3000)R(34000,16000)WP(15635,16450)L(1000,0.05)" \
-  --max-cll "1000,400"
+# Inject HDR10 metadata JSON
+hdr_forge inject-metadata -i video.mkv -o output.mkv \
+  --hdr10 metadata_hdr10.json
 
-# LG OLED C9 Display
-hdr_forge inject-hdr-metadata -i video.mkv -o output.mkv \
-  --master-display "G(13250,34500)B(7500,3000)R(34000,16000)WP(15635,16450)L(850,0.0001)" \
-  --max-cll "800,400"
-
-# Sony X900H Display
-hdr_forge inject-hdr-metadata -i video.mkv -o output.mkv \
-  --master-display "G(13250,34500)B(7500,3000)R(34000,16000)WP(15635,16450)L(1100,0.01)" \
-  --max-cll "1100,450"
+# Inject HDR10+ metadata
+hdr_forge inject-metadata -i video.mkv -o output.mkv \
+  --hdr10plus metadata_hdr10plus.json
 ```
 
-### Injection During Encoding
+### Inject Dolby Vision Metadata
 
 ```bash
-# Inject metadata while encoding
+# Inject RPU only
+hdr_forge inject-metadata -i video.mkv -o output.mkv \
+  --rpu dolby_vision.rpu
+
+# Inject RPU with Enhancement Layer (Profile 7)
+hdr_forge inject-metadata -i video.mkv -o output.mkv \
+  --rpu dolby_vision.rpu \
+  --el enhancement_layer.hevc
+
+# Inject multiple metadata types
+hdr_forge inject-metadata -i video.mkv -o output.mkv \
+  --rpu dolby_vision.rpu \
+  --hdr10 metadata_hdr10.json
+```
+
+### Metadata During Encoding
+
+**Note:** Use `--master-display` and `--max-cll` during encoding for CPU encoders only.
+
+```bash
+# Inject metadata while encoding (libx265/libx264 only)
 hdr_forge convert -i input.mkv -o output.mkv \
+  --encoder libx265 \
   --master-display "G(13250,34500)B(7500,30000)R(34000,16000)WP(15635,16450)L(1000,0.05)" \
   --max-cll "1000,400"
 
 # With quality settings
 hdr_forge convert -i input.mkv -o output.mkv \
+  --encoder libx265 \
   --quality 16 \
   --master-display "G(13250,34500)B(7500,30000)R(34000,16000)WP(15635,16450)L(1000,0.05)" \
   --max-cll "1000,400"
 ```
 
-### Updating Existing Metadata
+### Workflow: Extract and Re-inject
 
 ```bash
-# Replace incorrect metadata (no re-encoding)
-hdr_forge inject-hdr-metadata -i wrong_metadata.mkv -o fixed.mkv \
-  --master-display "G(13250,34500)B(7500,30000)R(34000,16000)WP(15635,16450)L(1000,0.05)" \
-  --max-cll "1000,400"
+# 1. Extract metadata from source
+hdr_forge extract-metadata -i source_with_metadata.mkv -o ./metadata
 
-# Update only MaxCLL values
-hdr_forge inject-hdr-metadata -i video.mkv -o output.mkv \
-  --master-display "G(13250,34500)B(7500,30000)R(34000,16000)WP(15635,16450)L(1000,0.05)" \
-  --max-cll "1200,500"
+# 2. Encode without metadata
+hdr_forge convert -i source_with_metadata.mkv -o encoded.mkv
+
+# 3. Re-inject extracted metadata
+hdr_forge inject-metadata -i encoded.mkv -o final.mkv \
+  --hdr10 ./metadata/hdr10_metadata.json
 ```
 
 ## Dolby Vision

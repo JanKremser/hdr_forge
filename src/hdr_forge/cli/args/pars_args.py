@@ -3,17 +3,17 @@
 import argparse
 
 from hdr_forge import __version__
-from hdr_forge.cli.cli_output import ANSI_BLUE, ANSI_GREEN, ANSI_ORANGE, ANSI_PINK, ANSI_RED, color_str, rainbow_text
+from hdr_forge.cli.cli_output import ANSI_BLUE, ANSI_GREEN, ANSI_ORANGE, ANSI_RED, color_str, rainbow_text
 
 
 HDR_FORGE_LOGO = rainbow_text("""
-░ ▒█▒    ▒█▒ ░ ▒███████▒ ░  ▒███████▒ ░       ░ ▒████████▒ ░ ▒██████▒ ░  ▒███████▒ ░ ░ ▒██████▒ ░  ▒████████▒ ░
-░ ▒█▒    ▒█▒ ░ ▒█▒    ▒█▒ ░ ▒█▒    ▒█▒ ░      ░ ▒█▒ ░     ░ ▒█▒    ▒█▒ ░ ▒█▒    ▒█▒ ░ ▒█▒    ▒█▒ ░ ▒█▒ ░
-░ ▒█▒    ▒█▒ ░ ▒█▒    ▒█▒ ░ ▒█▒    ▒█▒ ░      ░ ▒█▒ ░     ░ ▒█▒    ▒█▒ ░ ▒█▒    ▒█▒ ░ ▒█▒ ░      ░ ▒█▒ ░
-░ ▒████████▒ ░ ▒█▒    ▒█▒ ░ ▒███████▒ ░       ░ ▒██████▒    ▒█▒    ▒█▒ ░ ▒███████▒    ▒█▒  ▒███▒ ░ ▒██████▒ ░
-░ ▒█▒    ▒█▒ ░ ▒█▒    ▒█▒ ░ ▒█▒    ▒█▒ ░      ░ ▒█▒ ░     ░ ▒█▒    ▒█▒ ░ ▒█▒    ▒█▒ ░ ▒█▒    ▒█▒ ░ ▒█▒ ░
-░ ▒█▒    ▒█▒ ░ ▒█▒    ▒█▒ ░ ▒█▒    ▒█▒ ░      ░ ▒█▒ ░     ░ ▒█▒    ▒█▒ ░ ▒█▒    ▒█▒ ░ ▒█▒    ▒█▒ ░ ▒█▒ ░
-░ ▒█▒    ▒█▒ ░ ▒███████▒ ░  ▒█▒    ▒█▒ ░      ░ ▒█▒ ░      ░ ▒██████▒ ░  ▒█▒    ▒█▒    ▒██████▒ ░  ▒████████▒ ░""")
+▒█▒   ▒█▒ ▒██████▒  ▒██████▒      ▒██████▒  ▒█████▒   ▒██████▒    ▒█████▒  ▒██████▒
+▒█▒   ▒█▒ ▒█▒   ▒█▒ ▒█▒   ▒█▒     ▒█▒      ▒█▒   ▒█▒  ▒█▒   ▒█▒  ▒█▒       ▒█▒
+▒███████▒ ▒█▒   ▒█▒ ▒██████▒      ▒█████▒  ▒█▒   ▒█▒  ▒██████▒   ▒█▒ ▒██▒  ▒████▒
+▒█▒   ▒█▒ ▒█▒   ▒█▒ ▒█▒   ▒█▒     ▒█▒      ▒█▒   ▒█▒  ▒█▒   ▒█▒  ▒█▒   ▒█▒ ▒█▒
+▒█▒   ▒█▒ ▒██████▒  ▒█▒   ▒█▒     ▒█▒       ▒█████▒   ▒█▒   ▒█▒   ▒█████▒  ▒██████▒
+
+▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒""")
 
 def _add_version_arg(parser: argparse.ArgumentParser) -> None:
     """Add version argument to the parser.
@@ -24,7 +24,7 @@ def _add_version_arg(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         '--version',
         action='version',
-        version=f"""                                              HDR forge {__version__} - © JanKremser"""
+        version=f"""          HDR forge {__version__} - © JanKremser"""
     )
 
 
@@ -71,6 +71,34 @@ def _add_maxcll_subcommand(parser: argparse._SubParsersAction) -> None:
     )
 
     maxcll_parser.add_argument(
+        '-d', '--debug',
+        action='store_true',
+    )
+
+def _add_detect_logo_subcommand(parser: argparse._SubParsersAction) -> None:
+    """Add arguments for the 'detect_logo' subcommand.
+
+    Args:
+        parser: Argument parser to add arguments to
+    """
+    # "detect_logo" subcommand
+    detect_logo_parser: argparse.ArgumentParser = parser.add_parser('detect-logo',
+        description='Detect logos in a video file',
+        help='Detect logos'
+    )
+
+    detect_logo_parser.add_argument(
+        '-i', '--input',
+        required=True,
+        help='Video file for logo detection'
+    )
+
+    detect_logo_parser.add_argument(
+        '-e', '--export',
+        help='Export detected logo mask to specified file path as PNG image'
+    )
+
+    detect_logo_parser.add_argument(
         '-d', '--debug',
         action='store_true',
     )
@@ -130,7 +158,7 @@ Video codec to use for encoding.
 
     convert_parser.add_argument(
         '-p', '--preset',
-        choices=["auto", "film", "action", "animation"],
+        choices=["auto", "film", "banding", "video", "action", "animation"],
         default="auto",
         help=f"""{sdr_dot} {hdr_dot} {dolby_vision_dot}
 HDR Forge encoding preset for simplified settings. Default is the automation mode. Not libx265/libx264 presets.
@@ -139,9 +167,13 @@ Examples:
     hdr_forge convert -i input.mkv -o output.mkv --preset auto
     hdr_forge convert -i input.mkv -o output.mkv --preset film
 Presets:
-    [auto]        : Automatic preset selection based on input video characteristics. This is the default.
+    [auto]        : Use a film preset as default.
 
-    [film]        : Optimized for film content with moderate motion
+    [film]        : Optimized for film content with moderate motion.
+    [banding]     : Similar to 'film' but with additional banding reduction techniques.
+                    This settings switch 8bit encoding for SDR to 10bit, reducing banding artifacts in challenging scenes.
+    [video]       : Optimized for general video content. This is a neutral preset for varied content.
+                    You use the default ffmpeg presets, without optimizations for specific content types.
     [action]      : Optimized for action-packed content with fast motion
     [animation]   : Optimized for animated content with vibrant colors\n
 """
@@ -149,7 +181,7 @@ Presets:
 
     convert_parser.add_argument(
         '--hw-preset',
-        choices=["cpu:balanced", "cpu:quality", "gpu:balanced", "gpu:quality", "balanced", "quality"],
+        choices=["cpu:balanced", "cpu:quality", "gpu:balanced", "gpu:quality", "cpu", "gpu", "balanced", "quality"],
         default="cpu:balanced",
         help=f"""{sdr_dot} {hdr_dot} {dolby_vision_dot}
 HDR Forge hardware preset for encoding optimization. Not libx265/libx264 presets.
@@ -158,8 +190,10 @@ When using prefix-free presets (balanced, quality), the hardware is automaticall
 
 Examples:
     hdr_forge convert -i input.mkv -o output.mkv --hw-preset quality
-    hdr_forge convert -i input.mkv -o output.mkv --encoder hevc_nvenc --hw-preset balanced
+    hdr_forge convert -i input.mkv -o output.mkv --hw-preset cpu
     hdr_forge convert -i input.mkv -o output.mkv --hw-preset cpu:quality
+    hdr_forge convert -i input.mkv -o output.mkv --hw-preset gpu
+    hdr_forge convert -i input.mkv -o output.mkv --hw-preset gpu:quality
 
 Prefix-free presets (hardware derived from encoder):
     [balanced] : Balanced speed and quality (default)
@@ -189,18 +223,20 @@ This is overridden by encoder-specific parameters (--encoder-params).\n
 
     convert_parser.add_argument(
         '--speed',
-        choices=['ultrafast', 'superfast', 'veryfast', 'faster', 'fast', 'medium', 'slow', 'slower', 'veryslow'],
+        choices=['ultrafast', 'superfast', 'veryfast', 'faster', 'fast', 'medium', 'medium:plus', 'slow', 'slow:plus', 'slower', 'veryslow'],
         help=f"""{sdr_dot} {hdr_dot} {dolby_vision_dot}
 Universal speed preset. ONLY works with libx265/libx264 encoders.
-[ultrafast] : Fastest encoding, lowest compression
-[superfast] : Very fast encoding, very low compression
-[veryfast]  : Fast encoding, low compression
-[faster]    : Below average compression and speed
-[fast]      : Slightly below average compression and speed
-[medium]    : Balanced compression and speed
-[slow]      : Above average compression, slower encoding
-[slower]    : High compression, slow encoding
-[veryslow]  : Maximum compression, very slow encoding
+[ultrafast]   : Fastest encoding, lowest compression
+[superfast]   : Very fast encoding, very low compression
+[veryfast]    : Fast encoding, low compression
+[faster]      : Below average compression and speed
+[fast]        : Slightly below average compression and speed
+[medium]      : Balanced compression and speed
+[medium:plus] : Slightly better compression and quality than medium, with a moderate speed decrease
+[slow]        : Above average compression, slower encoding
+[slow:plus]   : better quality/speed tradeoff than slow
+[slower]      : High compression, slow encoding
+[veryslow]    : Maximum compression, very slow encoding
 
 Note: This parameter is NOT compatible with NVENC encoders. Use --encoder-params instead.\n
 """
@@ -215,6 +251,32 @@ Analyze grain in the input video and optimize encoding settings accordingly.
 [cat1]             : Apply light grain settings
 [cat2]             : Apply medium grain settings
 [cat3]             : Apply strong grain settings\n
+"""
+    )
+
+    convert_parser.add_argument(
+        '--remove-logo',
+        help=f"""{sdr_dot} {hdr_dot} {dolby_vision_dot}
+Remove logos from video. Not supported for Dolby Vision encoding.
+Examples:
+    --remove-logo off
+    --remove-logo auto
+    --remove-logo delogo:top-left
+    --remove-logo mask:auto
+[off]              : Default: Do not remove logos
+[auto]             : Automatically detect and remove logo
+
+[delogo:auto]      : Automatically detect and remove logo with delogo filter
+[delogo:top-left]  : Automatically detect (top-left) and remove logo with delogo filter
+[delogo:top-right] : Automatically detect (top-right) and remove logo with delogo filter
+[delogo:bot-left]  : Automatically detect (bottom-left) and remove logo with delogo filter
+[delogo:bot-right] : Automatically detect (bottom-right) and remove logo with delogo filter
+
+[mask:auto]        : Automatically detect logo and apply mask-based removal
+[mask:top-left]    : Automatically detect (top-left) logo and apply mask-based removal
+[mask:top-right]   : Automatically detect (top-right) logo and apply mask-based removal
+[mask:bot-left]    : Automatically detect (bottom-left) logo and apply mask-based removal
+[mask:bot-right]   : Automatically detect (bottom-right) logo and apply\n
 """
     )
 
@@ -270,7 +332,7 @@ Specifies how the video should be scaled after cropping. Not supported for Dolby
 Set custom Display Aspect Ratio (DAR) for the output video.
 This only changes the display, not the pixel ratio.
 Format:
-    [width:height] : Specify aspect ratio (e.g., 16:9, 4:3, 1.85:1)
+    [width:height]     : Specify aspect ratio (e.g., 16:9, 4:3, 1.85:1)
     [european]         : European Widescreen 1.66:1 ratio
     [us-widescreen]    : US Widescreen 1.85:1 ratio
     [cinema]           : CinemaScope Classic 2.35:1 ratio
@@ -338,6 +400,9 @@ Expert Option:
 
 Example:
     --master-display "G(13250,34500)B(7500,30000)R(34000,16000)WP(15635,16450)L(1000,0.05)"
+    --master-display "display-p3"
+    --master-display "bt.2020"
+    --master-display "bt.709"
 
 Input Video Master Display metadata will be used if not specified.
 """
@@ -359,7 +424,7 @@ Input Video MaxCLL and MaxFALL values will be used if not specified.
 
     convert_parser.add_argument(
         '--encoder',
-        choices=['auto', 'libx265', 'libx264', 'hevc_nvenc', 'h264_nvenc'],
+        choices=['auto', 'libx265', 'libx264', 'libsvtav1', 'hevc_nvenc', 'h264_nvenc'],
         default='auto',
         help=f"""{sdr_dot} {hdr_dot} {dolby_vision_dot} {expert_dot}
 Expert Option:
@@ -367,6 +432,7 @@ Expert Option:
 [auto]         : Automatic encoder selection (default)
 [libx265]      : Force libx265 encoder
 [libx264]      : Force libx264 encoder
+[libsvtav1]    : Force libsvtav1 encoder
 [hevc_nvenc]   : Force NVIDIA NVENC HEVC encoder
 [h264_nvenc]   : Force NVIDIA NVENC H.264 encoder\n
 """
@@ -408,18 +474,17 @@ Enable debug output\n
 """
     )
 
-def _add_inject_hdr_metadata_subcommand(parser: argparse._SubParsersAction) -> None:
-    """Add arguments for the 'inject_hdr_metadata' subcommand.
+def _add_extract_dolby_vision_hdr_metadata_subcommand(parser: argparse._SubParsersAction) -> None:
+    """Add arguments for the 'extract_dv_metadata' subcommand.
 
     Args:
         parser: Argument parser to add arguments to
     """
-    inject_parser: argparse.ArgumentParser = parser.add_parser('inject-hdr-metadata',
-        description="""Inject HDR metadata into an existing HEVC video stream, without re-encoding.
-NVENC GPU-encoded videos cannot be retroactively assigned HDR metadata using this function.
-Only CPU-encoded videos can be retroactively assigned HDR metadata.
+    inject_parser: argparse.ArgumentParser = parser.add_parser('extract-metadata',
+        description="""
+Extract Dolby Vision/HDR10 and/or HDR10Plus metadata from a encoded video file.
 """,
-        help='Inject HDR metadata'
+        help='Extract Dolby Vision metadata'
     )
 
     inject_parser.add_argument(
@@ -431,31 +496,104 @@ Only CPU-encoded videos can be retroactively assigned HDR metadata.
     inject_parser.add_argument(
         '-o', '--output',
         required=False,
-        help='Output MKV video file with injected HDR metadata'
+        help='Output folder for extracted HDR-JSON, RPU and EL files'
     )
 
     inject_parser.add_argument(
-        '--master-display',
+        '-d', '--debug',
+        action='store_true',
+    )
+
+def _add_inject_dolby_vision_hdr_metadata_subcommand(parser: argparse._SubParsersAction) -> None:
+    """Add arguments for the 'inject_metadata' subcommand.
+
+    Args:
+        parser: Argument parser to add arguments to
+    """
+    inject_parser: argparse.ArgumentParser = parser.add_parser('inject-metadata',
+        description="""
+Inject Dolby Vision/HDR10 and/or HDR10Plus metadata into an existing HEVC video stream, without re-encoding.
+NVENC GPU-encoded videos cannot be retroactively assigned HDR metadata using this function.
+Only CPU-encoded videos can be retroactively assigned HDR metadata.
+""",
+        help='Inject Dolby Vision metadata'
+    )
+
+    inject_parser.add_argument(
+        '-i', '--input',
         required=True,
-        help="""
-Set custom Master Display metadata for HDR10 videos. Format:
-G(x,y)B(x,y)R(x,y)WP(x,y)L(max,min)
-
-Example:
-    --master-display "G(13250,34500)B(7500,30000)R(34000,16000)WP(15635,16450)L(1000,0.05)"
-"""
+        help='Input Video file'
     )
 
     inject_parser.add_argument(
-        '--max-cll',
+        '-o', '--output',
+        required=True,
+        help='Output video file'
+    )
+
+    inject_parser.add_argument(
+        '--rpu',
         required=False,
         help="""
-Set custom MaxCLL and MaxFALL values for HDR10 videos. Format:
-
+Path to the RPU file containing Dolby Vision metadata to be injected.
 Example:
-    --max-cll "1000,400"
+    --rpu "path/to/dolby_vision.rpu"
 """
     )
+
+    inject_parser.add_argument(
+        '--el',
+        required=False,
+        help="""
+Path to the EL file containing Dolby Vision enhancement layer data to be injected.
+The “.hevc” extension is important; without this change, an error will occur.
+Example:
+    --el "path/to/dolby_vision.hevc"
+"""
+    )
+
+    inject_parser.add_argument(
+        '--hdr10',
+        required=False,
+        help="""
+Path to HDR10 metadata JSON file to be injected.
+Example:
+    --hdr10 "path/to/hdr10_metadata.json"
+"""
+    )
+
+    inject_parser.add_argument(
+        '--hdr10plus',
+        required=False,
+        help="""
+Path to HDR10 metadata JSON file to be injected.
+Example:
+    --hdr10plus "path/to/hdr10plus_metadata.json"
+"""
+    )
+
+#     inject_parser.add_argument(
+#         '--master-display',
+#         required=True,
+#         help="""
+# Set custom Master Display metadata for HDR10 videos. Format:
+# G(x,y)B(x,y)R(x,y)WP(x,y)L(max,min)
+
+# Example:
+#     --master-display "G(13250,34500)B(7500,30000)R(34000,16000)WP(15635,16450)L(1000,0.05)"
+# """
+#     )
+
+#     inject_parser.add_argument(
+#         '--max-cll',
+#         required=False,
+#         help="""
+# Set custom MaxCLL and MaxFALL values for HDR10 videos. Format:
+
+# Example:
+#     --max-cll "1000,400"
+# """
+#     )
 
     inject_parser.add_argument(
         '-d', '--debug',
@@ -486,6 +624,10 @@ def parse_args():
 
     _add_convert_subcommand(parser=subparsers)
 
-    _add_inject_hdr_metadata_subcommand(parser=subparsers)
+    _add_extract_dolby_vision_hdr_metadata_subcommand(parser=subparsers)
+
+    _add_inject_dolby_vision_hdr_metadata_subcommand(parser=subparsers)
+
+    _add_detect_logo_subcommand(parser=subparsers)
 
     return parser.parse_args()

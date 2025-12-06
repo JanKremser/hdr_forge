@@ -4,6 +4,8 @@ from typing import Optional
 
 
 
+
+from hdr_forge.typedefs.codec_typing import HEVC_NVENC_Preset, HdrForgeSpeedPreset, x265_x264_Preset
 from hdr_forge.typedefs.dolby_vision_typing import DolbyVisionProfileEncodingMode
 from hdr_forge.typedefs.video_typing import HdrMetadata
 
@@ -32,20 +34,13 @@ RESOLUTION_PRESETS_VALUES: dict[RESOLUTION_PRESETS, tuple[int, int]] = {
 }
 
 
-@dataclass
-class CropHandler:
-    """Datenklasse für die Ergebnisse der Crop-Analyse."""
-    finish_progress: bool = False
-    completed_samples: int = 0
-    total_samples: int = 0
-
-
 class HdrSdrFormat(Enum):
     """Target color format for video encoding."""
     AUTO = "auto"
     SDR = "sdr"
     HDR = "hdr"
     HDR10 = "hdr10"
+    HDR10_PLUS = "hdr10_plus"
     DOLBY_VISION = "dolby_vision"
 
 
@@ -53,15 +48,6 @@ class VideoCodec(Enum):
     """Video encoder mode."""
     H265 = "h265"
     H264 = "h264"
-    COPY = "copy"
-
-
-class VideoEncoderLibrary(Enum):
-    """Video encoder library for FFmpeg."""
-    LIBX265 = "libx265"
-    LIBX264 = "libx264"
-    HEVC_NVENC = "hevc_nvenc"
-    H264_NVENC = "h264_nvenc"
     COPY = "copy"
 
 class ScaleMode(Enum):
@@ -100,24 +86,6 @@ class SampleSettings:
     enabled: bool = False
     start_time: Optional[float] = None  # in seconds
     end_time: Optional[float] = None    # in seconds
-
-class HEVC_NVENC_Preset(Enum):
-    DEFAULT = "default"
-    SLOW = "slow"
-    HQ = "hq"
-    LLHQ = "llhq"
-    LLHP = "llhp"
-
-class x265_x264_Preset(Enum):
-    ULTRAFAST = "ultrafast"
-    SUPERFAST = "superfast"
-    VERYFAST = "veryfast"
-    FASTER = "faster"
-    FAST = "fast"
-    MEDIUM = "medium"
-    SLOW = "slow"
-    SLOWER = "slower"
-    VERYSLOW = "veryslow"
 
 class X265Tune(Enum):
     ANIMATION = "animation"
@@ -158,19 +126,21 @@ class NvencParams:
 class UniversalEncoderParams:
     """Universal encoder parameters that work across all encoders."""
     quality: Optional[int] = None  # Maps to CRF/CQ depending on encoder
-    speed: Optional[x265_x264_Preset] = None  # Only for libx265/libx264, not NVENC
+    speed: Optional[HdrForgeSpeedPreset] = None  # Only for libx265/libx264, not NVENC
 
 class EncoderOverride(Enum):
     """Encoder override for manual encoder selection."""
     AUTO = "auto"
     LIBX265 = "x265"
     LIBX264 = "x264"
+    LIBSVTAV1 = "libsvtav1"
     HEVC_NVENC = "hevc_nvenc"
     H264_NVENC = "h264_nvenc"
 
-class HdrForgeEncodingPresets(Enum):
-    AUTO = "auto"
+class HdrForgeEncodingTuningPresets(Enum):
+    VIDEO = "video"
     FILM = "film"
+    BANDING = "banding"
     ACTION = "action"
     ANIMATION = "animation"
 
@@ -184,9 +154,28 @@ class HdrForgeEncodingHardwarePresets(Enum):
     BALANCED = "balanced"
     QUALITY = "quality"
 
+class LogoRemovalAutoDetectMode(Enum):
+    AUTO = "auto"
+    AUTO_TOP_LEFT = "auto-top-left"
+    AUTO_TOP_RIGHT = "auto-top-right"
+    AUTO_BOT_LEFT = "auto-bot-left"
+    AUTO_BOT_RIGHT = "auto-bot-right"
+
+class LogoRemovalMode(Enum):
+    OFF = "off"
+    DELOGO = "delogo"
+    MASK = "mask"
+
+@dataclass
+class LogoRemovelSettings:
+    """Settings for logo removal from video."""
+    mode: LogoRemovalMode = LogoRemovalMode.OFF
+    position: LogoRemovalAutoDetectMode = LogoRemovalAutoDetectMode.AUTO
+    #mask_file: Optional[Path] = None  # Path to custom mask file for logo removal
+
 @dataclass
 class HdrForgeEncodingPresetSettings:
-    preset: HdrForgeEncodingPresets = HdrForgeEncodingPresets.AUTO
+    preset: HdrForgeEncodingTuningPresets = HdrForgeEncodingTuningPresets.FILM
     hardware_preset: HdrForgeEncodingHardwarePresets = HdrForgeEncodingHardwarePresets.CPU_BALANCED
 
 @dataclass
@@ -222,6 +211,7 @@ class EncoderSettings:
 
     crop: CropSettings = field(default_factory=lambda: CropSettings(mode=CropMode.AUTO))
     grain: GrainMode = GrainMode.OFF
+    logo_removal: LogoRemovelSettings = field(default_factory=lambda: LogoRemovelSettings())
 
     scale_height: Optional[int] = None
     scale_mode: ScaleMode = ScaleMode.HEIGHT

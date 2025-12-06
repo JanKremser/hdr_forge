@@ -5,7 +5,7 @@ import subprocess
 from typing import Callable, Optional
 
 from hdr_forge.core import config
-from hdr_forge.typedefs.ffmpeg_typing import ProgressInfo
+from hdr_forge.typedefs.ffmpeg_typing import FfmpegProgressInfo, FfmpegMiniProgressInfo
 
 
 # Constants
@@ -57,7 +57,7 @@ def clear_lines(n: int) -> str:
     Returns:
         ANSI escape code string to clear n lines
     """
-    return ''.join(f"{ANSI_CLEAR_LINE}{ANSI_CURSOR_UP_ONE}" for _ in range(n)) + ANSI_CLEAR_LINE + ANSI_MOVE_TO_START
+    return ''.join(f"{ANSI_CLEAR_LINE}{ANSI_CURSOR_UP_ONE}" for _ in range(n-1)) + ANSI_CLEAR_LINE + ANSI_MOVE_TO_START
 
 
 def color_str(value: str | int | float | None, color: str) -> str:
@@ -124,7 +124,7 @@ def print_err(msg: str) -> None:
 
 
 def print_debug(msg: str) -> None:
-    """Print an Debug message in blue color.
+    """Print an Debug message in purple color.
 
     Args:
         message: The Debug message to print
@@ -132,6 +132,14 @@ def print_debug(msg: str) -> None:
     if config.debug_mode == False:
         return
     print(f"{color_str(f'Debug: {msg}', ANSI_PURPLE)}")
+
+def print_info(msg: str) -> None:
+    """Print an Info message in blue color.
+
+    Args:
+        message: The Info message to print
+    """
+    print(f"{color_str(f'Info: {msg}', ANSI_BLUE)}")
 
 
 def create_progress_bar(percent: float, text: Optional[str] = None, width: int = PROGRESS_BAR_WIDTH) -> str:
@@ -240,7 +248,13 @@ def estimate_final_size(current_size_bytes: int | None, current_frame: int, tota
     return estimated_size
 
 
-def print_progress_info(first_update: bool, current_frame: int, total_frames: int, duration_seconds: float, process_time_seconds: float, fps: float, speed: float | None, time_seconds: float | None, bitrate_kbs: float | None, size_bytes: int | None) -> None:
+def print_progress_info(first_update: bool, current_frame: int, total_frames: int, duration_seconds: float, process_time_seconds: float, fps: float, speed: float | None, time_seconds: float | None, bitrate_kbs: float | None, size_bytes: int | None, video_fps: float | None, process_name: str | None) -> None:
+    #fix current_frame
+    if current_frame > total_frames:
+        current_frame = total_frames
+    elif current_frame < 0:
+        current_frame = total_frames
+
     # Calculate percentage
     percent: float = (current_frame / total_frames * 100) if total_frames > 0 else 0.0
 
@@ -250,23 +264,23 @@ def print_progress_info(first_update: bool, current_frame: int, total_frames: in
     # Create progress bar
     progress_bar: str = create_progress_bar_with_percent(percent=percent)
 
-    if time_seconds is None or (time_seconds == 0 and current_frame > 0):
-        time_seconds = calculate_time_seconds_backup(
-            current_frame=current_frame,
-            total_frames=total_frames,
-            duration_seconds=duration_seconds,
-        )
+    #if time_seconds is None or (time_seconds == 0 and current_frame > 0):
+    time_seconds = calculate_time_seconds(
+        current_frame=current_frame,
+        total_frames=total_frames,
+        duration_seconds=duration_seconds,
+        backup_time_seconds=time_seconds,
+    )
     time_str: str = format_time(seconds=time_seconds) if time_seconds is not None else "--:--:--"
 
     duration_str: str = format_time(seconds=duration_seconds) if duration_seconds is not None else "--:--:--"
     process_time_str: str = format_time(seconds=process_time_seconds)
 
-    if speed is None or (speed == 0 and current_frame > 0):
-        speed = calculate_speed_backup(
-            current_frame=current_frame,
-            process_time_seconds=process_time_seconds,
-            fps=fps,
-        )
+    speed = calculate_speed(
+        actual_fps=fps,
+        video_fps=video_fps,
+        backup_speed=speed,
+    )
     speed_str: str = f"{speed:.2f}" if speed is not None else "--.-"
 
     bitrate_str: str = f"{bitrate_kbs:.2f}" if bitrate_kbs is not None else "--.-"
@@ -285,9 +299,17 @@ def print_progress_info(first_update: bool, current_frame: int, total_frames: in
         estimated_size_kb_str: str = f"{estimated_size_bytes / 1024:.2f}"
         estimated_size_gb_str: str = f"{estimated_size_bytes / 1024 / 1024 / 1024:.2f}"
 
+    bar_len = 70
+    bar_str: str = color_str("-" * 70, ANSI_GREEN)
+    if process_name is not None:
+        word_len = len(process_name)
+        if word_len >= bar_len - 4:
+            process_name = process_name[:bar_len - 10] + "..."
+        new_bar_len: int = bar_len - (len(process_name) + 4)
+        bar_str = color_str(f"-- {process_name} " + ("-" * new_bar_len), ANSI_GREEN)
     # Format for multi-line output
     info_line: str = f"""
-{color_str("-" * 70, ANSI_GREEN)}
+{bar_str}
 Frame         : {color_str(current_frame, ANSI_GREEN)}/{total_frames}
 Speed         : {color_str(speed_str, ANSI_GREEN)}x | {color_str(fps, ANSI_GREEN)} FPS
 
@@ -299,14 +321,47 @@ Bitrate       : {color_str(bitrate_str, ANSI_GREEN)} kb/s
 Size          : {color_str(size_kb_str, ANSI_GREEN)} KB ~> {color_str(size_gb_str, ANSI_GREEN)} GB
 Final size    : {color_str(estimated_size_kb_str, ANSI_GREEN)} KB ~> {color_str(estimated_size_gb_str, ANSI_GREEN)} GB
 {progress_bar}
+{color_str("-" * bar_len, ANSI_GREEN)}"""
+
+    # For the first output, we only need to print both lines
+    print(clear_lines(14) if first_update is False else "", end="")
+    print(info_line, end="", flush=True)
+
+def print_progress_info_minimal(process_name: str, first_update: bool, current_frame: int, total_frames: int, process_time_seconds: float, fps: float) -> None:
+    #fix current_frame
+    if current_frame > total_frames:
+        current_frame = total_frames
+    elif current_frame < 0:
+        current_frame = total_frames
+
+    # Calculate percentage
+    percent: float = (current_frame / total_frames * 100) if total_frames > 0 else 0.0
+
+    # Calculate ETA
+    eta: str = calculate_eta(fps=fps, current_frame=current_frame, total_frames=total_frames)
+
+    # Create progress bar
+    progress_bar: str = create_progress_bar_with_percent(percent=percent)
+
+    process_time_str: str = format_time(seconds=process_time_seconds)
+
+    bar_len = 70
+    bar_len: int = bar_len - (len(process_name) + 4)
+    # Format for multi-line output
+    info_line: str = f"""
+{color_str(f"-- {process_name} " + ("-" * bar_len), ANSI_GREEN)}
+Frame         : {color_str(current_frame, ANSI_GREEN)}/{total_frames}
+ETA           : {color_str(eta, color=ANSI_GREEN)}
+Process Time  : {color_str(process_time_str, ANSI_GREEN)}
+{progress_bar}
 {color_str("-" * 70, ANSI_GREEN)}"""
 
     # For the first output, we only need to print both lines
-    print(clear_lines(13) if first_update is False else "", end="")
+    print(clear_lines(7) if first_update is False else "", end="")
     print(info_line, end="", flush=True)
 
 
-def create_progress_handler(duration: float, total_frames: int, process_start_time: float) -> Callable[[ProgressInfo], None]:
+def create_ffmpeg_progress_handler(duration: float, total_frames: int, process_start_time: float, video_fps: float | None = None, process_name: str | None = None) -> Callable[[FfmpegProgressInfo], None]:
     """Create a progress handler for ffmpeg encoding.
 
     Args:
@@ -317,13 +372,14 @@ def create_progress_handler(duration: float, total_frames: int, process_start_ti
     """
     first_update = True
 
-    def on_progress(progress: ProgressInfo) -> None:
+    def on_progress(progress: FfmpegProgressInfo) -> None:
         """Handle progress updates from ffmpeg."""
         nonlocal first_update
 
         time_seconds: float = 0.0
         if progress.time and duration > 0:
             time_seconds = progress.time
+
 
         current_frame: int = progress.frame
         fps: float = progress.fps if progress.fps else 0.0
@@ -343,6 +399,46 @@ def create_progress_handler(duration: float, total_frames: int, process_start_ti
             time_seconds=time_seconds,
             bitrate_kbs=progress.bitrate,
             size_bytes=progress.size,
+            video_fps=video_fps,
+            process_name=process_name,
+        )
+        if first_update:
+            first_update = False
+
+    return on_progress
+
+
+def create_ffmpeg_minimal_progress_handler(total_frames: int, process_start_time: float, process_name: str) -> Callable[[FfmpegMiniProgressInfo], None]:
+    """Create a progress handler for dovi_tool operations.
+
+    Args:
+        total_frames: Total number of frames to process
+        duration: Total video duration in seconds
+        process_start_time: Start time of the process
+
+    Returns:
+        Progress handler function that accepts DoviProgressInfo
+    """
+    first_update = True
+
+    def on_progress(progress: FfmpegMiniProgressInfo) -> None:
+        """Handle progress updates from dovi_tool FFmpeg pipeline."""
+        nonlocal first_update
+
+        current_frame: int = progress.frame
+        fps: float = progress.fps if progress.fps else 0.0
+
+        process_time_seconds: float = _calc_process_time_seconds(
+            process_start_time=process_start_time
+        )
+
+        print_progress_info_minimal(
+            process_name=process_name,
+            first_update=first_update,
+            current_frame=current_frame,
+            total_frames=total_frames,
+            process_time_seconds=process_time_seconds,
+            fps=fps,
         )
         if first_update:
             first_update = False
@@ -368,31 +464,61 @@ def print_conversion_summary(success_count: int, fail_count: int) -> None:
 class ProgressBarSpinner:
     """Simple spinner progress indicator for indeterminate tasks."""
 
-    def __init__(self, description: str):
-        self.description = description
+    def __init__(self, description: str | None = None, without_headline: bool = False) -> None:
+        self.description: str = description or "Processing"
         self.spinner = ['|', '/', '-', '\\']
         self.index = 0
         self.running = False
+        self.without_headline: bool = without_headline
 
     def start(self) -> None:
         """Start the spinner."""
         self.running = True
-        print(f"{self.description}", flush=True)
 
-    def update(self) -> None:
+        if self.without_headline:
+            return
+        start_line_len = 70
+        start_line_len: int = start_line_len - (len(self.description) + 4)
+        print(color_str(f"-- {self.description} " + ("-" * start_line_len), ANSI_GREEN), flush=True)
+
+    def update(self, count_clear_lines: int | None = None, percent: float | None = None) -> None:
         """Update the spinner state."""
         if not self.running:
             return
-        bar: str = create_progress_bar(percent=(self.index % 20) * 5, text=f"Processing {self.spinner[self.index % 4]}")  # Indeterminate progress
-        status: str = f"{ANSI_CLEAR_LINE}{ANSI_MOVE_TO_START}{bar}"
+
+        if percent is not None:
+            bar: str = create_progress_bar(
+                percent=percent,
+                text=f"{percent:.1f}% | {self.spinner[self.index % 4]}"
+            )
+        else:
+            bar: str = create_progress_bar(
+                percent=(self.index % 20) * 5,
+                text=f"Processing {self.spinner[self.index % 4]}"
+            )  # Indeterminate progress
+
+        end_line = color_str("-" * 70, ANSI_GREEN)
+
+        clear_lines_str: str = ""
+        if count_clear_lines:
+            clear_lines_str = clear_lines(count_clear_lines)
+        else:
+            if self.index == 0:
+                clear_lines_str = clear_lines(1)
+            else:
+                clear_lines_str = clear_lines(2)
+
+        status: str = f"{clear_lines_str}{bar}\n{end_line}"
         print(status, end='', flush=True)
         self.index += 1
 
-    def stop(self, text: str | None) -> None:
+    def stop(self, text: str | None, long_info_text: str | None = None) -> None:
         """Stop the spinner."""
         self.running = False
         bar: str = create_progress_bar(percent=100, text=text or "Processing Done")
-        status: str = f"{ANSI_CLEAR_LINE}{ANSI_MOVE_TO_START}{bar}\n"
+        end_line = color_str("-" * 70, ANSI_GREEN)
+        long_info: str = f"{long_info_text}\n" if long_info_text else ""
+        status: str = f"{ANSI_CLEAR_TWO_LINES}{bar}\n{long_info}{end_line}\n"
         print(status, end='', flush=True)
 
 def monitor_process_progress(process: subprocess.Popen, description: str) -> None:
@@ -472,26 +598,24 @@ def create_aspect_ratio_str(width: int, height: int, tolerance: float = 0.02) ->
     ratio_x_to_1: float = width / height
     return f"{ratio_x_to_1:.2f}:1"
 
-def calculate_speed_backup(current_frame: int, process_time_seconds: float, fps: float) -> float | None:
+def calculate_speed(actual_fps: float, video_fps: float | None, backup_speed: float | None) -> float | None:
     """
     Calculates a backup speed value if speed is None.
     Uses current frames and elapsed process time.
 
     Args:
-        current_frame (int): Current frame number
-        process_time_seconds (float): Elapsed process time in seconds
-        fps (float): Current FPS
+        actual_fps (float): Actual frames processed per second
+        video_fps (float): Original video frames per second
+        backup_speed (float | None): Backup speed value
 
     Returns:
         float | None: Calculated speed (e.g. 1.23 for 1.23x), or None if not calculable
     """
-    if process_time_seconds > 0 and fps > 0 and current_frame > 0:
-        # Actual speed = (processed frames per second) / (target FPS)
-        actual_fps = current_frame / process_time_seconds
-        return actual_fps / fps
-    return None
+    if actual_fps > 0 and video_fps and video_fps > 0:
+        return actual_fps / video_fps
+    return backup_speed
 
-def calculate_time_seconds_backup(current_frame: int, total_frames: int, duration_seconds: float) -> float | None:
+def calculate_time_seconds(current_frame: int, total_frames: int, duration_seconds: float, backup_time_seconds: float | None) -> float | None:
     """
     Calculates a backup time value (time_seconds) if it is None.
     Uses the ratio of current_frame to total_frames and multiplies by duration_seconds.
@@ -499,11 +623,12 @@ def calculate_time_seconds_backup(current_frame: int, total_frames: int, duratio
     Args:
         current_frame (int): Current frame number
         total_frames (int): Total number of frames
-        duration_seconds (float): Total duration in seconds
+        duration_seconds (float): Total video duration in seconds
+        backup_time_seconds (float | None): Backup time value
 
     Returns:
         float | None: Calculated time in seconds or None if not calculable
     """
     if total_frames > 0 and duration_seconds > 0 and current_frame >= 0:
         return (current_frame / total_frames) * duration_seconds
-    return None
+    return backup_time_seconds

@@ -43,10 +43,10 @@ def shutdown_system() -> None:
 
     try:
         if system == "Linux":
-            print_warn("Shutting down the system in 1 minute...")
+            print_warn("Shutting down the linux-system in 1 minute...")
             subprocess.run(["shutdown", "-h", "+1"])
         elif system == "Windows":
-            print_warn("Shutting down the system in 1 minute...")
+            print_warn("Shutting down the windows-system in 1 minute...")
             subprocess.run(["shutdown", "/s", "/t", "60"])
         else:
             print("Unbekanntes Betriebssystem")

@@ -6,8 +6,8 @@ import sys
 import time
 from typing import Dict, Optional, Tuple
 
-from hdr_forge import hdr_metadata_injector
-from hdr_forge.cli.cli_output import create_progress_handler, print_debug, print_err
+from hdr_forge.cli.cli_output import create_ffmpeg_progress_handler, print_debug, print_err
+from hdr_forge.core.config import get_global_temp_directory
 from hdr_forge.core.service import build_ffmpeg_cmd_dict_to_str
 from hdr_forge.tools import mkvmerge
 from hdr_forge.ffmpeg.ffmpeg_wrapper import run_ffmpeg
@@ -16,8 +16,10 @@ from hdr_forge.ffmpeg.video_codec.hevc_nvenc import HevcNvencCodec
 from hdr_forge.ffmpeg.video_codec.video_codec_base import VideoCodecBase
 from hdr_forge.ffmpeg.video_codec.libx264 import Libx264Codec
 from hdr_forge.ffmpeg.video_codec.libx265 import Libx265Codec
+from hdr_forge.ffmpeg.video_codec.libsvtav1 import LibSvtAV1Codec
 from hdr_forge.tools import dovi_tool
-from hdr_forge.typedefs.encoder_typing import EncoderOverride, HdrSdrFormat, EncoderSettings, SampleSettings, VideoCodec, VideoEncoderLibrary
+from hdr_forge.typedefs.codec_typing import VideoEncoderLibrary
+from hdr_forge.typedefs.encoder_typing import EncoderOverride, HdrSdrFormat, EncoderSettings, SampleSettings, VideoCodec
 from hdr_forge.typedefs.dolby_vision_typing import DolbyVisionEnhancementLayer, DolbyVisionProfile, DolbyVisionProfileEncodingMode
 from hdr_forge.video import Video
 
@@ -190,6 +192,9 @@ class Encoder:
                 print_err("Error: H264 NVENC encoder not available on this system.")
                 sys.exit(1)
 
+        elif override == EncoderOverride.LIBSVTAV1:
+            return LibSvtAV1Codec(encoder_settings=encoder_settings, video=video, scale=scale_tuple)
+
         return None
 
     def get_video_codec_lib(self) -> VideoCodecBase | None:
@@ -309,27 +314,29 @@ class Encoder:
         """
         return self._target_video_codec
 
-    def get_encoding_hdr_sdr_format(self) -> HdrSdrFormat:
+    def get_encoding_hdr_sdr_format(self) -> list[HdrSdrFormat]:
         """Get the effective color format for encoding.
 
         Returns:
             Effective ColorFormat
         """
         if self._video_codec_lib is None:
+            if HdrSdrFormat.DOLBY_VISION in self._video.get_hdr_sdr_format() and self._encoder_settings.hdr_sdr_format == HdrSdrFormat.HDR10:
+                return [HdrSdrFormat.HDR10]
             return self._video.get_hdr_sdr_format()
-        return self._video_codec_lib.get_encoding_hdr_sdr_format()
+        return [self._video_codec_lib.get_encoding_hdr_sdr_format()]
 
     def is_dolby_vision_encoding(self) -> bool:
         """Check if encoding to Dolby Vision format."""
-        return self.get_encoding_hdr_sdr_format() == HdrSdrFormat.DOLBY_VISION
+        return HdrSdrFormat.DOLBY_VISION in self.get_encoding_hdr_sdr_format()
 
     def is_hdr10_encoding(self) -> bool:
         """Check if encoding to HDR10 format."""
-        return self.get_encoding_hdr_sdr_format() == HdrSdrFormat.HDR10
+        return HdrSdrFormat.HDR10 in self.get_encoding_hdr_sdr_format()
 
     def is_sdr_encoding(self) -> bool:
         """Check if encoding to SDR format."""
-        return self.get_encoding_hdr_sdr_format() == HdrSdrFormat.SDR
+        return HdrSdrFormat.SDR in self.get_encoding_hdr_sdr_format()
 
     def get_target_file(self) -> Path:
         """Get the target output file path.
@@ -338,36 +345,6 @@ class Encoder:
             Target file Path
         """
         return self._target_file
-
-    def _get_temp_directory(self) -> Path:
-        """Get or create temporary directory for intermediate files.
-
-        Creates a temp directory in the same location as target_file:
-        {target_file_dir}/.hdr_forge_temp_{target_file_stem}/
-
-        Returns:
-            Path to temporary directory
-        """
-        temp_dir = self._target_file.parent / f".hdr_forge_temp_{self._target_file.stem}"
-        temp_dir.mkdir(parents=True, exist_ok=True)
-        return temp_dir
-
-    def _cleanup_temp_directory(self) -> None:
-        """Remove temporary directory and all its contents.
-
-        Deletes the temp directory created by _get_temp_directory().
-        Handles errors gracefully and prints warnings if cleanup fails.
-        """
-        import shutil
-
-        temp_dir = self._target_file.parent / f".hdr_forge_temp_{self._target_file.stem}"
-
-        if temp_dir.exists() and temp_dir.is_dir():
-            try:
-                shutil.rmtree(temp_dir)
-                print(f"Cleaned up temporary files: {temp_dir}")
-            except Exception as e:
-                print(f"Warning: Failed to clean up temporary directory {temp_dir}: {e}")
 
     def _build_ffmpeg_output_options(self) -> Dict[str, str]:
         """Build FFmpeg output options dictionary for encoding.
@@ -379,22 +356,31 @@ class Encoder:
             "map": "0",
         }
 
+        if self._video_sample_in_sec is not None:
+            start_time, end_time = self._video_sample_in_sec
+            output_options['ss'] = str(start_time)
+            output_options['t'] = str(end_time-start_time)
+
         if self._video_codec_lib:
-            output_options.update(self._video_codec_lib.get_ffmpeg_params())
+            output_options = self._video_codec_lib.get_ffmpeg_params(exist_params=output_options)
         else:
             output_options.update({
                 'c:v': 'copy',
             })
 
+        metadata: list[str] = [
+            'hdr_forge_version=' + str(getattr(sys.modules['hdr_forge'], '__version__', 'unknown')),
+        ]
+
+        if 'metadata' in output_options:
+            output_options['metadata'].extend(metadata)
+        else:
+            output_options['metadata'] = metadata
+
         output_options.update({
             'c:a': 'copy',
-            'c:s': 'copy'
+            'c:s': 'copy',
         })
-
-        if self._video_sample_in_sec is not None:
-            start_time, end_time = self._video_sample_in_sec
-            output_options['ss'] = str(start_time)
-            output_options['t'] = str(end_time-start_time)
 
         return output_options
 
@@ -411,10 +397,12 @@ class Encoder:
         process_start_time: float = time.time()
 
         if duration > 0:
-            progress_callback = create_progress_handler(
+            progress_callback = create_ffmpeg_progress_handler(
                 duration=duration,
                 total_frames=total_frames,
                 process_start_time=process_start_time,
+                video_fps=self._video.get_fps(),
+                process_name=f"Encoding Video: {target_file.name}",
             )
 
         try:
@@ -463,15 +451,16 @@ class Encoder:
     def convert_dolby_vision_to_hdr10_without_re_encoding(
         self,
     ) -> bool:
-        input_file: Path = self._video.get_filepath()
+        temp_dir: Path = get_global_temp_directory()
 
-        # Create temporary directory for all intermediate files
-        temp_dir: Path = self._get_temp_directory()
+        input_file: Path = self._video.get_filepath()
+        total_frames: int = self._video.get_total_frames()
 
         # Step 1: Extract base layer (HEVC without EL+RPU) from original video
         base_layer_hevc_path: Path = dovi_tool.extract_base_layer(
             input_path=input_file,
-            output_hevc=temp_dir / f"video_BL.hevc"
+            output_hevc=temp_dir / f"video_BL.hevc",
+            total_frames=total_frames,
         )
 
         # Step 2: Mux base layer HEVC with original audio/subtitles into final MKV
@@ -482,8 +471,6 @@ class Encoder:
             output_mkv=self._target_file,
         )
 
-        self._cleanup_temp_directory()
-
         return True
 
     def _convert_dolby_profile(
@@ -493,7 +480,9 @@ class Encoder:
         source_dv_profile: DolbyVisionProfile | None,
         target_dv_profile: DolbyVisionProfile | None,
     ) -> Path:
-        temp_dir: Path = self._get_temp_directory()
+        temp_dir: Path = get_global_temp_directory()
+
+        total_frames: int = self._video.get_total_frames()
 
         # Step 1: Extract RPU metadata from original Dolby Vision video
         rpu_file_path: Path = dovi_tool.extract_rpu(
@@ -501,6 +490,8 @@ class Encoder:
             output_rpu=temp_dir / f"RPU.rpu",
             dv_profile_source=source_dv_profile,
             dv_profile_encoding=target_dv_profile,
+            total_frames=total_frames,
+            use_cache=True,
         )
 
         hevc: Path = hevc_bl
@@ -508,8 +499,9 @@ class Encoder:
         if self._target_dv_el is not None:
             # start demux EL profile 7 for profile 7 encoding
             el_path: Path = dovi_tool.extract_enhancement_layer(
-                input_file=input_file,
+                input_path=input_file,
                 output_el=temp_dir / f"video_EL.hevc",
+                total_frames=total_frames,
             )
             bl_el_hevc: Path = dovi_tool.inject_dolby_vision_layers(
                 bl_path=hevc_bl,
@@ -532,14 +524,16 @@ class Encoder:
         self,
     ) -> bool:
         input_file: Path = self._video.get_filepath()
+        total_frames: int = self._video.get_total_frames()
 
         # Create temporary directory for all intermediate files
-        temp_dir: Path = self._get_temp_directory()
+        temp_dir: Path = get_global_temp_directory()
 
         # Step 1: Extract base layer (HEVC without RPU) from original video
         base_layer_hevc_path: Path = dovi_tool.extract_base_layer(
             input_path=input_file,
             output_hevc=temp_dir / f"video_BL.hevc",
+            total_frames=total_frames,
         )
 
         # Step 2: Convert Dolby Vision profile by injecting RPU into base layer HEVC
@@ -556,9 +550,6 @@ class Encoder:
             input_mkv=input_file,
             output_mkv=self._target_file,
         )
-
-        # Step 4: Clean up temporary directory (should be empty now, but removes it anyway)
-        self._cleanup_temp_directory()
 
         return True
 
@@ -590,14 +581,16 @@ class Encoder:
         only_hdr10_or_sdr_encoding: bool = not self.is_dolby_vision_encoding()
 
         input_file: Path = self._video.get_filepath()
+        total_frames: int = self._video.get_total_frames()
 
         # Create temporary directory for all intermediate files
-        temp_dir: Path = self._get_temp_directory()
+        temp_dir: Path = get_global_temp_directory()
 
         # Step 1: Extract base layer (HEVC without RPU) from original video
         base_layer_hevc_path: Path = dovi_tool.extract_base_layer(
             input_path=input_file,
             output_hevc=temp_dir / f"video_BL.hevc",
+            total_frames=total_frames,
         )
 
         # Step 2: Mux base layer HEVC with original audio/subtitles into temporary MKV
@@ -630,7 +623,6 @@ class Encoder:
 
         # For HDR10 or SDR encoding, we are done here
         if only_hdr10_or_sdr_encoding:
-            self._cleanup_temp_directory()
             return True
 
         print()
@@ -638,7 +630,8 @@ class Encoder:
         # Step 4: Extract encoded HEVC video stream from MKV
         encoded_hevc_bl_path: Path = mkvmerge.extract_hevc(
             input_path=encoded_base_layer_mkv,
-            output_hevc=temp_dir / f"video_encoded_BL.hevc"
+            output_hevc=temp_dir / f"video_encoded_BL.hevc",
+            total_frames=total_frames,
         )
 
         # Step 5: Convert Dolby Vision profile by injecting RPU into encoded base layer HEVC
@@ -658,9 +651,6 @@ class Encoder:
             input_mkv=encoded_base_layer_mkv,
             output_mkv=self._target_file,
         )
-
-        # Step 7: Clean up temporary directory (should be empty now, but removes it anyway)
-        self._cleanup_temp_directory()
 
         return True
 

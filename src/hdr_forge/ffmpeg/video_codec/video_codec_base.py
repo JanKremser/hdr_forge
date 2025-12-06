@@ -1,13 +1,16 @@
 from abc import ABC, abstractmethod
 import math
+from pathlib import Path
 import sys
 from typing import Optional, Tuple, Type, TypeVar
 
 from hdr_forge.analyze.crop_video import CropResult, VideoCropper
+from hdr_forge.analyze.detect_logo import LogoDetector
 from hdr_forge.analyze.grain_score import GrainAnalyzer
 from hdr_forge.cli.cli_output import print_err, print_warn
 from hdr_forge.ffmpeg.video_codec.service.presets import calc_hw_prest_params
-from hdr_forge.typedefs.encoder_typing import EncoderSettings, HdrSdrFormat, ScaleMode, VideoEncoderLibrary
+from hdr_forge.typedefs.codec_typing import HDR_FORGE_SPEED_PRESET, CodecPreset, VideoEncoderLibrary
+from hdr_forge.typedefs.encoder_typing import EncoderSettings, HdrForgeSpeedPreset, HdrSdrFormat, ScaleMode, UniversalEncoderParams
 from hdr_forge.typedefs.video_typing import HdrMetadata
 from hdr_forge.video import Video
 
@@ -37,12 +40,18 @@ class VideoCodecBase(ABC):
             print_err(f"{self.lib.value} does not support the selected {self._hdr_sdr_format_for_encoding.value}-format for encoding.")
             sys.exit(1)
 
+        self._logo_remover = LogoDetector(
+            video=video,
+            logo_removal=encoder_settings.logo_removal,
+        )
+        self._logo_remover.detect_logo()
+
         self._cropper = VideoCropper(
             video=video,
             crop_settings=encoder_settings.crop,
             encoding_hdr_sdr_format=self._hdr_sdr_format_for_encoding,
         )
-        self._cropper.process_crop()
+        self._cropper.detect_crop()
 
         self._grain = GrainAnalyzer(
             video=video,
@@ -67,15 +76,30 @@ class VideoCodecBase(ABC):
         return self._gpu_encoding
 
     @abstractmethod
-    def get_ffmpeg_params(self) -> dict:
+    def get_ffmpeg_params(self, exist_params: dict) -> dict:
         """Get FFmpeg parameters for this codec."""
         output_options: dict = {
+            **exist_params,
             "c:v": self.lib.value,
         }
 
         vf: str | None = self._get_default_video_filter()
         if vf:
             output_options["vf"] = vf
+
+        new_input: Path | None = self._logo_remover.get_ffmpeg_overlay_video_input()
+        if new_input:
+            filter_complex: str | None = self._logo_remover.get_ffmpeg_filter_filter_complex()
+            if filter_complex:
+                output_options = {
+                    "i": str(new_input),
+                    **output_options
+                }
+                output_options["map"] = ['[v]', '0:a?', '0:s?']
+                filter_vf: str | None = output_options.get("vf", None)
+                if filter_vf:
+                    del output_options["vf"]
+                output_options["filter_complex"] = f"{filter_complex}{"," + filter_vf if filter_vf else ""}[v]"
 
         if self._encoder_settings.dar_ratio is not None:
             dar_w, dar_h = self._encoder_settings.dar_ratio
@@ -91,6 +115,14 @@ class VideoCodecBase(ABC):
                     "colour_space=bt709"
                 ],
             })
+
+        metadata: list[str] = [
+            'hdr_forge_encoder_codec=' + self.lib.value,
+        ]
+        if 'metadata' in output_options:
+            output_options['metadata'].extend(metadata)
+        else:
+            output_options['metadata'] = metadata
 
         return output_options
 
@@ -109,7 +141,7 @@ class VideoCodecBase(ABC):
         pass
 
     @abstractmethod
-    def get_pix_format_for_encoding(self) -> str:
+    def get_pix_format_for_encoding(self) -> str | None:
         return self._video.get_pix_fmt()
 
     @abstractmethod
@@ -125,6 +157,35 @@ class VideoCodecBase(ABC):
         # keep original bit depth for SDR source videos
         return self._video.get_bit_depth()
 
+    @abstractmethod
+    def _get_auto_preset(self, calc_preset: HdrForgeSpeedPreset) -> CodecPreset:
+        """Select optimal encoding preset based on parameter priority.
+
+        Priority:
+            1. universal_params.speed (from --speed)
+            2. calc_preset (auto-detection)
+
+        Returns:
+            CodecPreset value
+        """
+        # Priority 2: universal_params from --speed
+        universal_params: UniversalEncoderParams = self._encoder_settings.universal_params
+
+        speed_preset: list[CodecPreset] | None = None
+        if universal_params.speed is not None:
+            speed_preset = HDR_FORGE_SPEED_PRESET[universal_params.speed]
+
+        # Priority 3: Auto-detection from hw_preset
+        if speed_preset is None:
+            speed_preset = HDR_FORGE_SPEED_PRESET[calc_preset]
+
+        assert speed_preset is not None
+        for s_preset in speed_preset:
+            if self.lib in s_preset.codec_libs:
+                return s_preset
+
+        raise ValueError(f"No valid preset found for {self.lib.value} codec.")
+
     def get_name(self) -> str:
         return self.lib.value
 
@@ -139,6 +200,13 @@ class VideoCodecBase(ABC):
         if vf is not None:
             _filter: list[str] = vf.split(',')
             filters.extend(_filter)
+
+        if self._video.is_video_interlaced():
+            filters.append('bwdif=mode=send_frame:parity=auto:deint=all')
+
+        delogo_filter: str | None = self._logo_remover.get_ffmpeg_delogo_filter()
+        if delogo_filter:
+            filters.append(delogo_filter)
 
         encoding_hdr_sdr_format: HdrSdrFormat = self.get_encoding_hdr_sdr_format()
 

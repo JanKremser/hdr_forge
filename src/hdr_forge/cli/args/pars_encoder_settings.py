@@ -3,13 +3,13 @@
 import sys
 from typing import Tuple
 
-from ffmpeg.types import T
 
 from hdr_forge import __version__
 from hdr_forge.cli.cli_output import print_err, print_warn
-from hdr_forge.typedefs.encoder_typing import CropMode, CropSettings, EncoderOverride, GrainMode, HEVC_NVENC_Preset, HdrForgeEncodingHardwarePresets, HdrForgeEncodingPresetSettings, HdrForgeEncodingPresets, HdrSdrFormat, EncoderSettings, NvencParams, NvencRcMode, SampleSettings, ScaleMode, UniversalEncoderParams, VideoCodec, VideoEncoderLibrary, Libx264Params, X264Tune, Libx265Params, X265Tune, x265_x264_Preset
+from hdr_forge.typedefs.codec_typing import HEVC_NVENC_Preset, VideoEncoderLibrary, x265_x264_Preset
+from hdr_forge.typedefs.encoder_typing import CropMode, CropSettings, EncoderOverride, GrainMode, HdrForgeEncodingHardwarePresets, HdrForgeEncodingPresetSettings, HdrForgeEncodingTuningPresets, HdrForgeSpeedPreset, HdrSdrFormat, EncoderSettings, LogoRemovalAutoDetectMode, LogoRemovalMode, LogoRemovelSettings, NvencParams, NvencRcMode, SampleSettings, ScaleMode, UniversalEncoderParams, VideoCodec, Libx264Params, X264Tune, Libx265Params, X265Tune
 from hdr_forge.typedefs.dolby_vision_typing import DolbyVisionProfileEncodingMode
-from hdr_forge.typedefs.video_typing import ContentLightLevelMetadata, HdrMetadata, MasterDisplayMetadata
+from hdr_forge.typedefs.video_typing import BT_2020_MASTER_DISPLAY, BT_709_MASTER_DISPLAY, DISPLAY_P3_MASTER_DISPLAY, ContentLightLevelMetadata, HdrMetadata, MasterDisplayMetadata
 
 # Resolution constants
 RESOLUTIONS: dict = {
@@ -209,6 +209,66 @@ def _get_grain_settings_from_string(grain_str: str | None) -> GrainMode:
     print_err(f"Invalid grain value '{grain_str}', using 'off'")
     sys.exit(1)
 
+def _get_logo_removal_mode_from_string(logo_str: str | None) -> LogoRemovelSettings:
+    """Convert logo removal argument string to LogoRemovalMode enum.
+
+    Args:
+        logo_str: Logo removal argument string
+
+    Returns:
+        LogoRemovalMode enum value
+    """
+    if logo_str is None:
+        return LogoRemovelSettings(mode=LogoRemovalMode.OFF, position=LogoRemovalAutoDetectMode.AUTO)
+
+    logo_str = logo_str.lower()
+    if logo_str == 'off':
+        return LogoRemovelSettings(mode=LogoRemovalMode.OFF, position=LogoRemovalAutoDetectMode.AUTO)
+    elif logo_str == 'auto':
+        return LogoRemovelSettings(mode=LogoRemovalMode.DELOGO, position=LogoRemovalAutoDetectMode.AUTO)
+    elif logo_str == 'mask':
+        return LogoRemovelSettings(mode=LogoRemovalMode.MASK, position=LogoRemovalAutoDetectMode.AUTO)
+    elif logo_str == 'delogo':
+        return LogoRemovelSettings(mode=LogoRemovalMode.DELOGO, position=LogoRemovalAutoDetectMode.AUTO)
+
+    if ':' in logo_str:
+        parts = logo_str.split(':')
+        if len(parts) == 2:
+            mode_part = parts[0]
+            position_part = parts[1]
+
+            mode: LogoRemovalMode
+            position: LogoRemovalAutoDetectMode
+
+            # Determine mode
+            if mode_part == 'delogo':
+                mode = LogoRemovalMode.DELOGO
+            elif mode_part == 'mask':
+                mode = LogoRemovalMode.MASK
+            else:
+                print_err(f"Invalid logo removal mode '{mode_part}', using 'off'")
+                sys.exit(1)
+
+            # Determine position
+            if position_part == 'auto':
+                position = LogoRemovalAutoDetectMode.AUTO
+            elif position_part == 'top-left':
+                position = LogoRemovalAutoDetectMode.AUTO_TOP_LEFT
+            elif position_part == 'top-right':
+                position = LogoRemovalAutoDetectMode.AUTO_TOP_RIGHT
+            elif position_part == 'bot-left':
+                position = LogoRemovalAutoDetectMode.AUTO_BOT_LEFT
+            elif position_part == 'bot-right':
+                position = LogoRemovalAutoDetectMode.AUTO_BOT_RIGHT
+            else:
+                print_err(f"Invalid logo removal position '{position_part}', using 'off'")
+                sys.exit(1)
+
+            return LogoRemovelSettings(mode=mode, position=position)
+
+    print_err(f"Invalid logo removal value '{logo_str}', using 'off'")
+    sys.exit(1)
+
 
 def _get_sample_settings_from_string(sample_str: str | None) -> SampleSettings:
     """Convert sample argument string to SampleSettings object.
@@ -250,12 +310,21 @@ def _get_master_display_from_string(md_str: str | None) -> MasterDisplayMetadata
     if md_str is None:
         return None
 
+    if md_str.lower() == 'display-p3':
+        return DISPLAY_P3_MASTER_DISPLAY
+
+    if md_str.lower() == 'bt.2020':
+        return BT_2020_MASTER_DISPLAY
+
+    if md_str.lower() == 'bt.709':
+        return BT_709_MASTER_DISPLAY
+
     try:
         parts = md_str.split('L(')
         lum_part = parts[1].rstrip(')')
         max_lum, min_lum = map(float, lum_part.split(','))
 
-        md_values = parts[0]
+        md_values: str = parts[0]
         r_x = float(md_values.split('R(')[1].split(',')[0]) / 50000
         r_y = float(md_values.split('R(')[1].split(')')[0].split(',')[1]) / 50000
         g_x = float(md_values.split('G(')[1].split(',')[0]) / 50000
@@ -376,6 +445,8 @@ def _get_encoder_override_from_string(encoder_str: str | None) -> EncoderOverrid
         return EncoderOverride.LIBX265
     elif encoder_str == 'libx264':
         return EncoderOverride.LIBX264
+    elif encoder_str == 'libsvtav1':
+        return EncoderOverride.LIBSVTAV1
     elif encoder_str == 'hevc_nvenc':
         return EncoderOverride.HEVC_NVENC
     elif encoder_str == 'h264_nvenc':
@@ -457,7 +528,7 @@ def _get_universal_params_from_args(args) -> UniversalEncoderParams:
     speed = None
     if speed_str is not None:
         try:
-            speed = x265_x264_Preset(speed_str)
+            speed = HdrForgeSpeedPreset(speed_str)
         except ValueError:
             print_err(msg=f"Invalid speed value '{speed_str}'")
             sys.exit(1)
@@ -512,6 +583,10 @@ def _validate_hw_preset_with_encoder(hw_preset_str: str, encoder_override: Encod
         # Prefix is valid or encoder is AUTO
         return hw_preset_str
 
+    if hw_preset_str in ['gpu', 'cpu']:
+        # Only prefix provided, default to balanced
+        return f"{hw_preset_str}:balanced"
+
     # Prefix-free preset - add appropriate prefix based on encoder
     prefix = 'gpu' if is_gpu_encoder else 'cpu'
     return f"{prefix}:{hw_preset_str}"
@@ -526,13 +601,13 @@ def _get_hdr_forge_encoder_presets_from_args(args, encoder_override: EncoderOver
     Returns:
         HdrForgeEncodingPresetSettings object with preset and hardware preset
     """
-    preset: HdrForgeEncodingPresets
+    preset: HdrForgeEncodingTuningPresets
     hw_preset: HdrForgeEncodingHardwarePresets
-    if args.preset is None:
-        preset = HdrForgeEncodingPresets.AUTO
+    if args.preset is None or args.preset.lower() == 'auto':
+        preset = HdrForgeEncodingTuningPresets.FILM
     else:
         try:
-            preset = HdrForgeEncodingPresets(args.preset)
+            preset = HdrForgeEncodingTuningPresets(args.preset)
         except ValueError:
             print_err(msg=f"Invalid preset value '{args.preset}'")
             sys.exit(1)
@@ -622,6 +697,7 @@ def create_encoder_settings_from_args(args) -> EncoderSettings:
         scale_mode=ScaleMode(args.scale_mode),
         crop=_get_crop_settings_from_string(crop_str=args.crop),
         grain=_get_grain_settings_from_string(grain_str=args.grain),
+        logo_removal=_get_logo_removal_mode_from_string(logo_str=args.remove_logo),
         sample=_get_sample_settings_from_string(sample_str=args.sample),
         hdr_metadata=hdr_metadata,
     )
