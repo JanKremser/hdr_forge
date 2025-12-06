@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 from enum import Enum
+from pickle import TRUE
 from typing import Optional
 
 
@@ -49,6 +50,21 @@ class VideoCodec(Enum):
     H265 = "h265"
     H264 = "h264"
     COPY = "copy"
+
+class AudioCodec(Enum):
+    """Audio codec options for encoding."""
+    COPY = "copy"
+    AAC = "aac"
+    OPUS = "opus"
+    VORBIS = "vorbis"
+    FLAC = "flac"
+    MP3 = "mp3"
+
+@dataclass
+class AudioCodecItem():
+    """Audio codec configuration for encoding."""
+    from_codec: Optional[str | AudioCodec] = None
+    to_codec: AudioCodec = AudioCodec.COPY
 
 class ScaleMode(Enum):
     """Scaling mode for video resizing after cropping."""
@@ -186,6 +202,7 @@ class EncoderSettings:
     making it easier to pass configuration to the convert_video function.
     """
     video_codec: VideoCodec = VideoCodec.H265
+    audio_codecs: dict[str, AudioCodecItem] = field(default_factory=lambda: {}) # { lang or track id: AudioCodecItem }
 
     # Video filter settings
     vfilter: Optional[str] = None

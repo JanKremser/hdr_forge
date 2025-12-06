@@ -157,6 +157,33 @@ Video codec to use for encoding.
     )
 
     convert_parser.add_argument(
+        '-a', '--audio-codec',
+        help=f"""{sdr_dot} {hdr_dot} {dolby_vision_dot}
+Audio codec to use for encoding.
+    [copy]                 : Copy stream without re-encoding
+    [aac]                  : Re-encode all audio tracks to AAC format
+
+You can specify multiple audio tracks with different codecs using the following format:
+    [ger:aac]              : Re-encode German audio track to AAC format
+    [eng:aac]              : Re-encode English audio track to AAC format
+    [2:aac]                : Re-encode audio track with ID 2 to AAC format -> Use the info subcommand to get track IDs
+
+You can also convert specific audio formats:
+    [dts>aac]              : Convert all DTS audio tracks to AAC format
+
+You can also combine copying and re-encoding:
+    [eng:dts>aac]         : Convert English DTS audio track to AAC format, other audio tracks are copied
+    [eng:aac;ger:dts>aac] : Convert English audio tracks to AAC and convert only the German DTS tracks to AAC track. Other audio tracks are copied.
+
+Examples:
+    hdr_forge convert -i input.mkv -o output.mkv --audio-codec copy
+    hdr_forge convert -i input.mkv -o output.mkv --audio-codec ger:aac
+    hdr_forge convert -i input.mkv -o output.mkv --audio-codec eng:dts>aac
+    hdr_forge convert -i input.mkv -o output.mkv --audio-codec eng:aac;ger:dts>aac\n
+"""
+    )
+
+    convert_parser.add_argument(
         '-p', '--preset',
         choices=["auto", "film", "banding", "video", "action", "animation"],
         default="auto",

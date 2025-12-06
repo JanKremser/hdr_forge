@@ -19,8 +19,9 @@ from hdr_forge.ffmpeg.video_codec.libx265 import Libx265Codec
 from hdr_forge.ffmpeg.video_codec.libsvtav1 import LibSvtAV1Codec
 from hdr_forge.tools import dovi_tool
 from hdr_forge.typedefs.codec_typing import VideoEncoderLibrary
-from hdr_forge.typedefs.encoder_typing import EncoderOverride, HdrSdrFormat, EncoderSettings, SampleSettings, VideoCodec
+from hdr_forge.typedefs.encoder_typing import AudioCodec, AudioCodecItem, EncoderOverride, HdrSdrFormat, EncoderSettings, SampleSettings, VideoCodec
 from hdr_forge.typedefs.dolby_vision_typing import DolbyVisionEnhancementLayer, DolbyVisionProfile, DolbyVisionProfileEncodingMode
+from hdr_forge.typedefs.mkv_typing import MkvTrack
 from hdr_forge.video import Video
 
 
@@ -346,6 +347,51 @@ class Encoder:
         """
         return self._target_file
 
+    def _build_ffmpeg_audio_options(self, options: dict) -> dict:
+        audio_codecs: dict[str, AudioCodecItem] = self._encoder_settings.audio_codecs
+        audio_tracks: list[MkvTrack] = self._video.get_container_audio_tracks()
+        for track in audio_tracks:
+            track_id_str = str(track.id)
+            audio_codec_item: AudioCodecItem | None = None
+            if track_id_str in audio_codecs:
+                audio_codec_item = audio_codecs[track_id_str]
+            elif track.properties.language in audio_codecs:
+                audio_codec_item = audio_codecs[track.properties.language]
+            elif 'default' in audio_codecs:
+                audio_codec_item = audio_codecs['default']
+
+            if audio_codec_item and audio_codec_item.to_codec != AudioCodec.COPY:
+                if audio_codec_item.from_codec == track.codec.lower() or audio_codec_item.from_codec is None:
+                    options['map'].append(f'0:a:{track.ffmpeg_index}')
+                    options[f'c:a:{track.ffmpeg_index}'] = audio_codec_item.to_codec.value
+                    count_ch = 2
+                    if track.properties.audio_channels:
+                        count_ch: int = track.properties.audio_channels
+
+
+                    if track.properties.audio_channels == 6:
+                        bitrate = 512 # 384-512 = AAC / 448-640 = AC3
+                    elif track.properties.audio_channels == 8:
+                        bitrate = 640 # 640-768 = AAC / 640 = AC3
+                    elif track.properties.audio_channels == 2:
+                        bitrate = 192 # 160-192 = AAC / 192-256 = AC3
+                    else:
+                        bitrate = 64 * count_ch
+
+                    if track.properties.tag_bps is not None:
+                        try:
+                            source_bitrate: float = int(track.properties.tag_bps) / 1000
+                            if source_bitrate < bitrate:
+                                bitrate = int(source_bitrate)
+                        except ValueError:
+                            pass
+
+                    options[f'b:a:{track.ffmpeg_index}'] = f"{bitrate}k"
+            else:
+                options['map'].append(f'0:a:{track.ffmpeg_index}')
+                options[f'c:a:{track.ffmpeg_index}'] = 'copy'
+        return options
+
     def _build_ffmpeg_output_options(self) -> Dict[str, str]:
         """Build FFmpeg output options dictionary for encoding.
 
@@ -353,7 +399,7 @@ class Encoder:
             Dictionary of FFmpeg output options
         """
         output_options: dict = {
-            "map": "0",
+            "map": ["0:v"],
         }
 
         if self._video_sample_in_sec is not None:
@@ -371,14 +417,15 @@ class Encoder:
         metadata: list[str] = [
             'hdr_forge_version=' + str(getattr(sys.modules['hdr_forge'], '__version__', 'unknown')),
         ]
-
         if 'metadata' in output_options:
             output_options['metadata'].extend(metadata)
         else:
             output_options['metadata'] = metadata
 
+        output_options = self._build_ffmpeg_audio_options(options=output_options)
+
+        output_options['map'].append(f'0:s?')
         output_options.update({
-            'c:a': 'copy',
             'c:s': 'copy',
         })
 
@@ -661,10 +708,10 @@ class Encoder:
 
             # Convert Dolby Vision to HDR10, without re-encoding
             if (self.get_encoding_video_codec() == VideoCodec.COPY):
-                if (self.is_hdr10_encoding()):
-                    return self.convert_dolby_vision_to_hdr10_without_re_encoding()
-                elif (self.is_dolby_vision_encoding()):
+                if (self.is_dolby_vision_encoding()):
                     return self.convert_dolby_vision_to_other_profile_without_re_encoding()
+                elif (self.is_hdr10_encoding()):
+                    return self.convert_dolby_vision_to_hdr10_without_re_encoding()
 
             # Dolby Vision encoding workflow
             return self.convert_dolby_vision()
