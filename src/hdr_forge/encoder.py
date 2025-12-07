@@ -449,7 +449,7 @@ class Encoder:
                 total_frames=total_frames,
                 process_start_time=process_start_time,
                 video_fps=self._video.get_fps(),
-                process_name=f"Encoding Video: {target_file.name}",
+                process_name=f"Encoding: {target_file.name}",
             )
 
         try:
