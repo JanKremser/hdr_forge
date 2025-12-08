@@ -195,7 +195,7 @@ HDR_FORGE_SPEED_PRESET: dict[HdrForgeSpeedPreset, list[CodecPreset]] = {
             ffmpeg_params={
                 'x264-params': {
                     'aq-mode': '2',
-                    'ref': '5',
+                    'ref': '4',
                     'bframes': '8',
                     'b-adapt': '2',
                     'trellis': '2',
@@ -210,14 +210,18 @@ HDR_FORGE_SPEED_PRESET: dict[HdrForgeSpeedPreset, list[CodecPreset]] = {
             codec_preset=x265_x264_Preset.SLOW.value,
             ffmpeg_params={
                 'x265-params': {
-                    'aq-mode': '2', # 2 frame schneller bei 2
-                    'ref': '4', # 1 frame schneller bei 3
-                    'bframes': '8', # 4 frame schneller bei 4
+                    # 'ref': '4',
+                    # 'bframes': '8',
+                    # 'rdoq-level': '2',
+
+                    'aq-mode': '2',
+                    'ref': '3',
+                    'bframes': '4',
                     'b-adapt': '2',
-                    'rdoq-level': '2', # 1 frame schneller bei 1
-                    'subme': '2', # default is 3 / 3-4 frame schneller bei 2
-                    'me': 'hex', # default is star / 3 frame schneller bei hex
-                    'lookahead-slices': '4', # default is 4
+                    'rdoq-level': '1', # 2-3 frame schneller bei 1, default 2
+                    'subme': '2',
+                    'me': 'hex',
+                    'lookahead-slices': '4',
                 }
             },
         ),

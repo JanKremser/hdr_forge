@@ -1,5 +1,6 @@
 """Parse encoder settings from command-line arguments."""
 
+import multiprocessing
 import sys
 from typing import Tuple
 
@@ -117,17 +118,17 @@ def _get_audio_codec_from_string(codec_str: str | None) -> dict[str, AudioCodecI
     Returns:
         Corresponding AudioEncoder enum value
     """
-    supported_codec: list[str] = ['aac', 'copy']
+    supported_codec: list[str] = ['aac', 'ac3', 'eac3', 'flac', 'copy']
     if codec_str is None:
         return {
             'default': AudioCodecItem(from_codec=None, to_codec=AudioCodec.COPY)
         }
 
-    codec_str = codec_str.lower()
-    if codec_str in supported_codec:
+    codec_str_norm = codec_str.lower().replace('-', '')
+    if codec_str_norm in supported_codec:
         # convert all tracks to codec
         return {
-            'default': AudioCodecItem(from_codec=None, to_codec=AudioCodec(codec_str))
+            'default': AudioCodecItem(from_codec=None, to_codec=AudioCodec(codec_str_norm))
         }
 
     codec_map: dict[str, AudioCodecItem] = {}
@@ -138,12 +139,14 @@ def _get_audio_codec_from_string(codec_str: str | None) -> dict[str, AudioCodecI
             print_err(f"Invalid audio codec value '{codec_str}', using default")
             sys.exit(1)
         from_codec, to_codec = from_to
-        if to_codec.lower() not in supported_codec:
+        from_codec_norm = from_codec.lower().replace('-', '')
+        to_codec_norm = to_codec.lower().replace('-', '')
+        if to_codec_norm.lower() not in supported_codec:
             print_err(f"Invalid audio codec value '{to_codec}', using default")
             sys.exit(1)
         return AudioCodecItem(
-            from_codec=from_codec.lower(),
-            to_codec=AudioCodec(to_codec.lower())
+            from_codec=from_codec_norm,
+            to_codec=AudioCodec(to_codec_norm)
         )
 
     def _build_map(codec: str) -> AudioCodecItem:
@@ -749,6 +752,19 @@ def create_encoder_settings_from_args(args) -> EncoderSettings:
     # Get validated hardware preset settings (includes encoder compatibility check)
     hdr_forge_preset_settings: HdrForgeEncodingPresetSettings = _get_hdr_forge_encoder_presets_from_args(args, encoder_override)
 
+    encoding_threads: str | None = getattr(args, 'threads', None)
+    if encoding_threads == "auto":
+        encoding_threads = None
+    try:
+        encoding_threads_int: int | None = int(encoding_threads) if encoding_threads is not None else None
+    except ValueError:
+        print_err(f"Invalid threads value '{encoding_threads}', must be 'auto' or an integer.")
+        sys.exit(1)
+    max_cpu_threads: int = multiprocessing.cpu_count()
+    if encoding_threads_int is not None and encoding_threads_int > max_cpu_threads:
+        print_err(f"Invalid threads value '{encoding_threads_int}', maximum is {max_cpu_threads} on your system.")
+        sys.exit(1)
+
     return EncoderSettings(
         video_codec=_get_video_codec_from_string(codec_str=args.video_codec),
         audio_codecs=_get_audio_codec_from_string(codec_str=getattr(args, 'audio_codec', None)),
@@ -770,6 +786,7 @@ def create_encoder_settings_from_args(args) -> EncoderSettings:
         logo_removal=_get_logo_removal_mode_from_string(logo_str=args.remove_logo),
         sample=_get_sample_settings_from_string(sample_str=args.sample),
         hdr_metadata=hdr_metadata,
+        threads=encoding_threads_int,
     )
 
 

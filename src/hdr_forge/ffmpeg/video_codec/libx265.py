@@ -266,7 +266,36 @@ class Libx265Codec(VideoCodecBase):
                 'psy-rd': '1.2',
                 'psy-rdoq': '1.0',
             })
-            pass
+        elif hdr_forge_preset == HdrForgeEncodingTuningPresets.FILM4K:
+            params.update({
+                'aq-mode': '3',
+                'aq-strength': '1.0',
+                'qcomp': '0.66',
+                'psy-rd': '2.0',
+                'psy-rdoq': '1.5',
+                'cutree': '1',
+                'sao': '0',
+                'deblock': '-1,-1',
+                'tu-intra-depth': '3',
+                'tu-inter-depth': '3',
+                'subme': '5',
+                'strong-intra-smoothing': '0',
+            })
+        elif hdr_forge_preset == HdrForgeEncodingTuningPresets.FILM4K_FAST:
+            params.update({
+                'aq-mode': '2',
+                'aq-strength': '0.9',
+                'qcomp': '0.65',
+                'psy-rd': '1.2',
+                'psy-rdoq': '1.0',
+                'cutree': '1',
+                'sao': '0',
+                'deblock': '0,-1',
+                'tu-intra-depth': '2',
+                'tu-inter-depth': '2',
+                'subme': '4',
+                'strong-intra-smoothing': '0',
+            })
         elif hdr_forge_preset == HdrForgeEncodingTuningPresets.BANDING:
             # reduce banding artifacts by enabling stronger deblocking and using 10bit encoding for SDR
             params.update({
@@ -278,7 +307,18 @@ class Libx265Codec(VideoCodecBase):
                 'rdoq-level': '2',
                 'qcomp': '0.65',
             })
-            pass
+        elif hdr_forge_preset == HdrForgeEncodingTuningPresets.GRAIN:
+            params.update({
+                'aq-mode': '3',# besser um grain zu erhalten
+                'aq-strength': '0.7', # 0.8 ist super, 0.7 ist besser für kompression
+                'psy-rd': '1.8',
+                'psy-rdoq': '1.0',
+                'cutree': '1',# 0 ist besser. 1 ist ein guter kompromiss
+                'qcomp': '0.80',# 0.80 ist super
+                #'qg-size': '16',# 16 beeinflusst das Kompressionsverhalten negativ
+                'sao': '0',
+                'rc-grain': '1',
+            })
 
         return list(f"{key}={value}" for key, value in params.items() if value is not None)
 
@@ -357,6 +397,9 @@ class Libx265Codec(VideoCodecBase):
         hdr_forge_preset: HdrForgeEncodingTuningPresets = self._encoder_settings.hdr_forge_encoding_preset.preset
         if hdr_forge_preset == HdrForgeEncodingTuningPresets.ANIMATION:
             return X265Tune.ANIMATION
+
+        if hdr_forge_preset == HdrForgeEncodingTuningPresets.GRAIN_FFMPEG:
+            return X265Tune.GRAIN
 
         if self._grain.get_category() >= 2:
             return X265Tune.GRAIN

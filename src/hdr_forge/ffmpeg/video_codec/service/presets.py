@@ -27,6 +27,8 @@ SPEED_PRESET_SCALE: list[str] = [
     "faster",
     "fast",
     "medium",
+    "medium:plus",
+    "slow:plus",
     "slow",
     "slower",
     "veryslow",
@@ -54,15 +56,15 @@ HW_PRESET: dict = {
         {
             "from_pixel": RESOLUTION_PRESETS.NONE.value,
             "to_pixel": RESOLUTION_PRESETS.HD.value,
-            VideoEncoderLibrary.LIBX265: {"from_CRF": 22, "to_CRF": 19, "from_preset": "slow", "to_preset": "medium"},
-            VideoEncoderLibrary.LIBX264: {"from_CRF": 20, "to_CRF": 17, "from_preset": "slow", "to_preset": "medium"},
+            VideoEncoderLibrary.LIBX265: {"from_CRF": 22, "to_CRF": 19, "from_preset": "slow", "to_preset": "medium:plus"},
+            VideoEncoderLibrary.LIBX264: {"from_CRF": 20, "to_CRF": 17, "from_preset": "slow", "to_preset": "medium:plus"},
             VideoEncoderLibrary.LIBSVTAV1: {"from_CRF": 25, "to_CRF": 23, "from_preset": 5, "to_preset": 5},
         },
         {
             "from_pixel": RESOLUTION_PRESETS.HD.value + 1,
             "to_pixel": RESOLUTION_PRESETS.FHD.value,
-            VideoEncoderLibrary.LIBX265: {"from_CRF": 19, "to_CRF": 18, "from_preset": "medium", "to_preset": "medium"},
-            VideoEncoderLibrary.LIBX264: {"from_CRF": 17, "to_CRF": 16, "from_preset": "medium", "to_preset": "medium"},
+            VideoEncoderLibrary.LIBX265: {"from_CRF": 19, "to_CRF": 18, "from_preset": "medium:plus", "to_preset": "medium"},
+            VideoEncoderLibrary.LIBX264: {"from_CRF": 17, "to_CRF": 16, "from_preset": "medium:plus", "to_preset": "medium"},
             VideoEncoderLibrary.LIBSVTAV1: {"from_CRF": 23, "to_CRF": 22, "from_preset": 4, "to_preset": 4},
         },
         {
@@ -79,12 +81,6 @@ HW_PRESET: dict = {
             VideoEncoderLibrary.LIBX264: {"from_CRF": 16, "to_CRF": 12, "from_preset": "fast", "to_preset": "fast"},
             VideoEncoderLibrary.LIBSVTAV1: {"from_CRF": 21, "to_CRF": 18, "from_preset": 6, "to_preset": 6},
         },
-        # { OLD Preset
-        #     "from_pixel": RESOLUTION_PRESETS.FHD.value + 1,
-        #     "to_pixel": RESOLUTION_PRESETS.UHD.value,
-        #     VideoEncoderLibrary.LIBX265: {"from_CRF": 19, "to_CRF": 15, "from_preset": "medium", "to_preset": "fast"},
-        #     VideoEncoderLibrary.LIBX264: {"from_CRF": 17, "to_CRF": 14, "from_preset": "medium", "to_preset": "fast"},
-        # },
         {
             "from_pixel": RESOLUTION_PRESETS.UHD.value + 1,
             "to_pixel": RESOLUTION_PRESETS.FUHD.value,
@@ -97,8 +93,8 @@ HW_PRESET: dict = {
         {
             "from_pixel": RESOLUTION_PRESETS.NONE.value,
             "to_pixel": RESOLUTION_PRESETS.HD.value,
-            VideoEncoderLibrary.LIBX265: {"from_CRF": 20, "to_CRF": 19, "from_preset": "veryslow", "to_preset": "slower"},
-            VideoEncoderLibrary.LIBX264: {"from_CRF": 18, "to_CRF": 17, "from_preset": "veryslow", "to_preset": "slower"}
+            VideoEncoderLibrary.LIBX265: {"from_CRF": 20, "to_CRF": 19, "from_preset": "slower", "to_preset": "slow"},
+            VideoEncoderLibrary.LIBX264: {"from_CRF": 18, "to_CRF": 17, "from_preset": "slower", "to_preset": "slow"}
         },
         {
             "from_pixel": RESOLUTION_PRESETS.HD.value + 1,
@@ -109,14 +105,14 @@ HW_PRESET: dict = {
         {
             "from_pixel": RESOLUTION_PRESETS.FHD.value + 1,
             "to_pixel": RESOLUTION_PRESETS.UHD.value,
-            VideoEncoderLibrary.LIBX265: {"from_CRF": 16, "to_CRF": 15, "from_preset": "slow", "to_preset": "slow"},
+            VideoEncoderLibrary.LIBX265: {"from_CRF": 16, "to_CRF": 14, "from_preset": "slow", "to_preset": "slow"},
             VideoEncoderLibrary.LIBX264: {"from_CRF": 15, "to_CRF": 14, "from_preset": "slow", "to_preset": "slow"}
         },
         {
             "from_pixel": RESOLUTION_PRESETS.UHD.value + 1,
             "to_pixel": RESOLUTION_PRESETS.FUHD.value,
-            VideoEncoderLibrary.LIBX265: {"from_CRF": 14, "to_CRF": 11, "from_preset": "slower", "to_preset": "veryslow"},
-            VideoEncoderLibrary.LIBX264: {"from_CRF": 13, "to_CRF": 11, "from_preset": "slower", "to_preset": "veryslow"}
+            VideoEncoderLibrary.LIBX265: {"from_CRF": 13, "to_CRF": 13, "from_preset": "slower", "to_preset": "veryslow"},
+            VideoEncoderLibrary.LIBX264: {"from_CRF": 13, "to_CRF": 12, "from_preset": "slower", "to_preset": "veryslow"}
         },
     ],
     HdrForgeEncodingHardwarePresets.GPU_BALANCED: [

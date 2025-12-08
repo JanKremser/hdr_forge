@@ -6,7 +6,7 @@ import sys
 import time
 from typing import Dict, Optional, Tuple
 
-from hdr_forge.cli.cli_output import create_ffmpeg_progress_handler, print_debug, print_err
+from hdr_forge.cli.cli_output import create_ffmpeg_progress_handler, print_debug, print_err, print_warn
 from hdr_forge.core.config import get_global_temp_directory
 from hdr_forge.core.service import build_ffmpeg_cmd_dict_to_str
 from hdr_forge.tools import mkvmerge
@@ -361,20 +361,59 @@ class Encoder:
                 audio_codec_item = audio_codecs['default']
 
             if audio_codec_item and audio_codec_item.to_codec != AudioCodec.COPY:
-                if audio_codec_item.from_codec == track.codec.lower() or audio_codec_item.from_codec is None:
+                track_codec = track.codec.lower().replace('-', '')
+                if audio_codec_item.from_codec == track_codec or audio_codec_item.from_codec is None:
                     options['map'].append(f'0:a:{track.ffmpeg_index}')
                     options[f'c:a:{track.ffmpeg_index}'] = audio_codec_item.to_codec.value
                     count_ch = 2
                     if track.properties.audio_channels:
                         count_ch: int = track.properties.audio_channels
 
+                    if audio_codec_item.to_codec == AudioCodec.FLAC and count_ch > 8:
+                        print_err(f"FLAC codec supports a maximum of 8 (7.1) channels. Track ID {track.id} has {count_ch} channels.")
+                        sys.exit(1)
+                    elif audio_codec_item.to_codec == AudioCodec.FLAC and count_ch > 6:
+                        print_warn(f"FLAC codec with more than 6 channels may not be widely supported. Track ID {track.id} has {count_ch} channels.")
+                    if audio_codec_item.to_codec == AudioCodec.FLAC:
+                        options['compression_level'] = '12' # 0-12 / 12 is a best kompression but slowest
+                        continue # no bitrate setting for FLAC
 
-                    if track.properties.audio_channels == 6:
-                        bitrate = 512 # 384-512 = AAC / 448-640 = AC3
-                    elif track.properties.audio_channels == 8:
-                        bitrate = 640 # 640-768 = AAC / 640 = AC3
-                    elif track.properties.audio_channels == 2:
-                        bitrate = 192 # 160-192 = AAC / 192-256 = AC3
+                    if audio_codec_item.to_codec == AudioCodec.AC3 and count_ch > 6:
+                        print_err(f"AC3 codec supports a maximum of 6 (5.1) channels. Track ID {track.id} has {count_ch} channels.")
+                        sys.exit(1)
+
+                    if audio_codec_item.to_codec == AudioCodec.AAC and count_ch > 6:
+                        print_warn(f"AAC codec with more than 6 channels may not be widely supported. Track ID {track.id} has {count_ch} channels.")
+
+                    if count_ch == 1: # Mono
+                        if audio_codec_item.to_codec == AudioCodec.AC3 or audio_codec_item.to_codec == AudioCodec.EAC3:
+                            bitrate = 128 # 96-128 = AC3
+                        else:
+                            bitrate = 128
+                    elif count_ch == 2: # Stereo
+                        if audio_codec_item.to_codec == AudioCodec.AC3:
+                            bitrate = 384 # 192-384 = AC3
+                        elif audio_codec_item.to_codec == AudioCodec.EAC3:
+                            bitrate = 256 # 128-256 = EAC3
+                        else:
+                            bitrate = 256 # 128-256 = AAC / default 192
+                    elif count_ch == 6: # 5.1
+                        if audio_codec_item.to_codec == AudioCodec.AC3:
+                            bitrate = 640 # 640 = AC3
+                        elif audio_codec_item.to_codec == AudioCodec.EAC3:
+                            bitrate = 1024 # 1024 = EAC3
+                        else:
+                            bitrate = 640 # 384-640 = AAC / default 512
+                    elif count_ch == 8: # 7.1
+                        if audio_codec_item.to_codec == AudioCodec.EAC3:
+                            bitrate = 1536 # 768-1536 = EAC3
+                        else:
+                            bitrate = 1024 # 512-1024 = AAC / default 768
+                    elif count_ch == 10: # 7.1.2
+                        if audio_codec_item.to_codec == AudioCodec.EAC3:
+                            bitrate = 2048 # 1024-2048 = EAC3
+                        else:
+                            bitrate = 1536 # 768–1536 bei 7.1.2 / default 1024
                     else:
                         bitrate = 64 * count_ch
 
@@ -428,6 +467,9 @@ class Encoder:
         output_options.update({
             'c:s': 'copy',
         })
+
+        if self._encoder_settings.threads:
+            output_options['threads'] = str(self._encoder_settings.threads)
 
         return output_options
 

@@ -55,6 +55,8 @@ class AudioCodec(Enum):
     """Audio codec options for encoding."""
     COPY = "copy"
     AAC = "aac"
+    AC3 = "ac3"
+    EAC3 = "eac3"
     OPUS = "opus"
     VORBIS = "vorbis"
     FLAC = "flac"
@@ -159,6 +161,10 @@ class HdrForgeEncodingTuningPresets(Enum):
     BANDING = "banding"
     ACTION = "action"
     ANIMATION = "animation"
+    GRAIN = "grain"
+    GRAIN_FFMPEG = "grain:ffmpeg"
+    FILM4K = "film4k"
+    FILM4K_FAST = "film4k:fast"
 
 class HdrForgeEncodingHardwarePresets(Enum):
     # Prefixed presets (explicit hardware specification)
@@ -233,3 +239,5 @@ class EncoderSettings:
     scale_height: Optional[int] = None
     scale_mode: ScaleMode = ScaleMode.HEIGHT
     sample: SampleSettings = field(default_factory=lambda: SampleSettings(enabled=False))
+
+    threads: Optional[int] = None  # Number of threads to use for encoding (None for auto)

@@ -159,9 +159,13 @@ Video codec to use for encoding.
     convert_parser.add_argument(
         '-a', '--audio-codec',
         help=f"""{sdr_dot} {hdr_dot} {dolby_vision_dot}
-Audio codec to use for encoding.
+Audio codec to use for encoding. Default is 'copy'.
+The Profiles are optimized for Mono, Stereo, 5.1, 7.1 and 7.1.2 audio tracks.
     [copy]                 : Copy stream without re-encoding
-    [aac]                  : Re-encode all audio tracks to AAC format
+    [aac]                  : Re-encode all audio tracks to AAC format (lossy, up to 48 channels, but usually 2-6 channels, for most devices)
+    [ac3]                  : Re-encode all audio tracks to AC3 format (Dolby Digital, up to 6 channels / 5.1)
+    [eac3]                 : Re-encode all audio tracks to EAC3 format (Dolby Digital Plus 2.0-7.1.x)
+    [flac]                 : Re-encode all audio tracks to FLAC format (lossless, up to 8 channels / 7.1)
 
 You can specify multiple audio tracks with different codecs using the following format:
     [ger:aac]              : Re-encode German audio track to AAC format
@@ -185,7 +189,7 @@ Examples:
 
     convert_parser.add_argument(
         '-p', '--preset',
-        choices=["auto", "film", "banding", "video", "action", "animation"],
+        choices=["auto", "film", "film4k", "film4k:fast", "banding", "video", "action", "animation", "grain", "grain:ffmpeg"],
         default="auto",
         help=f"""{sdr_dot} {hdr_dot} {dolby_vision_dot}
 HDR Forge encoding preset for simplified settings. Default is the automation mode. Not libx265/libx264 presets.
@@ -194,15 +198,19 @@ Examples:
     hdr_forge convert -i input.mkv -o output.mkv --preset auto
     hdr_forge convert -i input.mkv -o output.mkv --preset film
 Presets:
-    [auto]        : Use a film preset as default.
+    [auto]         : Use a film preset as default.
 
-    [film]        : Optimized for film content with moderate motion.
-    [banding]     : Similar to 'film' but with additional banding reduction techniques.
-                    This settings switch 8bit encoding for SDR to 10bit, reducing banding artifacts in challenging scenes.
-    [video]       : Optimized for general video content. This is a neutral preset for varied content.
-                    You use the default ffmpeg presets, without optimizations for specific content types.
-    [action]      : Optimized for action-packed content with fast motion
-    [animation]   : Optimized for animated content with vibrant colors\n
+    [video]        : Optimized for general video content. This is a neutral preset for varied content.
+                     You use the default ffmpeg presets, without optimizations for specific content types.
+    [film]         : Optimized for film content with moderate motion.
+    [film4k]       : Similar to 'film' but optimized for 4K film content, focus on detail retention.
+    [film4k:fast]  : Faster version of 'film4k' with a slight quality trade-off for speed.
+    [banding]      : Similar to 'film' but with additional banding reduction techniques.
+                     This settings switch 8bit encoding for SDR to 10bit, reducing banding artifacts in challenging scenes.
+    [action]       : Optimized for action-packed content with fast motion
+    [animation]    : Optimized for animated content with vibrant colors
+    [grain]        : Optimize encoding settings for grainy content
+    [grain:ffmpeg] : Using ffmpeg's tune=grain option\n
 """
     )
 
@@ -482,6 +490,39 @@ hevc_nvenc/h264_nvenc:
 
     NVENC Presets: default, slow, hq, llhq, llhp
     RC Modes: vbr, vbr_hq, cbr, cqp\n
+"""
+    )
+
+#     convert_parser.add_argument(
+#         '--bit-depth',
+#         choices=['auto', '8', '10'],
+#         default='auto',
+#         help=f"""{sdr_dot} {expert_dot}
+# Expert Option:
+#     Set output bit depth for encoding.
+#     By default, HDR Forge selects optimal bit depth based on input video and target format.
+#     It is recommended to use this only with SDR content in order to utilize more bit depth during encoding.
+
+#     This allows you to force 8-bit for the “banding” preset.
+#     No effect on HDR/HDR10/HDR10+/DolbyVision content!
+
+# Example:
+#     --bit-depth 8
+#     --bit-depth 10\n
+# """
+#     )
+
+    convert_parser.add_argument(
+        '--threads',
+        help=f"""{expert_dot}
+Expert Option:
+    Set number of threads for encoding.
+    By default, HDR Forge automatically determines optimal thread count based on system capabilities.
+
+Example:
+    --threads auto
+    --threads 4
+    --threads 8\n
 """
     )
 
