@@ -231,6 +231,7 @@ class EncoderSettings:
     # Universal parameters and encoder override
     universal_params: UniversalEncoderParams = field(default_factory=UniversalEncoderParams)
     encoder_override: EncoderOverride = EncoderOverride.AUTO
+    override_bit_depth: Optional[int] = None  # Override bit depth (8 or 10), None for auto
 
     crop: CropSettings = field(default_factory=lambda: CropSettings(mode=CropMode.AUTO))
     grain: GrainMode = GrainMode.OFF

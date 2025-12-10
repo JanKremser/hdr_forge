@@ -493,24 +493,24 @@ hevc_nvenc/h264_nvenc:
 """
     )
 
-#     convert_parser.add_argument(
-#         '--bit-depth',
-#         choices=['auto', '8', '10'],
-#         default='auto',
-#         help=f"""{sdr_dot} {expert_dot}
-# Expert Option:
-#     Set output bit depth for encoding.
-#     By default, HDR Forge selects optimal bit depth based on input video and target format.
-#     It is recommended to use this only with SDR content in order to utilize more bit depth during encoding.
+    convert_parser.add_argument(
+        '--bit-depth',
+        choices=['auto', '8', '10'],
+        default='auto',
+        help=f"""{sdr_dot} {expert_dot}
+Expert Option:
+    Set output bit depth for encoding.
+    By default, HDR Forge selects optimal bit depth based on input video and target format.
+    It is recommended to use this only with SDR content in order to utilize more bit depth during encoding.
 
-#     This allows you to force 8-bit for the “banding” preset.
-#     No effect on HDR/HDR10/HDR10+/DolbyVision content!
+    This allows you to force 8-bit for the “banding” preset.
+    No effect on HDR/HDR10/HDR10+/DolbyVision content!
 
-# Example:
-#     --bit-depth 8
-#     --bit-depth 10\n
-# """
-#     )
+Example:
+    --bit-depth 8
+    --bit-depth 10\n
+"""
+    )
 
     convert_parser.add_argument(
         '--threads',

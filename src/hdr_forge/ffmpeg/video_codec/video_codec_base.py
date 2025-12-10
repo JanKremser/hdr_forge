@@ -10,7 +10,7 @@ from hdr_forge.analyze.grain_score import GrainAnalyzer
 from hdr_forge.cli.cli_output import print_err, print_warn
 from hdr_forge.ffmpeg.video_codec.service.presets import calc_hw_prest_params
 from hdr_forge.typedefs.codec_typing import HDR_FORGE_SPEED_PRESET, CodecPreset, VideoEncoderLibrary
-from hdr_forge.typedefs.encoder_typing import EncoderSettings, HdrForgeSpeedPreset, HdrSdrFormat, ScaleMode, UniversalEncoderParams
+from hdr_forge.typedefs.encoder_typing import EncoderSettings, HdrForgeEncodingTuningPresets, HdrForgeSpeedPreset, HdrSdrFormat, ScaleMode, UniversalEncoderParams
 from hdr_forge.typedefs.video_typing import HdrMetadata
 from hdr_forge.video import Video
 
@@ -150,7 +150,16 @@ class VideoCodecBase(ABC):
 
         if encoding_hdr_sdr_format in [HdrSdrFormat.HDR, HdrSdrFormat.HDR10, HdrSdrFormat.DOLBY_VISION]:
             return 10
-        elif encoding_hdr_sdr_format == HdrSdrFormat.SDR:
+
+        override_bit_depth: int | None = self._encoder_settings.override_bit_depth
+        if override_bit_depth is not None:
+            return override_bit_depth
+
+        hdr_forge_preset: HdrForgeEncodingTuningPresets = self._encoder_settings.hdr_forge_encoding_preset.preset
+        if hdr_forge_preset == HdrForgeEncodingTuningPresets.BANDING:
+            return 10
+
+        if encoding_hdr_sdr_format == HdrSdrFormat.SDR:
             if self._video.is_hdr_video():
                 return 8
 
@@ -196,13 +205,13 @@ class VideoCodecBase(ABC):
             Video filter string
         """
         filters: list[str] = []
+        if self._video.is_video_interlaced():
+            filters.append('bwdif=mode=send_frame:parity=auto:deint=all')
+
         vf: str | None = self._encoder_settings.vfilter
         if vf is not None:
             _filter: list[str] = vf.split(',')
             filters.extend(_filter)
-
-        if self._video.is_video_interlaced():
-            filters.append('bwdif=mode=send_frame:parity=auto:deint=all')
 
         delogo_filter: str | None = self._logo_remover.get_ffmpeg_delogo_filter()
         if delogo_filter:

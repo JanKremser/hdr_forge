@@ -91,12 +91,8 @@ class Libx265Codec(VideoCodecBase):
         return output_options
 
     def get_pix_format_for_encoding(self) -> str | None:
-        bit_depth = self.get_bit_depth_for_encoding()
-
-        hdr_forge_preset: HdrForgeEncodingTuningPresets = self._encoder_settings.hdr_forge_encoding_preset.preset
-        if hdr_forge_preset == HdrForgeEncodingTuningPresets.BANDING:
-            return PIXEL_FORMAT_YUV420_10_BIT  # always use 10bit for banding reduction
-
+        bit_depth: int = self.get_bit_depth_for_encoding()
+        
         if bit_depth == 10:
             return PIXEL_FORMAT_YUV420_10_BIT
         elif bit_depth == 8:
@@ -104,13 +100,7 @@ class Libx265Codec(VideoCodecBase):
         return super().get_pix_format_for_encoding()
 
     def get_bit_depth_for_encoding(self) -> int:
-        bit: int =  super().get_bit_depth_for_encoding()
-
-        hdr_forge_preset: HdrForgeEncodingTuningPresets = self._encoder_settings.hdr_forge_encoding_preset.preset
-        if hdr_forge_preset == HdrForgeEncodingTuningPresets.BANDING:
-            return 10
-
-        return bit
+        return super().get_bit_depth_for_encoding()
 
     def get_custom_lib_parameters(self) -> dict:
         masterdisplay: MasterDisplayMetadata | None = self._get_master_display_for_encoding()

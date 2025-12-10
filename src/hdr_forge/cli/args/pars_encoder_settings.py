@@ -752,6 +752,7 @@ def create_encoder_settings_from_args(args) -> EncoderSettings:
     # Get validated hardware preset settings (includes encoder compatibility check)
     hdr_forge_preset_settings: HdrForgeEncodingPresetSettings = _get_hdr_forge_encoder_presets_from_args(args, encoder_override)
 
+    # Parse and validate threads setting
     encoding_threads: str | None = getattr(args, 'threads', None)
     if encoding_threads == "auto":
         encoding_threads = None
@@ -764,6 +765,17 @@ def create_encoder_settings_from_args(args) -> EncoderSettings:
     if encoding_threads_int is not None and encoding_threads_int > max_cpu_threads:
         print_err(f"Invalid threads value '{encoding_threads_int}', maximum is {max_cpu_threads} on your system.")
         sys.exit(1)
+
+    # Validate bit depth
+    bit_depth = getattr(args, 'bit_depth', None)
+    if bit_depth == "auto":
+        bit_depth = None
+    bit_depth_int: int | None = None
+    if bit_depth is not None:
+        bit_depth_int = int(bit_depth)
+        if bit_depth_int not in [8, 10]:
+            print_err(f"Invalid bit depth value '{bit_depth_int}', must be 'auto', 8, or 10.")
+            sys.exit(1)
 
     return EncoderSettings(
         video_codec=_get_video_codec_from_string(codec_str=args.video_codec),
@@ -779,6 +791,7 @@ def create_encoder_settings_from_args(args) -> EncoderSettings:
         nvenc_params=nvenc_params,
         universal_params=universal_params,
         encoder_override=encoder_override,
+        override_bit_depth=bit_depth_int,
         scale_height=_get_scale_height(scale=args.scale),
         scale_mode=ScaleMode(args.scale_mode),
         crop=_get_crop_settings_from_string(crop_str=args.crop),
