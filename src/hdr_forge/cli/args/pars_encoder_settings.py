@@ -7,7 +7,7 @@ from typing import Tuple
 
 from hdr_forge import __version__
 from hdr_forge.cli.cli_output import print_err, print_warn
-from hdr_forge.typedefs.codec_typing import HEVC_NVENC_Preset, VideoEncoderLibrary, x265_x264_Preset
+from hdr_forge.typedefs.codec_typing import ColorPrimaries, HEVC_NVENC_Preset, VideoEncoderLibrary, x265_x264_Preset
 from hdr_forge.typedefs.encoder_typing import AudioCodec, AudioCodecItem, CropMode, CropSettings, EncoderOverride, GrainMode, HdrForgeEncodingHardwarePresets, HdrForgeEncodingPresetSettings, HdrForgeEncodingTuningPresets, HdrForgeSpeedPreset, HdrSdrFormat, EncoderSettings, LogoRemovalAutoDetectMode, LogoRemovalMode, LogoRemovelSettings, NvencParams, NvencRcMode, SampleSettings, ScaleMode, UniversalEncoderParams, VideoCodec, Libx264Params, X264Tune, Libx265Params, X265Tune
 from hdr_forge.typedefs.dolby_vision_typing import DolbyVisionProfileEncodingMode
 from hdr_forge.typedefs.video_typing import BT_2020_MASTER_DISPLAY, BT_709_MASTER_DISPLAY, DISPLAY_P3_MASTER_DISPLAY, ContentLightLevelMetadata, HdrMetadata, MasterDisplayMetadata
@@ -777,6 +777,18 @@ def create_encoder_settings_from_args(args) -> EncoderSettings:
             print_err(f"Invalid bit depth value '{bit_depth_int}', must be 'auto', 8, or 10.")
             sys.exit(1)
 
+    # Validate color primaries flag
+    color_primaries_flag = getattr(args, 'color_primaries_flag', None)
+    if color_primaries_flag == "auto":
+        color_primaries_flag = None
+    color_primaries_flag_override: ColorPrimaries | None = None
+    if color_primaries_flag is not None:
+        try:
+            color_primaries_flag_override = ColorPrimaries(color_primaries_flag)
+        except ValueError:
+            print_err(f"Invalid color primaries flag value '{color_primaries_flag}', must be one of {[cp.value for cp in ColorPrimaries]}.")
+            sys.exit(1)
+
     return EncoderSettings(
         video_codec=_get_video_codec_from_string(codec_str=args.video_codec),
         audio_codecs=_get_audio_codec_from_string(codec_str=getattr(args, 'audio_codec', None)),
@@ -792,6 +804,7 @@ def create_encoder_settings_from_args(args) -> EncoderSettings:
         universal_params=universal_params,
         encoder_override=encoder_override,
         override_bit_depth=bit_depth_int,
+        override_color_primaries_flag=color_primaries_flag_override,
         scale_height=_get_scale_height(scale=args.scale),
         scale_mode=ScaleMode(args.scale_mode),
         crop=_get_crop_settings_from_string(crop_str=args.crop),

@@ -1,11 +1,12 @@
 """CLI output and progress tracking functionality."""
 
+from email.mime import audio
 from hdr_forge.analyze.crop_video import CropResult
 from hdr_forge.cli.args.pars_encoder_settings import print_parameter_warnings
 from hdr_forge.cli.cli_output import ANSI_BLUE, color_str, create_aspect_ratio_str
 from hdr_forge.ffmpeg.video_codec.video_codec_base import VideoCodecBase
 from hdr_forge.typedefs.dolby_vision_typing import DolbyVisionEnhancementLayer, DolbyVisionProfile
-from hdr_forge.typedefs.encoder_typing import EncoderSettings, HdrSdrFormat, VideoCodec
+from hdr_forge.typedefs.encoder_typing import AudioCodec, AudioCodecItem, EncoderSettings, VideoCodec
 from hdr_forge.encoder import Encoder
 
 
@@ -36,7 +37,16 @@ def print_encoding_params(encoder: Encoder) -> None:
     print(f"  Output File: {color_str(str(encoder.get_target_file()), color)}")
 
     video_codec: VideoCodec = encoder.get_encoding_video_codec()
-    print(f"  Video Codec: {color_str(video_codec.value, color)}")
+    print(f"  Video Codec: {color_str(video_codec.value, color=color)}")
+    audio_codec_items: dict[str, AudioCodecItem] = encoder.get_audio_codec_items()
+    for track in audio_codec_items:
+        print(f"  Audio Track ({track}):")
+        from_codec: str | AudioCodec | None = audio_codec_items[track].from_codec
+        from_codec_str = "all"
+        if from_codec:
+            from_codec_str: str = from_codec.value if isinstance(from_codec, AudioCodec) else from_codec
+        print(f"    Codec: {color_str(from_codec_str, color)} -> {color_str(audio_codec_items[track].to_codec.value, color)}")
+
     video_codec_lib: VideoCodecBase | None = encoder.get_video_codec_lib()
     if video_codec_lib:
         # Print warnings for incompatible parameters
@@ -71,23 +81,20 @@ def print_encoding_params(encoder: Encoder) -> None:
         print(f"  Pixel Format: {color_str(video_codec_lib.get_pix_format_for_encoding() or '-', color)}")
         print(f"  Bit Depth: {color_str(video_codec_lib.get_bit_depth_for_encoding(), color)}")
 
-        hdr_formats_str: str = ', '.join([fmt.value.upper() for fmt in encoder.get_encoding_hdr_sdr_format()])
-        print(f"  HDR/SDR: {color_str(hdr_formats_str, color)}")
-        if video_codec_lib.is_hdr10_encoding():
-            _print_hdr10_metadata(video_codec_lib=video_codec_lib)
+    hdr_formats_str: str = ', '.join([fmt.value.upper() for fmt in encoder.get_encoding_hdr_sdr_format()])
+    print(f"  HDR/SDR: {color_str(hdr_formats_str, color)}")
+
     if encoder.is_dolby_vision_encoding():
         dv_profile: DolbyVisionProfile | None = encoder.get_encoding_dolby_vision_profile()
         assert dv_profile is not None
         print(f"  Dolby Vision:")
         print(f"    Profile: {color_str(dv_profile.value, color)}")
 
-        dv_el: DolbyVisionEnhancementLayer | None = encoder.get_encoding_dolby_vision_enhancement_layer()
+        dv_el: bool | None = encoder.get_encoding_dolby_vision_el_present()
 
         dv_layout: str = f"BL+{'EL+' if dv_el else ''}RPU"
         print(f"    Layout: {color_str(dv_layout, color)}")
 
-        dv_el_str: str | None = dv_el.value if dv_el else None
-        print(f"    Enhancement Layer (EL): {color_str(dv_el_str or '-', color)}")
         if video_codec_lib:
             _print_hdr10_metadata(video_codec_lib=video_codec_lib)
 

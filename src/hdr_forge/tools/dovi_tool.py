@@ -186,7 +186,10 @@ def extract_rpu(
     if output_rpu is None:
         output_rpu = fallback_path
 
-    if output_rpu.exists() and use_cache:
+    if (output_rpu.exists() and use_cache) and not (
+            # Skip extraction if profile conversion is needed
+            dv_profile_source and dv_profile_encoding and dv_profile_source != dv_profile_encoding
+        ):
         return output_rpu
 
     dovi_tool_exec = _get_dovi_tool_path()

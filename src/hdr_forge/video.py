@@ -283,6 +283,18 @@ class Video:
             if track.type == MkvTrackType.AUDIO
         ]
 
+    def get_container_subtitles_tracks(self) -> list[MkvTrack]:
+        """Get audio tracks from the container metadata.
+
+        Returns:
+            List of MkvTrack objects representing audio tracks
+        """
+        return [
+            track
+            for track in self._container_metadata.tracks
+            if track.type == MkvTrackType.SUBTITLES
+        ]
+
     def _get_dolby_vision_side_data_infos(self) -> Optional[DolbyVisionSiteDataInfo]:
         """Extract Dolby Vision metadata.
 
@@ -303,14 +315,6 @@ class Video:
 
         return None
 
-    def _get_dolby_vision_rpu_info(self) -> Optional[DolbyVisionRpuInfo]:
-        """Get Dolby Vision RPU information.
-
-        Returns:
-            RpuInfo object containing RPU metadata or None if not available
-        """
-        return self._dolby_vision_rpu_info
-
     def get_dolby_vision_info(self) -> Optional[DolbyVisionInfo]:
         """Get Dolby Vision detailed information.
 
@@ -319,26 +323,41 @@ class Video:
         """
         if not self.is_dolby_vision_video():
             return None
-        dv_rpu_info: DolbyVisionRpuInfo | None = self._get_dolby_vision_rpu_info()
 
-        if not dv_rpu_info:
-            return None
+        dv_profile: int | None = None
+        dv_profile_el: str | None  = None
+        dm_version: int | None = None
+        cm_version: str | None = None
+
+        dv_rpu_info: DolbyVisionRpuInfo | None = self._dolby_vision_rpu_info
         dv_site_data: DolbyVisionSiteDataInfo | None = self._get_dolby_vision_side_data_infos()
+        if dv_rpu_info:
+            dv_profile = dv_rpu_info.profile
+            dv_profile_el = dv_rpu_info.profile_el
+            dm_version = dv_rpu_info.dm_version
+            cm_version = dv_rpu_info.cm_version
+        else:
+            dv_profile = dv_site_data.dv_profile if dv_site_data else None
 
         dv_level: Optional[int] = None
         if dv_site_data:
             dv_level = dv_site_data.dv_level
 
         dv_map_el: str = ''
-        if dv_rpu_info.profile_el:
+        if dv_profile_el or dv_site_data and dv_site_data.el_present_flag == 1:
             dv_map_el = f"EL+"
 
+        if dv_profile is None:
+            return None
+
         return DolbyVisionInfo(
-            dv_profile=dv_rpu_info.profile,
-            dv_profile_el=dv_rpu_info.profile_el,
+            dv_profile=dv_profile,
+            dv_profile_el=dv_profile_el,
             dv_level=dv_level,
-            dm_version=dv_rpu_info.dm_version,
-            cm_version=dv_rpu_info.cm_version,
+            el_preset=dv_site_data.el_present_flag == 1 if dv_site_data else False,
+            rpu_preset=dv_site_data.rpu_present_flag == 1 if dv_site_data else False,
+            dm_version=dm_version,
+            cm_version=cm_version,
             dv_layout=f"BL+{dv_map_el}RPU",
         )
 

@@ -32,7 +32,7 @@ def set_global_temp_directory(input_path_str: str | None, output_path_str: str |
 
     base_temp_folder: Path = Path("/tmp/.hdr_forge_temp")
 
-    if output_path and output_path.exists():
+    if output_path:
         if output_path.is_dir():
             base_temp_folder = output_path / f".hdr_forge_temp_{output_path.stem}"
         else:

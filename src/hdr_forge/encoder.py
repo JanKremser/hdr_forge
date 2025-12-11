@@ -20,7 +20,7 @@ from hdr_forge.ffmpeg.video_codec.libsvtav1 import LibSvtAV1Codec
 from hdr_forge.tools import dovi_tool
 from hdr_forge.typedefs.codec_typing import VideoEncoderLibrary
 from hdr_forge.typedefs.encoder_typing import AudioCodec, AudioCodecItem, EncoderOverride, HdrSdrFormat, EncoderSettings, SampleSettings, VideoCodec
-from hdr_forge.typedefs.dolby_vision_typing import DolbyVisionEnhancementLayer, DolbyVisionProfile, DolbyVisionProfileEncodingMode
+from hdr_forge.typedefs.dolby_vision_typing import DolbyVisionInfo, DolbyVisionProfile, DolbyVisionProfileEncodingMode
 from hdr_forge.typedefs.mkv_typing import MkvTrack
 from hdr_forge.video import Video
 
@@ -57,7 +57,7 @@ class Encoder:
         self._target_dv_profile: Optional[DolbyVisionProfile] = self._determine_dv_profile(
             dv_profile=settings.target_dv_profile
         )
-        self._target_dv_el: DolbyVisionEnhancementLayer | None = self._determine_dv_enhancement_layer(
+        self._dv_el_present: bool | None = self._determine_dv_el_present(
             target_dv_profile=self._target_dv_profile,
         )
 
@@ -249,10 +249,10 @@ class Encoder:
         return (int(start_time), int(end_time))
 
 
-    def _determine_dv_enhancement_layer(
+    def _determine_dv_el_present(
         self,
         target_dv_profile: Optional[DolbyVisionProfile],
-    ) -> Optional[DolbyVisionEnhancementLayer]:
+    ) -> Optional[bool]:
         """Determine the Dolby Vision Enhancement Layer for encoding.
 
         Args:
@@ -262,13 +262,13 @@ class Encoder:
         if not self.is_dolby_vision_encoding():
             return None
 
-        if target_dv_profile == DolbyVisionProfile._7:
-            source_el: DolbyVisionEnhancementLayer | None = self._video.get_dolby_vision_enhancement_layer()
-            source_profile: DolbyVisionProfile | None = self._video.get_dolby_vision_profile()
-            if source_el is not None and source_profile == DolbyVisionProfile._7:
-                return source_el
+        source_dv_profile: DolbyVisionProfile | None = self._video.get_dolby_vision_profile()
+        if target_dv_profile == source_dv_profile:
+            dv_info: DolbyVisionInfo | None = self._video.get_dolby_vision_info()
+            if dv_info is not None and dv_info.dv_profile == DolbyVisionProfile._7.value:
+                return dv_info.el_preset
 
-        return None
+        return False
 
     def _determine_dv_profile(self, dv_profile: DolbyVisionProfileEncodingMode) -> Optional[DolbyVisionProfile]:
         """Determine the Dolby Vision profile for encoding.
@@ -286,7 +286,7 @@ class Encoder:
         if source_dv_profile is None:
             return None
 
-        if dv_profile == DolbyVisionProfileEncodingMode.AUTO:
+        if dv_profile == DolbyVisionProfileEncodingMode.AUTO and self.get_encoding_video_codec() == VideoCodec.COPY:
             return source_dv_profile
 
         return DolbyVisionProfile._8
@@ -299,13 +299,13 @@ class Encoder:
         """
         return self._target_dv_profile
 
-    def get_encoding_dolby_vision_enhancement_layer(self) -> Optional[DolbyVisionEnhancementLayer]:
+    def get_encoding_dolby_vision_el_present(self) -> Optional[bool]:
         """Get the Dolby Vision Enhancement Layer for encoding.
 
         Returns:
             DolbyVisionEnhancementLayer or None if not applicable
         """
-        return self._target_dv_el
+        return self._dv_el_present
 
     def get_encoding_video_codec(self) -> VideoCodec:
         """Get the video codec to be used for encoding.
@@ -314,6 +314,14 @@ class Encoder:
             VideoCodec enum value
         """
         return self._target_video_codec
+
+    def get_audio_codec_items(self) -> Dict[str, AudioCodecItem]:
+        """Get the audio codec items for encoding.
+
+        Returns:
+            Dictionary of audio codec items
+        """
+        return self._encoder_settings.audio_codecs
 
     def get_encoding_hdr_sdr_format(self) -> list[HdrSdrFormat]:
         """Get the effective color format for encoding.
@@ -338,6 +346,14 @@ class Encoder:
     def is_sdr_encoding(self) -> bool:
         """Check if encoding to SDR format."""
         return HdrSdrFormat.SDR in self.get_encoding_hdr_sdr_format()
+
+    def is_audio_copy_encoding(self) -> bool:
+        audio: dict[str, AudioCodecItem] = self._encoder_settings.audio_codecs
+
+        if audio.get('default') and audio['default'].to_codec == AudioCodec.COPY:
+            return True
+
+        return False
 
     def get_target_file(self) -> Path:
         """Get the target output file path.
@@ -585,7 +601,7 @@ class Encoder:
 
         hevc: Path = hevc_bl
         # Setup 2: If AUTO profile and source is profile 7, demux EL profile 7 RPU
-        if self._target_dv_el is not None:
+        if self._dv_el_present:
             # start demux EL profile 7 for profile 7 encoding
             el_path: Path = dovi_tool.extract_enhancement_layer(
                 input_path=input_file,
@@ -603,7 +619,7 @@ class Encoder:
         encoded_hevc_with_rpu_path: Path = dovi_tool.inject_rpu(
             input_path=hevc,
             input_rpu=rpu_file_path,
-            output_hevc=temp_dir / f"video_encoded_BL_{'EL_' if self._target_dv_el else ''}RPU.hevc"
+            output_hevc=temp_dir / f"video_encoded_BL_{'EL_' if self._dv_el_present else ''}RPU.hevc"
         )
 
         return encoded_hevc_with_rpu_path
@@ -749,7 +765,7 @@ class Encoder:
         if self._video.is_dolby_vision_video():
 
             # Convert Dolby Vision to HDR10, without re-encoding
-            if (self.get_encoding_video_codec() == VideoCodec.COPY):
+            if (self.get_encoding_video_codec() == VideoCodec.COPY and self.is_audio_copy_encoding()):
                 if (self.is_dolby_vision_encoding()):
                     return self.convert_dolby_vision_to_other_profile_without_re_encoding()
                 elif (self.is_hdr10_encoding()):

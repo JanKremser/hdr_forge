@@ -53,6 +53,12 @@ def print_video_infos(video: Video) -> None:
         print(f"    ID: {color_str(str(a_track.id), color)}")
         print(f"    Codec: {color_str(a_track.codec, color)}")
         print(f"    Language: {color_str(a_track.properties.language or '-', color)}")
+    subs_tracks: list[MkvTrack] = video.get_container_subtitles_tracks()
+    for s_track in subs_tracks:
+        print(f"  Subtitles Tracks:")
+        print(f"    ID: {color_str(str(s_track.id), color)}")
+        print(f"    Codec: {color_str(s_track.codec, color)}")
+        print(f"    Language: {color_str(s_track.properties.language or '-', color)}")
 
     resolution: str = f"{video.get_width()}x{video.get_height()}"
     aspect_ratio: str = create_aspect_ratio_str(video.get_width(), video.get_height())
@@ -66,7 +72,7 @@ def print_video_infos(video: Video) -> None:
     print(f"  Color Transfer: {color_str(video.get_color_transfer() or "-", color)}")
     print(f"  Color Space: {color_str(video.get_color_space() or "-", color)}")
     print(f"  Color Range: {color_str(video.get_color_range() or '-', color)}")
-    print(f"  PIX Format: {color_str(video.get_pix_fmt() or '-', color)}")
+    print(f"  Pixel Format: {color_str(video.get_pix_fmt() or '-', color)}")
     print(f"  Bit depth: {color_str(video.get_bit_depth(), color)}")
 
     hdr_formats_str: str = ', '.join([fmt.value.upper() for fmt in video.get_hdr_sdr_format()])
@@ -76,7 +82,8 @@ def print_video_infos(video: Video) -> None:
         print("  HDR10/Dolby Vision Metadata:")
         print(f"    Profile: {color_str(dolby_vision_info.dv_profile or '-', color)}")
         print(f"    Layout: {color_str(dolby_vision_info.dv_layout, color)}")
-        print(f"    Enhancement Layer (EL): {color_str(dolby_vision_info.dv_profile_el or '-', color)}")
+        if dolby_vision_info.dv_profile_el:
+            print(f"    Enhancement Layer (EL): {color_str(dolby_vision_info.dv_profile_el or '-', color)}")
         _print_hdr10_metadata(video=video)
     elif video.is_hdr10_video():
         print(f"  HDR/SDR: {color_str(hdr_formats_str, color)}")

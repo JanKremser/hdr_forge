@@ -6,7 +6,7 @@ from typing import Optional
 
 
 
-from hdr_forge.typedefs.codec_typing import HEVC_NVENC_Preset, HdrForgeSpeedPreset, x265_x264_Preset
+from hdr_forge.typedefs.codec_typing import ColorPrimaries, HEVC_NVENC_Preset, HdrForgeSpeedPreset, x265_x264_Preset
 from hdr_forge.typedefs.dolby_vision_typing import DolbyVisionProfileEncodingMode
 from hdr_forge.typedefs.video_typing import HdrMetadata
 
@@ -232,6 +232,7 @@ class EncoderSettings:
     universal_params: UniversalEncoderParams = field(default_factory=UniversalEncoderParams)
     encoder_override: EncoderOverride = EncoderOverride.AUTO
     override_bit_depth: Optional[int] = None  # Override bit depth (8 or 10), None for auto
+    override_color_primaries_flag: Optional[ColorPrimaries] = None  # Override color primaries flag
 
     crop: CropSettings = field(default_factory=lambda: CropSettings(mode=CropMode.AUTO))
     grain: GrainMode = GrainMode.OFF

@@ -17,6 +17,20 @@ class HdrForgeSpeedPreset(Enum):
     SLOWER = "slower"
     VERYSLOW = "veryslow"
 
+BT_601_PAL_FLAGS: list[str] = [
+    'colorprim=bt470bg',
+    'transfer=bt470bg',
+    'colormatrix=smpte170m',
+    'range=limited',
+]
+
+BT_601_NTSC_FLAGS: list[str] = [
+    'colorprim=smpte170m',
+    'transfer=smpte170m',
+    'colormatrix=smpte170m',
+    'range=limited',
+]
+
 BT_709_FLAGS: list[str] = [
     'colorprim=bt709',
     'transfer=bt709',
@@ -28,6 +42,25 @@ BT_2020_FLAGS: list[str] = [
     'transfer=smpte2084',
     'colormatrix=bt2020nc',
 ]
+
+# BT_2020_FLAGS_SDR: list[str] = [
+#     'colorprim=bt2020',
+#     'transfer=bt709',# SDR transfer characteristic
+#     'colormatrix=bt2020nc',
+# ]
+
+class ColorPrimaries(Enum):
+    BT709 = "bt709"
+    BT2020 = "bt2020"
+    BT601_PAL = "bt470bg"
+    BT601_NTSC = "smpte170m"
+
+COLOR_PRIMARIES_FLAG_MAP: dict[ColorPrimaries, list[str]] = {
+    ColorPrimaries.BT709: BT_709_FLAGS,
+    ColorPrimaries.BT2020: BT_2020_FLAGS,
+    ColorPrimaries.BT601_PAL: BT_601_PAL_FLAGS,
+    ColorPrimaries.BT601_NTSC: BT_601_NTSC_FLAGS,
+}
 
 class VideoEncoderLibrary(Enum):
     """Video encoder library for FFmpeg."""

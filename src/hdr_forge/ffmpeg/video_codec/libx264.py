@@ -3,7 +3,7 @@ from hdr_forge.ffmpeg.video_codec.service.presets import Hdr_Forge_X265_X264_Pre
 from hdr_forge.ffmpeg.video_codec.video_codec_base import VideoCodecBase
 from hdr_forge.typedefs.encoder_typing import EncoderSettings, HdrForgeEncodingTuningPresets, HdrForgeSpeedPreset, HdrSdrFormat, Libx264Params, X264Tune
 from hdr_forge.typedefs.video_typing import HdrMetadata
-from hdr_forge.typedefs.codec_typing import BT_709_FLAGS, PIXEL_FORMAT_YUV420_10_BIT, PIXEL_FORMAT_YUV420_8_BIT, CodecPreset, VideoEncoderLibrary
+from hdr_forge.typedefs.codec_typing import BT_709_FLAGS, COLOR_PRIMARIES_FLAG_MAP, PIXEL_FORMAT_YUV420_10_BIT, PIXEL_FORMAT_YUV420_8_BIT, CodecPreset, ColorPrimaries, VideoEncoderLibrary
 from hdr_forge.video import Video
 
 class Libx264Codec(VideoCodecBase):
@@ -164,8 +164,17 @@ class Libx264Codec(VideoCodecBase):
         """
         params: list[str] = self._build_default_x264_params()
 
-        if self._video.get_color_primaries() == 'bt709':
-            params.extend(BT_709_FLAGS.copy())
+        color_primaries_flag: Optional[ColorPrimaries] = self._encoder_settings.override_color_primaries_flag
+        if color_primaries_flag is None:
+            try:
+                color_primaries_flag = ColorPrimaries(self._video.get_color_primaries())
+            except ValueError:
+                color_primaries_flag = None
+                # unknown color primaries
+
+        if color_primaries_flag is not None:
+            flags: list[str] = COLOR_PRIMARIES_FLAG_MAP[color_primaries_flag].copy()
+            params.extend(flags)
 
         x264_params_str: str = ':'.join(params)
         return x264_params_str

@@ -397,7 +397,12 @@ User-specified target color format for the output video.
         choices=['auto', '8'],
         default='auto',
         help=f"""{dolby_vision_dot}
-Dolby Vision profile for encoding (auto = automatic detection, 8 = force profile 8.1)\n
+Dolby Vision profile for encoding (auto = automatic detection, 8 = force profile 8.1)
+
+Profile 7 encoding is not supported.
+[auto] : Automatically detect and use appropriate Dolby Vision profile based on input video.
+         For Profile 7 use copy mode. By h265 encoding only Profile 8.1 is supported.
+[8]    : Force Dolby Vision Profile 8.1 encoding\n
 """
     )
 
@@ -509,6 +514,26 @@ Expert Option:
 Example:
     --bit-depth 8
     --bit-depth 10\n
+"""
+    )
+
+    convert_parser.add_argument(
+        '--color-primaries-flag',
+        choices=['auto', 'bt470bg', 'smpte170m', 'bt709', 'bt2020'],
+        default='auto',
+        help=f"""{sdr_dot} {hdr_dot} {dolby_vision_dot} {expert_dot}
+Expert Option:
+    Set color primaries flag for output video.
+    By default, HDR Forge automatically sets the color primaries based on input video and target format.
+    This option allows manual override. The colour space is not converted!
+    Only for libx265/libx264 encoders. Not for NVENC or AV1 encoders.
+
+    Rec.601 (PAL) = "bt470bg"
+    Rec.601 (NTSC) = "smpte170m"
+
+Example:
+    --color-primaries-flag bt709
+    --color-primaries-flag bt2020\n
 """
     )
 

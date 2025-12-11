@@ -1,9 +1,10 @@
+from calendar import c
 from typing import Optional, Tuple
 from hdr_forge.ffmpeg.video_codec.service.presets import Hdr_Forge_X265_X264_Preset
 from hdr_forge.ffmpeg.video_codec.video_codec_base import VideoCodecBase
 from hdr_forge.typedefs.encoder_typing import EncoderSettings, HdrForgeEncodingTuningPresets, HdrForgeSpeedPreset, HdrSdrFormat, Libx265Params, X265Tune
 from hdr_forge.typedefs.video_typing import ContentLightLevelMetadata, HdrMetadata, MasterDisplayMetadata, build_master_display_string, build_max_cll_string
-from hdr_forge.typedefs.codec_typing import BT_2020_FLAGS, BT_709_FLAGS, PIXEL_FORMAT_YUV420_10_BIT, PIXEL_FORMAT_YUV420_8_BIT, CodecPreset, VideoEncoderLibrary
+from hdr_forge.typedefs.codec_typing import BT_2020_FLAGS, BT_709_FLAGS, COLOR_PRIMARIES_FLAG_MAP, PIXEL_FORMAT_YUV420_10_BIT, PIXEL_FORMAT_YUV420_8_BIT, CodecPreset, ColorPrimaries, VideoEncoderLibrary
 from hdr_forge.video import Video
 
 class Libx265Codec(VideoCodecBase):
@@ -92,7 +93,7 @@ class Libx265Codec(VideoCodecBase):
 
     def get_pix_format_for_encoding(self) -> str | None:
         bit_depth: int = self.get_bit_depth_for_encoding()
-        
+
         if bit_depth == 10:
             return PIXEL_FORMAT_YUV420_10_BIT
         elif bit_depth == 8:
@@ -359,13 +360,17 @@ class Libx265Codec(VideoCodecBase):
             params.append('master-display=G(0,0)B(0,0)R(0,0)WP(0,0)L(0,0)')
             params.append('max-cll=0,0')
 
-        if self._video.get_color_primaries() == 'bt2020':
-            params.extend(BT_2020_FLAGS.copy())
-        elif self._video.get_color_primaries() == 'bt709':
-            params.extend(BT_709_FLAGS.copy())
-        else:
-            # unknown color primaries, do not set any
-            pass
+        color_primaries_flag: Optional[ColorPrimaries] = self._encoder_settings.override_color_primaries_flag
+        if color_primaries_flag is None:
+            try:
+                color_primaries_flag = ColorPrimaries(self._video.get_color_primaries())
+            except ValueError:
+                color_primaries_flag = None
+                # unknown color primaries
+
+        if color_primaries_flag is not None:
+            flags: list[str] = COLOR_PRIMARIES_FLAG_MAP[color_primaries_flag].copy()
+            params.extend(flags)
         return params
 
     def _get_auto_tune(self) -> Optional[X265Tune]:
