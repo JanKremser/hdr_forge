@@ -1,4 +1,3 @@
-from concurrent.futures import ProcessPoolExecutor
 import os
 from dataclasses import dataclass
 from pathlib import Path
@@ -8,8 +7,6 @@ from typing import List, Optional, Tuple
 import numpy as np
 from collections import Counter
 
-from PIL import Image
-import tempfile
 
 from hdr_forge.core.config import get_global_temp_directory
 from hdr_forge.ffmpeg import ffmpeg_wrapper
@@ -636,6 +633,9 @@ Total candidates: {len(results)}"""
             )
 
         output_options: dict = {
+            'map': '0:v:0',
+            'crf': '0',
+            'preset': 'ultrafast',
             'vf': f"crop=x={mask_result.x}:y={mask_result.y}:w={mask_result.width}:h={mask_result.height}"
         }
         output_path: Path = temp_dir / "crop_video.mp4"
@@ -676,6 +676,9 @@ Total candidates: {len(results)}"""
         delogo_str: str = f"delogo=x={mask_info['x']}:y={mask_info['y']}:w={mask_info['width']}:h={mask_info['height']}"
 
         output_options: dict[str, str] = {
+            'map': '0:v:0',
+            'crf': '0',
+            'preset': 'ultrafast',
             'vf': f"crop=x={mask_result.x}:y={mask_result.y}:w={mask_result.width}:h={mask_result.height},{delogo_str}"
         }
         output_path: Path = temp_dir / "crop_delogo_video.mp4"
@@ -715,7 +718,9 @@ Total candidates: {len(results)}"""
                 str(delogo_path),
                 str(mask_path),
             ],
-            "filter_complex": "[2:v]format=yuva420p,scale=iw:ih[mask_alpha];[1:v][mask_alpha]alphamerge[replacement_masked];[0:v][replacement_masked]overlay"
+            'crf': '0',
+            'preset': 'ultrafast',
+            "filter_complex": "[2:v]format=gray,gblur=sigma=2.5,format=yuva420p[mask_alpha];[1:v][mask_alpha]alphamerge[replacement_masked];[0:v][replacement_masked]overlay"
         }
         output_path: Path = temp_dir / "final_crop_video_delogo_mask.mp4"
         success: bool = ffmpeg_wrapper.run_ffmpeg(
@@ -734,6 +739,7 @@ Total candidates: {len(results)}"""
         """
         Erzeugt direkt aus einem Video eine finale Schnittmengen-Maske im Speicher.
         Nur Pixel, die in allen gültigen Frames weiß sind, bleiben weiß.
+        Analysiert maximal 2 Minuten des Videos (oder die gesamte Länge, falls kürzer).
 
         Args:
             video_path (str): Pfad zum Video.
@@ -750,12 +756,21 @@ Total candidates: {len(results)}"""
         if not cap.isOpened():
             raise FileNotFoundError(f"Video {video_path} konnte nicht geöffnet werden!")
 
+        # Berechne maximale Anzahl zu analysierender Frames (maximal 2 Minuten)
+        fps = self._video.get_fps()
+        duration_seconds = self._video.get_duration_seconds()
+        max_duration_seconds = min(120, duration_seconds)  # Maximal 2 Minuten (120 Sekunden)
+        max_frames = int(max_duration_seconds * fps)
+        total_frames = self._video.get_total_frames()
+        frames_to_process = min(max_frames, total_frames)
+
         progressbar = ProgressBarSpinner(description="Creating logo mask")
         progressbar.start()
 
         valid_masks: list = []
+        frame_count = 0
 
-        while True:
+        while frame_count < frames_to_process:
             ret, frame = cap.read()
             if not ret:
                 break
@@ -772,7 +787,8 @@ Total candidates: {len(results)}"""
             if np.any(mask > 0):
                 valid_masks.append(mask)
 
-            progressbar.update(percent=(cap.get(cv2.CAP_PROP_POS_FRAMES) / cap.get(cv2.CAP_PROP_FRAME_COUNT)) * 100)
+            frame_count += 1
+            progressbar.update(percent=(frame_count / frames_to_process) * 100)
 
         progressbar.stop("Mask creation completed.")
 
@@ -941,9 +957,9 @@ Total candidates: {len(results)}"""
                 crop_rect=(detect_logo.x, detect_logo.y, detect_logo.width, detect_logo.height),
                 threshold=40,
                 padding=10,
-                blur_radius=20
+                blur_radius=0
             )
-            default_padding = 10
+            default_padding = 20
             if self._logo_removal_settings.mode == LogoRemovalMode.DELOGO:
                 default_padding = 5
 
@@ -967,7 +983,7 @@ Total candidates: {len(results)}"""
             return None
         detect_logos = self._filter_logo_results(
             results=detect_logos,
-            max_size_ratio=0.15,
+            max_size_ratio=0.30,
             min_size_ratio=0.01,
             video_height=self._video.height,
             video_width=self._video.width,
@@ -986,6 +1002,8 @@ Total candidates: {len(results)}"""
 
         mask: MaskResult | None = self.create_mask()
         if mask is None:
+            print_err(msg="No valid logo mask could be created.")
+            sys.exit(status=1)
             return None
 
         if self._logo_removal_settings.mode == LogoRemovalMode.MASK:
