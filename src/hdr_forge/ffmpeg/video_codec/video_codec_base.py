@@ -234,13 +234,13 @@ class VideoCodecBase(ABC):
             # Upscale to HDR10 color space for SDR to HDR10/DV conversion
             if encoding_hdr_sdr_format == HdrSdrFormat.SDR:
                 if self.get_bit_depth_for_encoding() == 10:
-                    filters.extend([
-                        'libplacebo=colorspace=bt709:color_primaries=bt709:color_trc=bt709:format=yuv420p10le'
-                    ])
+                    format= "yuv420p10le"
                 else:
-                    filters.extend([
-                        'libplacebo=colorspace=bt709:color_primaries=bt709:color_trc=bt709:format=yuv420p'
-                    ])
+                    format= "yuv420p"
+
+                filters.extend([
+                    f'libplacebo=colorspace=bt709:color_primaries=bt709:color_trc=bt709:format={format}'
+                ])
             else:
                 filters.extend([
                     'libplacebo=colorspace=bt2020nc:color_primaries=bt2020:color_trc=smpte2084:format=yuv420p10le'
@@ -248,12 +248,16 @@ class VideoCodecBase(ABC):
         elif encoding_hdr_sdr_format == HdrSdrFormat.SDR:
             if self._video.is_hdr_video():
                 # Tone mapping for HDR to SDR conversion
+                if self.get_bit_depth_for_encoding() == 10:
+                    format= "yuv420p10le"
+                else:
+                    format= "yuv420p"
                 filters.extend([
                     'zscale=t=linear:npl=100',
                     'format=gbrpf32le',
                     'tonemap=tonemap=hable:desat=0',
                     'zscale=t=bt709:m=bt709:p=bt709:r=tv',
-                    'format=yuv420p'
+                    f'format={format}'
                 ])
         if len(filters) == 0:
             return None
