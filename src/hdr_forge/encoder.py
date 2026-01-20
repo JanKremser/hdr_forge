@@ -514,16 +514,13 @@ class Encoder:
             # Build output options
             output_options: dict = self._build_ffmpeg_output_options()
 
-            # Debug output
-            debug_ffmpeg: str = build_ffmpeg_cmd_dict_to_str(output_options)
-            print_debug(f'Run command: ffmpeg -y -i "{input_file}" {debug_ffmpeg} "{target_file}"')
-
             # Execute FFmpeg with progress tracking
             success: bool = run_ffmpeg(
                 input_file=input_file,
                 output_file=target_file,
                 output_options=output_options,
-                progress_callback=progress_callback
+                progress_callback=progress_callback,
+                try_fix=self._encoder_settings.try_fix,
             )
             print()
 

@@ -538,6 +538,16 @@ Example:
     )
 
     convert_parser.add_argument(
+        '--try-fix',
+        action='store_true',
+        help=f"""{expert_dot}
+Expert Option:
+    Try to repair a damaged video input during processing.
+    Errors are ignored during import, which may work for videos that are not too badly damaged.
+"""
+    )
+
+    convert_parser.add_argument(
         '--threads',
         help=f"""{expert_dot}
 Expert Option:

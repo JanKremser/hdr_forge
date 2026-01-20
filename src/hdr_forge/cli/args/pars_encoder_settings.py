@@ -794,6 +794,7 @@ def create_encoder_settings_from_args(args) -> EncoderSettings:
         audio_codecs=_get_audio_codec_from_string(codec_str=getattr(args, 'audio_codec', None)),
         vfilter=getattr(args, 'vfilter', None),
         dar_ratio=_get_dar_ratio_settings_from_string(getattr(args, 'dar_ratio', None)),
+        try_fix=getattr(args, 'try_fix', False) or False,
         hdr_forge_encoding_preset=hdr_forge_preset_settings,
         hdr_sdr_format=_get_hdr_sdr_format_from_string(format_str=args.hdr_sdr_format),
         enable_gpu_acceleration=hdr_forge_preset_settings.hardware_preset.value.startswith('gpu:'),

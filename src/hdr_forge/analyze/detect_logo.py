@@ -675,7 +675,7 @@ Total candidates: {len(results)}"""
 
         delogo_str: str = f"delogo=x={mask_info['x']}:y={mask_info['y']}:w={mask_info['width']}:h={mask_info['height']}"
 
-        output_options: dict[str, str] = {
+        output_options: dict[str, list[str] | str] = {
             'map': '0:v:0',
             'crf': '0',
             'preset': 'ultrafast',
