@@ -6,9 +6,8 @@ import sys
 import time
 from typing import Dict, Optional, Tuple
 
-from hdr_forge.cli.cli_output import create_ffmpeg_progress_handler, print_debug, print_err, print_warn
+from hdr_forge.cli.cli_output import create_ffmpeg_progress_handler, print_err, print_warn
 from hdr_forge.core.config import get_global_temp_directory
-from hdr_forge.core.service import build_ffmpeg_cmd_dict_to_str
 from hdr_forge.tools import mkvmerge
 from hdr_forge.ffmpeg.ffmpeg_wrapper import run_ffmpeg
 from hdr_forge.ffmpeg.video_codec.h264_nvenc import H264NvencCodec
@@ -514,6 +513,10 @@ class Encoder:
             # Build output options
             output_options: dict = self._build_ffmpeg_output_options()
 
+            init_hw_device_vulkan: bool = False
+            if (self._video.get_dolby_vision_profile() == DolbyVisionProfile._5):
+                init_hw_device_vulkan = True
+
             # Execute FFmpeg with progress tracking
             success: bool = run_ffmpeg(
                 input_file=input_file,
@@ -521,6 +524,7 @@ class Encoder:
                 output_options=output_options,
                 progress_callback=progress_callback,
                 try_fix=self._encoder_settings.try_fix,
+                init_hw_device_vulkan=init_hw_device_vulkan,
             )
             print()
 
@@ -530,7 +534,7 @@ class Encoder:
             print_err(f"Error during encoding: {e}")
             return False
 
-    def convert_sdr_hdr10(
+    def convert_sdr_hdr10_or_video_copy(
         self,
     ) -> bool:
         """Execute FFmpeg conversion with configured parameters.
@@ -657,6 +661,7 @@ class Encoder:
 
     def convert_dolby_vision(
         self,
+        extract_base_layer: bool = True,
     ) -> bool:
         """Convert Dolby Vision video by re-encoding base layer and optionally re-injecting RPU or EL+RPU.
 
@@ -688,23 +693,24 @@ class Encoder:
         # Create temporary directory for all intermediate files
         temp_dir: Path = get_global_temp_directory()
 
-        # Step 1: Extract base layer (HEVC without RPU) from original video
-        base_layer_hevc_path: Path = dovi_tool.extract_base_layer(
-            input_path=input_file,
-            output_hevc=temp_dir / f"video_BL.hevc",
-            total_frames=total_frames,
-        )
+        if extract_base_layer:
+            # Step 1: Extract base layer (HEVC without RPU) from original video
+            base_layer_hevc_path: Path = dovi_tool.extract_base_layer(
+                input_path=input_file,
+                output_hevc=temp_dir / f"video_BL.hevc",
+                total_frames=total_frames,
+            )
 
-        # Step 2: Mux base layer HEVC with original audio/subtitles into temporary MKV
-        # This creates a playable MKV file with base layer video + original audio/subs
-        base_layer_mkv_path: Path = mkvmerge.mux_hevc_to_mkv(
-            input_hevc_path=base_layer_hevc_path,
-            input_mkv=input_file,
-            output_mkv=temp_dir / f"video_BL.mkv",
-        )
+            # Step 2: Mux base layer HEVC with original audio/subtitles into temporary MKV
+            # This creates a playable MKV file with base layer video + original audio/subs
+            base_layer_mkv_path: Path = mkvmerge.mux_hevc_to_mkv(
+                input_hevc_path=base_layer_hevc_path,
+                input_mkv=input_file,
+                output_mkv=temp_dir / f"video_BL.mkv",
+            )
 
-        # Cleanup: Delete base layer HEVC (no longer needed after muxing)
-        base_layer_hevc_path.unlink(missing_ok=True)
+            # Cleanup: Delete base layer HEVC (no longer needed after muxing)
+            base_layer_hevc_path.unlink(missing_ok=True)
 
         # Step 3: Re-encode the base layer MKV with FFmpeg (apply CRF, filters, etc.)
         encoded_base_layer_mkv: Path = temp_dir / f"video_BL_Encoded.mkv"
@@ -713,12 +719,15 @@ class Encoder:
         if only_hdr10_or_sdr_encoding:
             encoded_base_layer_mkv = self._target_file
 
+        ffmpeg_encoding_input_file: Path = base_layer_mkv_path if extract_base_layer else input_file
+
         encoding_success: bool = self._run_ffmpeg_encoding_process(
-            input_file=Path(base_layer_mkv_path),
+            input_file=ffmpeg_encoding_input_file,
             target_file=encoded_base_layer_mkv,
         )
-        # Cleanup: Delete base layer MKV (no longer needed after encoding)
-        base_layer_mkv_path.unlink(missing_ok=True)
+        if extract_base_layer:
+            # Cleanup: Delete base layer MKV (no longer needed after encoding)
+            base_layer_mkv_path.unlink(missing_ok=True)
 
         if not encoding_success:
             return False
@@ -761,6 +770,16 @@ class Encoder:
     ) -> bool:
         if self._video.is_dolby_vision_video():
 
+            if (self.get_encoding_video_codec() == VideoCodec.COPY and self._encoder_settings.target_dv_profile == DolbyVisionProfileEncodingMode.AUTO):
+                # Dolby Vision Profile copy without re-encoding
+                return self.convert_sdr_hdr10_or_video_copy()
+
+            if (self._video.get_dolby_vision_profile() == DolbyVisionProfile._5):
+                # Dolby Vision Profile 5 cannot be converted to other profiles without re-encoding
+                return self.convert_dolby_vision(
+                    extract_base_layer=False,
+                )
+
             # Convert Dolby Vision to HDR10, without re-encoding
             if (self.get_encoding_video_codec() == VideoCodec.COPY and self.is_audio_copy_encoding()):
                 if (self.is_dolby_vision_encoding()):
@@ -771,4 +790,4 @@ class Encoder:
             # Dolby Vision encoding workflow
             return self.convert_dolby_vision()
 
-        return self.convert_sdr_hdr10()
+        return self.convert_sdr_hdr10_or_video_copy()

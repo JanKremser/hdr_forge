@@ -142,6 +142,7 @@ def run_ffmpeg(
     progress_callback: Optional[Callable[[FfmpegProgressInfo], None]] = None,
     timeout: Optional[float] = None,
     try_fix: bool = False,
+    init_hw_device_vulkan: bool = False,
 ) -> bool:
     """Execute FFmpeg with progress tracking.
 
@@ -160,6 +161,9 @@ def run_ffmpeg(
     """
     # Build FFmpeg command
     cmd = []
+
+    if init_hw_device_vulkan:
+        cmd.extend(['-init_hw_device', 'vulkan'])
 
     if try_fix:
         cmd.extend(['-err_detect', 'ignore_err'])

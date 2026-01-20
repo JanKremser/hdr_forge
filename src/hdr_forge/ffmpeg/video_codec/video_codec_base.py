@@ -10,6 +10,7 @@ from hdr_forge.analyze.grain_score import GrainAnalyzer
 from hdr_forge.cli.cli_output import print_err, print_warn
 from hdr_forge.ffmpeg.video_codec.service.presets import calc_hw_prest_params
 from hdr_forge.typedefs.codec_typing import HDR_FORGE_SPEED_PRESET, CodecPreset, VideoEncoderLibrary
+from hdr_forge.typedefs.dolby_vision_typing import DolbyVisionProfile
 from hdr_forge.typedefs.encoder_typing import EncoderSettings, HdrForgeEncodingTuningPresets, HdrForgeSpeedPreset, HdrSdrFormat, ScaleMode, UniversalEncoderParams
 from hdr_forge.typedefs.video_typing import HdrMetadata
 from hdr_forge.video import Video
@@ -229,7 +230,22 @@ class VideoCodecBase(ABC):
             if scale_filter:
                 filters.append(scale_filter)
 
-        if encoding_hdr_sdr_format == HdrSdrFormat.SDR:
+        if self._video.get_dolby_vision_profile() == DolbyVisionProfile._5:
+            # Upscale to HDR10 color space for SDR to HDR10/DV conversion
+            if encoding_hdr_sdr_format == HdrSdrFormat.SDR:
+                if self.get_bit_depth_for_encoding() == 10:
+                    filters.extend([
+                        'libplacebo=colorspace=bt709:color_primaries=bt709:color_trc=bt709:format=yuv420p10le'
+                    ])
+                else:
+                    filters.extend([
+                        'libplacebo=colorspace=bt709:color_primaries=bt709:color_trc=bt709:format=yuv420p'
+                    ])
+            else:
+                filters.extend([
+                    'libplacebo=colorspace=bt2020nc:color_primaries=bt2020:color_trc=smpte2084:format=yuv420p10le'
+                ])
+        elif encoding_hdr_sdr_format == HdrSdrFormat.SDR:
             if self._video.is_hdr_video():
                 # Tone mapping for HDR to SDR conversion
                 filters.extend([

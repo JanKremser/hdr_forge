@@ -225,7 +225,12 @@ class Video:
         Returns:
             Color primaries string
         """
-        return self._get_video_stream().get('color_primaries', None)
+        color_primaries: str | None = self._get_video_stream().get('color_primaries', None)
+        if color_primaries is None and self.get_dolby_vision_profile() == DolbyVisionProfile._5:
+            # DV Profile 5 implies BT.2020 color primaries
+            return "bt2020"
+
+        return color_primaries
 
     def get_color_space(self) -> str | None:
         """Get color space information.

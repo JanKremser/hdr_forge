@@ -68,7 +68,7 @@ def extract_base_layer(
         returncode, stderr = run_ffmpeg_tool_pipeline(
             input_path=input_path,
             tool_cmd=dovi_cmd,
-            process_name="Extracting HDR10 Base Layer:",
+            process_name="Extracting Base Layer:",
             total_frames=total_frames,
         )
 
@@ -77,9 +77,9 @@ def extract_base_layer(
             raise RuntimeError(f"dovi_tool Base Layer extraction failed: {error_msg}")
 
         if not output_hevc.exists():
-            raise RuntimeError("HDR10 Base Layer file was not created")
+            raise RuntimeError("Base Layer file was not created")
 
-        print_debug(f"HDR10 Base Layer extracted successfully: {str(output_hevc)}")
+        print_debug(f"Base Layer extracted successfully: {str(output_hevc)}")
         return output_hevc
 
     except FileNotFoundError as e:

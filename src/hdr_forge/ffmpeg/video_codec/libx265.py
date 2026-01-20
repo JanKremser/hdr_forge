@@ -1,10 +1,9 @@
-from calendar import c
 from typing import Optional, Tuple
 from hdr_forge.ffmpeg.video_codec.service.presets import Hdr_Forge_X265_X264_Preset
 from hdr_forge.ffmpeg.video_codec.video_codec_base import VideoCodecBase
 from hdr_forge.typedefs.encoder_typing import EncoderSettings, HdrForgeEncodingTuningPresets, HdrForgeSpeedPreset, HdrSdrFormat, Libx265Params, X265Tune
 from hdr_forge.typedefs.video_typing import ContentLightLevelMetadata, HdrMetadata, MasterDisplayMetadata, build_master_display_string, build_max_cll_string
-from hdr_forge.typedefs.codec_typing import BT_2020_FLAGS, BT_709_FLAGS, COLOR_PRIMARIES_FLAG_MAP, PIXEL_FORMAT_YUV420_10_BIT, PIXEL_FORMAT_YUV420_8_BIT, CodecPreset, ColorPrimaries, VideoEncoderLibrary
+from hdr_forge.typedefs.codec_typing import BT_2020_FLAGS, COLOR_PRIMARIES_FLAG_MAP, PIXEL_FORMAT_YUV420_10_BIT, PIXEL_FORMAT_YUV420_8_BIT, CodecPreset, ColorPrimaries, VideoEncoderLibrary
 from hdr_forge.video import Video
 
 class Libx265Codec(VideoCodecBase):
@@ -360,8 +359,12 @@ class Libx265Codec(VideoCodecBase):
             params.append('master-display=G(0,0)B(0,0)R(0,0)WP(0,0)L(0,0)')
             params.append('max-cll=0,0')
 
+        encoding_hdr_sdr_format: HdrSdrFormat = self.get_encoding_hdr_sdr_format()
+
         color_primaries_flag: Optional[ColorPrimaries] = self._encoder_settings.override_color_primaries_flag
-        if color_primaries_flag is None:
+        if self._video.is_hdr_video() and encoding_hdr_sdr_format == HdrSdrFormat.SDR:
+            color_primaries_flag = ColorPrimaries.BT709
+        elif color_primaries_flag is None:
             try:
                 color_primaries_flag = ColorPrimaries(self._video.get_color_primaries())
             except ValueError:
