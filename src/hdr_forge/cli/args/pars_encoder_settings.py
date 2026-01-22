@@ -1,5 +1,6 @@
 """Parse encoder settings from command-line arguments."""
 
+import locale
 import multiprocessing
 import sys
 from typing import Tuple
@@ -8,7 +9,7 @@ from typing import Tuple
 from hdr_forge import __version__
 from hdr_forge.cli.cli_output import print_err, print_warn
 from hdr_forge.typedefs.codec_typing import ColorPrimaries, HEVC_NVENC_Preset, VideoEncoderLibrary, x265_x264_Preset
-from hdr_forge.typedefs.encoder_typing import AudioCodec, AudioCodecItem, CropMode, CropSettings, EncoderOverride, GrainMode, HdrForgeEncodingHardwarePresets, HdrForgeEncodingPresetSettings, HdrForgeEncodingTuningPresets, HdrForgeSpeedPreset, HdrSdrFormat, EncoderSettings, LogoRemovalAutoDetectMode, LogoRemovalMode, LogoRemovelSettings, NvencParams, NvencRcMode, SampleSettings, ScaleMode, UniversalEncoderParams, VideoCodec, Libx264Params, X264Tune, Libx265Params, X265Tune
+from hdr_forge.typedefs.encoder_typing import AudioCodec, AudioCodecItem, CropMode, CropSettings, EncoderOverride, GrainMode, HdrForgeEncodingHardwarePresets, HdrForgeEncodingPresetSettings, HdrForgeEncodingTuningPresets, HdrForgeSpeedPreset, HdrSdrFormat, EncoderSettings, LogoRemovalAutoDetectMode, LogoRemovalMode, LogoRemovelSettings, NvencParams, NvencRcMode, SampleSettings, ScaleMode, SubtitleMode, SubtitleModeItem, UniversalEncoderParams, VideoCodec, Libx264Params, X264Tune, Libx265Params, X265Tune
 from hdr_forge.typedefs.dolby_vision_typing import DolbyVisionProfileEncodingMode
 from hdr_forge.typedefs.video_typing import BT_2020_MASTER_DISPLAY, BT_709_MASTER_DISPLAY, DISPLAY_P3_MASTER_DISPLAY, ContentLightLevelMetadata, HdrMetadata, MasterDisplayMetadata
 
@@ -179,6 +180,57 @@ def _get_audio_codec_from_string(codec_str: str | None) -> dict[str, AudioCodecI
         sys.exit(1)
 
     return codec_map
+
+def _get_subtitle_codec_from_string(codec_str: str | None) -> SubtitleModeItem:
+    """Convert string to SubtitleEncoder enum.
+
+    Args:
+        codec_str: Subtitle codec string
+
+    Returns:
+        Corresponding SubtitleEncoder enum value
+    """
+    def get_default_lang() -> str | None:
+        ISO_639_1_TO_2: dict = {
+            "de": "ger",
+            "en": "eng",
+            "fr": "fra",
+            "es": "spa",
+            "it": "ita",
+            "nl": "nld",
+            "pl": "pol",
+            "pt": "por",
+            "ja": "jpn",
+            "zh": "zho",
+        }
+        locale.setlocale(locale.LC_ALL, '')
+        lang, _ = locale.getlocale()
+
+        _default_lang = None
+        if lang:
+            iso1 = lang.split('_')[0]
+            _default_lang: str | None = ISO_639_1_TO_2.get(iso1, None)  # und = undefined
+        return _default_lang
+
+    supported_modi: list[str] = ['copy', 'remove', 'auto']
+    if codec_str is None:
+        return SubtitleModeItem(mode=SubtitleMode.COPY, default_lang=None)
+
+    codec_str_norm = codec_str.lower().replace('-', '')
+    if codec_str_norm in supported_modi:
+        if 'auto' in codec_str_norm:
+            default_lang: str | None = get_default_lang()
+            return SubtitleModeItem(mode=SubtitleMode.AUTO, default_lang=default_lang)
+
+        return SubtitleModeItem(mode=SubtitleMode(codec_str_norm), default_lang=None)
+    elif "auto>" in codec_str_norm:
+        auto_lang: list[str] = codec_str_norm.split(">")
+        if len(auto_lang) != 2:
+            print_err(f"Invalid subtitle codec value '{codec_str}', using default")
+            sys.exit(1)
+        return SubtitleModeItem(mode=SubtitleMode(auto_lang[0]), default_lang=auto_lang[1])
+
+    return SubtitleModeItem(mode=SubtitleMode.COPY, default_lang=None)
 
 
 def _get_crop_settings_from_string(crop_str: str | None) -> CropSettings:
@@ -792,6 +844,7 @@ def create_encoder_settings_from_args(args) -> EncoderSettings:
     return EncoderSettings(
         video_codec=_get_video_codec_from_string(codec_str=args.video_codec),
         audio_codecs=_get_audio_codec_from_string(codec_str=getattr(args, 'audio_codec', None)),
+        subtitle_codec=_get_subtitle_codec_from_string(codec_str=getattr(args, 'subtitle_codec', None)),
         vfilter=getattr(args, 'vfilter', None),
         dar_ratio=_get_dar_ratio_settings_from_string(getattr(args, 'dar_ratio', None)),
         try_fix=getattr(args, 'try_fix', False) or False,

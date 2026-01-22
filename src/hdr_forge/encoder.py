@@ -18,7 +18,7 @@ from hdr_forge.ffmpeg.video_codec.libx265 import Libx265Codec
 from hdr_forge.ffmpeg.video_codec.libsvtav1 import LibSvtAV1Codec
 from hdr_forge.tools import dovi_tool
 from hdr_forge.typedefs.codec_typing import VideoEncoderLibrary
-from hdr_forge.typedefs.encoder_typing import AudioCodec, AudioCodecItem, EncoderOverride, HdrSdrFormat, EncoderSettings, SampleSettings, VideoCodec
+from hdr_forge.typedefs.encoder_typing import AudioCodec, AudioCodecItem, EncoderOverride, HdrSdrFormat, EncoderSettings, SampleSettings, SubtitleMode, SubtitleModeItem, VideoCodec
 from hdr_forge.typedefs.dolby_vision_typing import DolbyVisionInfo, DolbyVisionProfile, DolbyVisionProfileEncodingMode
 from hdr_forge.typedefs.mkv_typing import MkvTrack
 from hdr_forge.video import Video
@@ -446,6 +446,61 @@ class Encoder:
                 options[f'c:a:{track.ffmpeg_index}'] = 'copy'
         return options
 
+    def _build_ffmpeg_subtitle_options(self, options: dict) -> dict:
+        subtitle_codec: SubtitleModeItem = self._encoder_settings.subtitle_codec
+        if subtitle_codec.mode == SubtitleMode.REMOVE:
+            return options
+        elif subtitle_codec.mode == SubtitleMode.COPY:
+            options['map'].append(f'0:s?')
+            options.update({
+                'c:s': 'copy',
+            })
+            return options
+
+        default_lang: str | None = subtitle_codec.default_lang
+
+        subtitle_tracks: list[MkvTrack] = self._video.get_container_subtitles_tracks()
+
+        has_default_track = False
+        for track in subtitle_tracks:
+            options['map'].append(f'0:s:{track.ffmpeg_index}')
+            options[f'c:s:{track.ffmpeg_index}'] = 'copy'
+
+            title: str = ""
+            disposition: str = "none"
+            if (
+                track.properties.forced_track
+                or (
+                    track.properties.track_name and "forced" in track.properties.track_name.lower()
+                )
+            ):
+                title = "forced"
+                if default_lang and track.properties.language == default_lang and not has_default_track:
+                    disposition = "default" # forced+default
+                    has_default_track = True
+
+            track_name = track.properties.track_name or ""
+            if title == "":
+                if "commentary" in track_name.lower():
+                    title = "commentary"
+                else:
+                    title = "full"
+
+            if "sdh" in track_name.lower():
+                title += " SDH"
+
+            if track.properties.codec_id:
+                codec: list[str] = track.properties.codec_id.upper().split('/')
+
+                if len(codec) > 1:
+                    sub_codec: str = codec[1]
+                    title += f" ({sub_codec})"
+
+            options[f'metadata:s:s:{track.ffmpeg_index}'] = f'title={title}'
+            options[f'disposition:s:{track.ffmpeg_index}'] = disposition
+
+        return options
+
     def _build_ffmpeg_output_options(self) -> Dict[str, str]:
         """Build FFmpeg output options dictionary for encoding.
 
@@ -470,6 +525,7 @@ class Encoder:
 
         metadata: list[str] = [
             'hdr_forge_version=' + str(getattr(sys.modules['hdr_forge'], '__version__', 'unknown')),
+            #'title="Mein Film – Extended Cut"',
         ]
         if 'metadata' in output_options:
             output_options['metadata'].extend(metadata)
@@ -478,10 +534,7 @@ class Encoder:
 
         output_options = self._build_ffmpeg_audio_options(options=output_options)
 
-        output_options['map'].append(f'0:s?')
-        output_options.update({
-            'c:s': 'copy',
-        })
+        output_options = self._build_ffmpeg_subtitle_options(options=output_options)
 
         if self._encoder_settings.threads:
             output_options['threads'] = str(self._encoder_settings.threads)

@@ -1,6 +1,5 @@
 from dataclasses import dataclass, field
 from enum import Enum
-from pickle import TRUE
 from typing import Optional
 
 
@@ -67,6 +66,18 @@ class AudioCodecItem():
     """Audio codec configuration for encoding."""
     from_codec: Optional[str | AudioCodec] = None
     to_codec: AudioCodec = AudioCodec.COPY
+
+class SubtitleMode(Enum):
+    """Subtitle mode options for encoding."""
+    COPY = "copy"
+    REMOVE = "remove"
+    AUTO = "auto"
+
+@dataclass
+class SubtitleModeItem():
+    """Subtitle mode configuration for encoding."""
+    mode: SubtitleMode = SubtitleMode.AUTO
+    default_lang: Optional[str] = None
 
 class ScaleMode(Enum):
     """Scaling mode for video resizing after cropping."""
@@ -209,6 +220,9 @@ class EncoderSettings:
     """
     video_codec: VideoCodec = VideoCodec.H265
     audio_codecs: dict[str, AudioCodecItem] = field(default_factory=lambda: {}) # { lang or track id: AudioCodecItem }
+    subtitle_codec: SubtitleModeItem = field(default_factory=lambda: SubtitleModeItem(
+        mode=SubtitleMode.COPY, default_lang=None
+    ))
 
     # Video filter settings
     vfilter: Optional[str] = None

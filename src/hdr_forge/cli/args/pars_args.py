@@ -123,7 +123,7 @@ def _add_convert_subcommand(parser: argparse._SubParsersAction) -> None:
         epilog=f"""
 {expert_dot} EXPERT
 {sdr_dot} Available for SDR
-{hdr_dot} Available for HDR10/HDR
+{hdr_dot} Available for HDR/HDR10/HDR10+
 {dolby_vision_dot} Available for Dolby Vision
 
 Examples:
@@ -184,6 +184,21 @@ Examples:
     hdr_forge convert -i input.mkv -o output.mkv --audio-codec ger:aac
     hdr_forge convert -i input.mkv -o output.mkv --audio-codec eng:dts>aac
     hdr_forge convert -i input.mkv -o output.mkv --audio-codec eng:aac;ger:dts>aac\n
+"""
+    )
+
+    convert_parser.add_argument(
+        '-s', '--subtitle-codec',
+        default="copy",
+        help=f"""{sdr_dot} {hdr_dot} {dolby_vision_dot}
+Subtitle flags. Default is 'copy'.
+    [copy]                 : Copy all subtitle tracks
+    [remove]               : Remove all subtitle tracks
+    [auto]                 : Automatically select subtitle tracks (forced and default tracks), by name
+    [auto>ger]             : Automatically select subtitle tracks (forced and default tracks), for German language
+
+
+Info: VLC has problems displaying a title name when the ffmpeg set it. Kodi and MKVtoolnix has no problems with it.
 """
     )
 
@@ -562,7 +577,7 @@ Example:
     )
 
     convert_parser.add_argument(
-        '-s', '--shutdown',
+        '--shutdown',
         action='store_true',
         help=f"""{sdr_dot} {hdr_dot} {dolby_vision_dot}
 Shutdown the system after conversion is complete.\n
