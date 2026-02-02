@@ -365,6 +365,9 @@ class Encoder:
     def _build_ffmpeg_audio_options(self, options: dict) -> dict:
         audio_codecs: dict[str, AudioCodecItem] = self._encoder_settings.audio_codecs
         audio_tracks: list[MkvTrack] = self._video.get_container_audio_tracks()
+
+        audio_default_track: str | None = self._encoder_settings.audio_default_track
+
         for track in audio_tracks:
             track_id_str = str(track.id)
             audio_codec_item: AudioCodecItem | None = None
@@ -375,7 +378,9 @@ class Encoder:
             elif 'default' in audio_codecs:
                 audio_codec_item = audio_codecs['default']
 
-            if audio_codec_item and audio_codec_item.to_codec != AudioCodec.COPY:
+            if audio_codec_item and audio_codec_item.to_codec == AudioCodec.REMOVE:
+                continue
+            elif audio_codec_item and audio_codec_item.to_codec != AudioCodec.COPY:
                 track_codec = track.codec.lower().replace('-', '')
                 if audio_codec_item.from_codec == track_codec or audio_codec_item.from_codec is None:
                     options['map'].append(f'0:a:{track.ffmpeg_index}')
@@ -400,6 +405,7 @@ class Encoder:
                     if audio_codec_item.to_codec == AudioCodec.AAC and count_ch > 6:
                         print_warn(f"AAC codec with more than 6 channels may not be widely supported. Track ID {track.id} has {count_ch} channels.")
 
+                    bitrate: int
                     if count_ch == 1: # Mono
                         if audio_codec_item.to_codec == AudioCodec.AC3 or audio_codec_item.to_codec == AudioCodec.EAC3:
                             bitrate = 128 # 96-128 = AC3
@@ -441,23 +447,33 @@ class Encoder:
                             pass
 
                     options[f'b:a:{track.ffmpeg_index}'] = f"{bitrate}k"
+                    options[f'ac:a:{track.ffmpeg_index}'] = str(count_ch)
             else:
                 options['map'].append(f'0:a:{track.ffmpeg_index}')
                 options[f'c:a:{track.ffmpeg_index}'] = 'copy'
+
+            # Set default audio track
+            if audio_default_track == "copy":
+                continue
+            if audio_default_track == track_id_str or track.properties.language == audio_default_track:
+                options[f'disposition:a:{track.ffmpeg_index}'] = 'default'
+            else:
+                options[f'disposition:a:{track.ffmpeg_index}'] = '0'
+
         return options
 
     def _build_ffmpeg_subtitle_options(self, options: dict) -> dict:
-        subtitle_codec: SubtitleModeItem = self._encoder_settings.subtitle_codec
-        if subtitle_codec.mode == SubtitleMode.REMOVE:
+        subtitle_flags: SubtitleModeItem = self._encoder_settings.subtitle_flags
+        if subtitle_flags.mode == SubtitleMode.REMOVE:
             return options
-        elif subtitle_codec.mode == SubtitleMode.COPY:
+        elif subtitle_flags.mode == SubtitleMode.COPY:
             options['map'].append(f'0:s?')
             options.update({
                 'c:s': 'copy',
             })
             return options
 
-        default_lang: str | None = subtitle_codec.default_lang
+        default_lang: str | None = subtitle_flags.default_lang
 
         subtitle_tracks: list[MkvTrack] = self._video.get_container_subtitles_tracks()
 
@@ -489,12 +505,17 @@ class Encoder:
             if "sdh" in track_name.lower():
                 title += " SDH"
 
-            if track.properties.codec_id:
-                codec: list[str] = track.properties.codec_id.upper().split('/')
+            if track.codec:
+                codec: list[str] = track.codec.upper().split('/')
+                codec_2: list[str] = track.codec.upper().split(' ')
 
+                sub_codec: str = track.codec
                 if len(codec) > 1:
                     sub_codec: str = codec[1]
-                    title += f" ({sub_codec})"
+                elif len(codec_2) > 1:
+                    sub_codec: str = codec_2[1]
+
+                title += f" ({sub_codec})"
 
             options[f'metadata:s:s:{track.ffmpeg_index}'] = f'title={title}'
             options[f'disposition:s:{track.ffmpeg_index}'] = disposition

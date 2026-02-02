@@ -119,7 +119,7 @@ def _get_audio_codec_from_string(codec_str: str | None) -> dict[str, AudioCodecI
     Returns:
         Corresponding AudioEncoder enum value
     """
-    supported_codec: list[str] = ['aac', 'ac3', 'eac3', 'flac', 'copy']
+    supported_codec: list[str] = ['aac', 'ac3', 'eac3', 'flac', 'copy', 'remove']
     if codec_str is None:
         return {
             'default': AudioCodecItem(from_codec=None, to_codec=AudioCodec.COPY)
@@ -181,7 +181,7 @@ def _get_audio_codec_from_string(codec_str: str | None) -> dict[str, AudioCodecI
 
     return codec_map
 
-def _get_subtitle_codec_from_string(codec_str: str | None) -> SubtitleModeItem:
+def _get_subtitle_flags_from_string(flag_str: str | None) -> SubtitleModeItem:
     """Convert string to SubtitleEncoder enum.
 
     Args:
@@ -213,10 +213,10 @@ def _get_subtitle_codec_from_string(codec_str: str | None) -> SubtitleModeItem:
         return _default_lang
 
     supported_modi: list[str] = ['copy', 'remove', 'auto']
-    if codec_str is None:
+    if flag_str is None:
         return SubtitleModeItem(mode=SubtitleMode.COPY, default_lang=None)
 
-    codec_str_norm = codec_str.lower().replace('-', '')
+    codec_str_norm = flag_str.lower().replace('-', '')
     if codec_str_norm in supported_modi:
         if 'auto' in codec_str_norm:
             default_lang: str | None = get_default_lang()
@@ -226,7 +226,7 @@ def _get_subtitle_codec_from_string(codec_str: str | None) -> SubtitleModeItem:
     elif "auto>" in codec_str_norm:
         auto_lang: list[str] = codec_str_norm.split(">")
         if len(auto_lang) != 2:
-            print_err(f"Invalid subtitle codec value '{codec_str}', using default")
+            print_err(f"Invalid subtitle codec value '{flag_str}', using default")
             sys.exit(1)
         return SubtitleModeItem(mode=SubtitleMode(auto_lang[0]), default_lang=auto_lang[1])
 
@@ -844,7 +844,8 @@ def create_encoder_settings_from_args(args) -> EncoderSettings:
     return EncoderSettings(
         video_codec=_get_video_codec_from_string(codec_str=args.video_codec),
         audio_codecs=_get_audio_codec_from_string(codec_str=getattr(args, 'audio_codec', None)),
-        subtitle_codec=_get_subtitle_codec_from_string(codec_str=getattr(args, 'subtitle_codec', None)),
+        audio_default_track=getattr(args, 'audio_default', None),
+        subtitle_flags=_get_subtitle_flags_from_string(flag_str=getattr(args, 'subtitle_flags', None)),
         vfilter=getattr(args, 'vfilter', None),
         dar_ratio=_get_dar_ratio_settings_from_string(getattr(args, 'dar_ratio', None)),
         try_fix=getattr(args, 'try_fix', False) or False,

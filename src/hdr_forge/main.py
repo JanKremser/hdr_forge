@@ -14,6 +14,7 @@ from hdr_forge.core import config
 from hdr_forge.core.service import shutdown_system
 from hdr_forge.metadata_injector import MetadataInjector
 from hdr_forge.tools import dovi_tool, hdr10plus_tool, hevc_hdr_editor
+from hdr_forge.typedefs.dolby_vision_typing import DolbyVisionProfile
 from hdr_forge.typedefs.encoder_typing import EncoderSettings, LogoRemovalAutoDetectMode, LogoRemovalMode, LogoRemovelSettings
 from hdr_forge.encoder import Encoder
 from hdr_forge.video import Video
@@ -262,10 +263,13 @@ def process_extract_metadata_command(args) -> int:
 
         if video.is_dolby_vision_video():
             rpu_file_path: Path = output_path / f"{input_path.stem}.rpu"
+            to_dv_profile_8: bool = args.getattr('to_dv_8', False)
             dovi_tool.extract_rpu(
                 input_path=video.get_filepath(),
                 output_rpu=rpu_file_path,
                 total_frames=video.get_total_frames(),
+                dv_profile_source=video.get_dolby_vision_profile(),
+                dv_profile_encoding=DolbyVisionProfile._8 if to_dv_profile_8 else None,
             )
             dv_info: dovi_tool.DolbyVisionRpuInfo = dovi_tool.get_rpu_info(
                 rpu_path=rpu_file_path,

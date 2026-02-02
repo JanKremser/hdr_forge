@@ -53,6 +53,7 @@ class VideoCodec(Enum):
 class AudioCodec(Enum):
     """Audio codec options for encoding."""
     COPY = "copy"
+    REMOVE = "remove"
     AAC = "aac"
     AC3 = "ac3"
     EAC3 = "eac3"
@@ -220,7 +221,8 @@ class EncoderSettings:
     """
     video_codec: VideoCodec = VideoCodec.H265
     audio_codecs: dict[str, AudioCodecItem] = field(default_factory=lambda: {}) # { lang or track id: AudioCodecItem }
-    subtitle_codec: SubtitleModeItem = field(default_factory=lambda: SubtitleModeItem(
+    audio_default_track: Optional[str] = None  # Default audio track language or ID
+    subtitle_flags: SubtitleModeItem = field(default_factory=lambda: SubtitleModeItem(
         mode=SubtitleMode.COPY, default_lang=None
     ))
 

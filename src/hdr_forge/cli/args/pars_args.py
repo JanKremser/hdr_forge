@@ -162,6 +162,7 @@ Video codec to use for encoding.
 Audio codec to use for encoding. Default is 'copy'.
 The Profiles are optimized for Mono, Stereo, 5.1, 7.1 and 7.1.2 audio tracks.
     [copy]                 : Copy stream without re-encoding
+    [remove]               : Remove all audio tracks
     [aac]                  : Re-encode all audio tracks to AAC format (lossy, up to 48 channels, but usually 2-6 channels, for most devices)
     [ac3]                  : Re-encode all audio tracks to AC3 format (Dolby Digital, up to 6 channels / 5.1)
     [eac3]                 : Re-encode all audio tracks to EAC3 format (Dolby Digital Plus 2.0-7.1.x)
@@ -171,6 +172,8 @@ You can specify multiple audio tracks with different codecs using the following 
     [ger:aac]              : Re-encode German audio track to AAC format
     [eng:aac]              : Re-encode English audio track to AAC format
     [2:aac]                : Re-encode audio track with ID 2 to AAC format -> Use the info subcommand to get track IDs
+    [1:remove]             : Remove audio track with ID 1 -> Use the info subcommand to get track IDs
+    [eng:remove]           : Remove English audio track -> Use the info subcommand to get track languages
 
 You can also convert specific audio formats:
     [dts>aac]              : Convert all DTS audio tracks to AAC format
@@ -188,7 +191,23 @@ Examples:
     )
 
     convert_parser.add_argument(
-        '-s', '--subtitle-codec',
+        '--audio-default',
+        default="copy",
+        help=f"""{sdr_dot} {hdr_dot} {dolby_vision_dot}
+Set default audio track. Default is 'copy'.
+    [copy]                 : Keep existing default audio track
+    [ger]                  : Set the German audio track as default
+    [eng]                  : Set the English audio track as default
+    [2]                    : Set audio track with ID 2 as default -> Use the info subcommand to get track IDs
+
+Examples:
+    hdr_forge convert -i input.mkv -o output.mkv --audio-default ger
+    hdr_forge convert -i input.mkv -o output.mkv --audio-default 2\n
+"""
+    )
+
+    convert_parser.add_argument(
+        '-s', '--subtitle-flags',
         default="copy",
         help=f"""{sdr_dot} {hdr_dot} {dolby_vision_dot}
 Subtitle flags. Default is 'copy'.
@@ -196,7 +215,6 @@ Subtitle flags. Default is 'copy'.
     [remove]               : Remove all subtitle tracks
     [auto]                 : Automatically select subtitle tracks (forced and default tracks), by name
     [auto>ger]             : Automatically select subtitle tracks (forced and default tracks), for German language
-
 
 Info: VLC has problems displaying a title name when the ffmpeg set it. Kodi and MKVtoolnix has no problems with it.
 """
@@ -414,9 +432,12 @@ User-specified target color format for the output video.
         help=f"""{dolby_vision_dot}
 Dolby Vision profile for encoding (auto = automatic detection, 8 = force profile 8.1)
 
-Profile 7 encoding is not supported.
+Encoding according to profiles 7 and 5 is not supported. You must convert to profile 8.1 or use a copy mode.
+Libplacebo tone mapping is used automatically when converting from profile 5 to 8.1.
+Profile 5 to 8.1 does not support copy mode.
+
 [auto] : Automatically detect and use appropriate Dolby Vision profile based on input video.
-         For Profile 7 use copy mode. By h265 encoding only Profile 8.1 is supported.
+         For Profile 7 or 5 use copy mode. By h265 encoding only Profile 8.1 is supported.
 [8]    : Force Dolby Vision Profile 8.1 encoding\n
 """
     )
@@ -615,6 +636,13 @@ Extract Dolby Vision/HDR10 and/or HDR10Plus metadata from a encoded video file.
         '-o', '--output',
         required=False,
         help='Output folder for extracted HDR-JSON, RPU and EL files'
+    )
+
+    inject_parser.add_argument(
+        '--to-dv-8',
+        action='store_true',
+        required=False,
+        help='Convert extracted Dolby Vision metadata to Profile 8.1 format'
     )
 
     inject_parser.add_argument(

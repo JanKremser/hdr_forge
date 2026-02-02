@@ -17,7 +17,7 @@ class Libx265Codec(VideoCodecBase):
 
     # HDR x265 parameters for HDR10 encoding
     HDR10_X265_PARAMS: list[str] = [
-        'profile=main10',
+        #'profile=main10',
         'hdr-opt=1',
         'hdr10=1',
         'repeat-headers=1',
@@ -44,12 +44,12 @@ class Libx265Codec(VideoCodecBase):
     ]
 
     HDR_X265_PARAMS: list[str] = [
-        'profile=main10',
+        #'profile=main10',
     ]
 
     # SDR x265 parameters
     SDR_X265_PARAMS: list[str] = [
-        'profile=main',
+        #'profile=main',
     ]
 
     REMOVE_HDR_FLAGS: list[str] = [
