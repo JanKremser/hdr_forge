@@ -299,13 +299,13 @@ class Libx265Codec(VideoCodecBase):
             })
         elif hdr_forge_preset == HdrForgeEncodingTuningPresets.GRAIN:
             params.update({
-                'aq-mode': '3',# besser um grain zu erhalten
-                'aq-strength': '0.7', # 0.8 ist super, 0.7 ist besser für kompression
+                'aq-mode': '3',# better to preserve grain
+                'aq-strength': '0.7', # 0.8 is great, 0.7 is better for compression
                 'psy-rd': '1.8',
                 'psy-rdoq': '1.0',
-                'cutree': '1',# 0 ist besser. 1 ist ein guter kompromiss
-                'qcomp': '0.80',# 0.80 ist super
-                #'qg-size': '16',# 16 beeinflusst das Kompressionsverhalten negativ
+                'cutree': '1',# 0 is better. 1 is a good compromise
+                'qcomp': '0.80',# 0.80 is great
+                #'qg-size': '16',# 16 negatively affects compression behavior
                 'sao': '0',
                 'rc-grain': '1',
             })

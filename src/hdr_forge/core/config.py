@@ -7,11 +7,11 @@ from hdr_forge.cli.cli_output import print_warn
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 def _get_project_root():
-    # 2) PyInstaller One-Folder oder One-File mit externen Daten:
+    # 2) PyInstaller One-Folder or One-File with external data:
     if getattr(sys, 'frozen', False):
         return os.path.dirname(sys.executable)
 
-    # 3) Normaler Python-Run:
+    # 3) Normal Python run:
     return os.path.abspath(os.path.join(CURRENT_DIR, "../../../"))
 
 PROJECT_ROOT = _get_project_root()

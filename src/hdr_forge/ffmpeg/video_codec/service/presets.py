@@ -35,7 +35,7 @@ SPEED_PRESET_SCALE: list[str] = [
 ]
 
 class RESOLUTION_PRESETS(Enum):
-    """Vordefinierte Auflösungen für die Skalierung."""
+    """Predefined resolutions for scaling."""
     FUHD = 7680 * 4320
     UHD = 3840 * 2160
     QHD_PLUS = 3200 * 1800
@@ -49,7 +49,7 @@ class RESOLUTION_PRESETS(Enum):
 """
 CRF x265 to x264: 2-5 points lower than libx265 for similar quality.
 
-bei x265 ist CRF 13 fast schon „visually lossless“.
+For x265, CRF 13 is almost "visually lossless".
 """
 HW_PRESET: dict = {
     HdrForgeEncodingHardwarePresets.CPU_BALANCED: [
@@ -170,14 +170,14 @@ HW_PRESET: dict = {
 }
 
 def interpolate(value, x1, x2, y1, y2):
-    """Lineare Interpolation"""
+    """Linear interpolation"""
     if x1 == x2:
         return y1
     return y1 + (value - x1) * (y2 - y1) / (x2 - x1)
 
 
 def interpolate_preset(value, x1, x2, from_preset, to_preset):
-    """Interpoliert das Preset basierend auf PRESET_SCALE."""
+    """Interpolates the preset based on PRESET_SCALE."""
     if from_preset == to_preset:
         return from_preset
     i1 = SPEED_PRESET_SCALE.index(from_preset)

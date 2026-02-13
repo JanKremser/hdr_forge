@@ -67,11 +67,11 @@ class Encoder:
 
     def get_available_hw_encoders(self) -> list[VideoEncoderLibrary]:
         """
-        Gibt eine Liste von Enum-Mitgliedern zurück, deren Encoder
-        auf dem System über FFmpeg verfügbar sind UND Hardware-beschleunigt sind.
+        Returns a list of enum members whose encoders are available on the
+        system via FFmpeg AND are hardware-accelerated.
 
-        :param enum_class: Enum-Klasse, z. B. VideoEncoderLibrary
-        :return: Liste der Enum-Mitglieder, die verfügbar und HW-Encoder sind
+        :param enum_class: Enum class, e.g. VideoEncoderLibrary
+        :return: List of enum members that are available and are HW encoders
         """
         try:
             result = subprocess.run(
@@ -89,7 +89,7 @@ class Encoder:
                     parts = line.split()
                     if len(parts) > 1:
                         encoder_name = parts[1]
-                        # typische HW-Kennzeichen
+                        # typical HW indicators
                         if any(hw in encoder_name for hw in ["nvenc", "qsv", "vaapi", "amf", "v4l2"]):
                             available_hw_encoders.add(encoder_name)
 
@@ -102,7 +102,7 @@ class Encoder:
             return result_members
 
         except subprocess.CalledProcessError as e:
-            print("Fehler beim Abfragen der Encoder:", e)
+            print("Error querying encoders:", e)
             return []
 
 
@@ -434,7 +434,7 @@ class Encoder:
                         if audio_codec_item.to_codec == AudioCodec.EAC3:
                             bitrate = 2048 # 1024-2048 = EAC3
                         else:
-                            bitrate = 1536 # 768–1536 bei 7.1.2 / default 1024
+                            bitrate = 1536 # 768–1536 for 7.1.2 / default 1024
                     else:
                         bitrate = 64 * count_ch
 

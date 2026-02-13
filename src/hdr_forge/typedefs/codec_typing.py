@@ -232,7 +232,7 @@ HDR_FORGE_SPEED_PRESET: dict[HdrForgeSpeedPreset, list[CodecPreset]] = {
                     'bframes': '8',
                     'b-adapt': '2',
                     'trellis': '2',
-                    'subme': '8',  # default bei slow ist 7
+                    'subme': '8',  # default for slow is 7
                     'me': 'umh',
                     'merange': '24',
                 }
@@ -251,7 +251,7 @@ HDR_FORGE_SPEED_PRESET: dict[HdrForgeSpeedPreset, list[CodecPreset]] = {
                     'ref': '3',
                     'bframes': '4',
                     'b-adapt': '2',
-                    'rdoq-level': '1', # 2-3 frame schneller bei 1, default 2
+                    'rdoq-level': '1', # 2-3 frames faster at 1, default 2
                     'subme': '2',
                     'me': 'hex',
                     'lookahead-slices': '4',

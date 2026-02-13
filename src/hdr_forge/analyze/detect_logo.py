@@ -121,11 +121,11 @@ class LogoDetector:
         filtered: List[LogoDetectResult] = []
 
         for result in results:
-            # Größen-Filter (zu groß)
+            # Size filter (too large)
             if result.width > max_width or result.height > max_height:
                 continue
 
-            # Größen-Filter (zu klein)
+            # Size filter (too small)
             if result.width < min_width or result.height < min_height:
                 continue
 
@@ -434,7 +434,7 @@ class LogoDetector:
         max_dimension = max(self._video.width, self._video.height)
         merge_threshold = max_dimension * 0.08
 
-        # Erstelle Index-Liste sortiert nach Cluster-Größe (größte zuerst)
+        # Create index list sorted by cluster size (largest first)
         sorted_indices = sorted(range(len(clusters)), key=lambda i: len(clusters[i]), reverse=True)
 
         merged_results: List[ClusterInfo] = []
@@ -448,7 +448,7 @@ class LogoDetector:
                 orig_idx, clusters, merge_threshold
             )
 
-            # Markiere verwendete Cluster
+            # Mark used clusters
             used_clusters.add(orig_idx)
             for idx in merged_indices:
                 used_clusters.add(idx)
@@ -461,8 +461,8 @@ class LogoDetector:
                 merged_count=merged_count
             ))
 
-        # Ergebnisse sind bereits nach ursprünglicher Cluster-Größe geordnet
-        # (größter initialer Cluster zuerst)
+        # Results are already sorted by original cluster size
+        # (largest initial cluster first)
         return merged_results
 
     def _find_largest_reasonable_box(
@@ -754,9 +754,9 @@ Total candidates: {len(results)}"""
 
         cap = cv2.VideoCapture(video_path)
         if not cap.isOpened():
-            raise FileNotFoundError(f"Video {video_path} konnte nicht geöffnet werden!")
+            raise FileNotFoundError(f"Video {video_path} could not be opened!")
 
-        # Berechne maximale Anzahl zu analysierender Frames (maximal 2 Minuten)
+        # Calculate maximum number of frames to analyze (maximum 2 minutes)
         fps = self._video.get_fps()
         duration_seconds = self._video.get_duration_seconds()
         max_duration_seconds = min(120, duration_seconds)  # Maximal 2 Minuten (120 Sekunden)
@@ -778,7 +778,7 @@ Total candidates: {len(results)}"""
             # Crop
             cropped = frame[y:y+h, x:x+w]
 
-            # Graustufen
+            # Grayscale
             gray = cv2.cvtColor(cropped, cv2.COLOR_BGR2GRAY)
 
             # Threshold → Binärmaske
@@ -794,12 +794,12 @@ Total candidates: {len(results)}"""
 
         cap.release()
         if not valid_masks:
-            raise ValueError("Keine gültigen Masken mit weißen Pixeln gefunden!")
+            raise ValueError("No valid masks with white pixels found!")
 
-        # Stack zu einem 3D-Array
+        # Stack to a 3D array
         stack = np.stack(valid_masks, axis=0)
 
-        # Schnittmenge: Pixel nur weiß, wenn in allen Frames weiß
+        # Intersection: pixels only white if white in all frames
         final_mask = np.min(stack, axis=0)
         final_mask[final_mask > 0] = 255
 
@@ -831,7 +831,7 @@ Total candidates: {len(results)}"""
         if not contours:
             return None
 
-        # Größte Kontur oder alle kombinieren
+        # Largest contour or combine all
         all_points = np.vstack(contours)
         x, y, w, h = cv2.boundingRect(all_points)
 
@@ -850,51 +850,51 @@ Total candidates: {len(results)}"""
 
     def _center_mask_in_canvas(self, mask: np.ndarray, crop_rect: Tuple[int, int, int, int], padding: int = 10) -> MaskResult:
         """
-        Verschiebt die Maskierung in der Maske in die Mitte einer neuen Maske mit Padding.
-        Berechnet die neue Position und Größe im Originalvideo.
+        Shifts the masking in the mask to the center of a new mask with padding.
+        Calculates the new position and size in the original video.
 
         Args:
-            mask (np.ndarray): Binärmaske (0/255).
-            crop_rect (tuple): (x, y, w, h) Bereich im Originalvideo, aus dem die Maske stammt.
-            padding (int): Abstand um die Maskierung herum.
+            mask (np.ndarray): Binary mask (0/255).
+            crop_rect (tuple): (x, y, w, h) area in the original video from which the mask originates.
+            padding (int): Distance around the masking.
 
         Returns:
-            centered_mask (np.ndarray): Neue Maske mit zentrierter Maskierung.
-            new_video_pos (tuple): (x, y, w, h) im Originalvideo.
+            centered_mask (np.ndarray): New mask with centered masking.
+            new_video_pos (tuple): (x, y, w, h) in the original video.
         """
         info = self._get_mask_info(mask)
         if info is None:
-            raise ValueError("Keine Kontur in der Maske gefunden!")
+            raise ValueError("No contour found in the mask!")
 
-        # Alte Position und Größe in der Maske
+        # Old position and size in the mask
         mask_x, mask_y, mask_w, mask_h = info['x'], info['y'], info['width'], info['height']
 
-        # Neue Größe inkl. Padding
+        # New size including padding
         new_w = mask_w + 2 * padding
         new_h = mask_h + 2 * padding
 
-        # Seitenverhältnis auf gerade Zahl bringen
+        # Make aspect ratio even number
         if new_w % 2 != 0:
             new_w += 1
         if new_h % 2 != 0:
             new_h += 1
 
-        # Erstelle neue leere Maske
+        # Create new empty mask
         centered_mask = np.zeros((new_h, new_w), dtype=np.uint8)
 
-        # Kopiere die Maskierung in die Mitte
+        # Copy the masking to the center
         centered_mask[padding:padding+mask_h, padding:padding+mask_w] = mask[mask_y:mask_y+mask_h, mask_x:mask_x+mask_w]
 
-        # Berechne neue Position im Originalvideo
+        # Calculate new position in the original video
         crop_x, crop_y, crop_w, crop_h = crop_rect
         new_x = crop_x + mask_x - padding
         new_y = crop_y + mask_y - padding
 
-        # Stelle sicher, dass die neue Position nicht negativ ist
+        # Ensure that the new position is not negative
         new_x = max(0, new_x)
         new_y = max(0, new_y)
 
-        # Optional: Begrenzung auf Videogröße kann hier ergänzt werden
+        # Optional: limitation to video size can be added here
         return MaskResult(mask=centered_mask, x=new_x, y=new_y, width=new_w, height=new_h, region=None)
 
     def _create_mask_delogo(self, mask_result: MaskResult) -> None | Path:
