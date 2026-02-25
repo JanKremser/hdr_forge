@@ -18,7 +18,7 @@ class Hdr_Forge_HEVC_H264_NVENC_Preset:
 @dataclass
 class Hdr_Forge_AV1_Preset:
     crf: float
-    preset: HdrForgeSpeedPreset
+    preset: int
 
 SPEED_PRESET_SCALE: list[str] = [
     "ultrafast",
@@ -230,7 +230,7 @@ def calc_hw_prest_params(
                     r[lib]["from_preset"],
                     r[lib]["to_preset"]
                 ))
-                params["preset"] = HdrForgeSpeedPreset(preset)
+                params["preset"] = preset
 
             if lib in [VideoEncoderLibrary.HEVC_NVENC, VideoEncoderLibrary.H264_NVENC]:
                 from_cq = r[lib]["from_CQ"]

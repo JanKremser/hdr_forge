@@ -12,40 +12,6 @@ class LibSvtAV1Codec(VideoCodecBase):
         HdrSdrFormat.HDR,
         HdrSdrFormat.HDR10,
         HdrSdrFormat.SDR,
-        HdrSdrFormat.DOLBY_VISION,
-    ]
-
-    # HDR x265 parameters for HDR10 encoding
-    HDR10_X265_PARAMS: list[str] = [
-        'profile=main10',
-        'hdr-opt=1',
-        'hdr10=1',
-        'repeat-headers=1',
-        'colorprim=bt2020',
-        'transfer=smpte2084',
-        'colormatrix=bt2020nc',
-    ]
-
-    HDR_X265_PARAMS: list[str] = [
-        'profile=main10',
-        'hdr-opt=0',
-        'hdr10=0',
-        'no-hdr10-opt=1',
-        'colorprim=bt2020',
-        'transfer=smpte2084',
-        'colormatrix=bt2020nc',
-    ]
-
-    # SDR x265 parameters
-    SDR_X265_PARAMS: list[str] = [
-        'profile=main',
-        'hdr-opt=0',
-        'hdr10=0',
-        'no-hdr10-opt=1',
-        # //
-        'colorprim=bt709',
-        'transfer=bt709',
-        'colormatrix=bt709',
     ]
 
     def __init__(self, encoder_settings: EncoderSettings, video: Video, scale: Tuple[int, int]):
@@ -71,14 +37,21 @@ class LibSvtAV1Codec(VideoCodecBase):
         if pix_fmt is not None:
             output_options["pix_fmt"] = pix_fmt
 
-        # encoding_hdr_sdr_format: HdrSdrFormat = self.get_encoding_hdr_sdr_format()
+        encoding_hdr_sdr_format: HdrSdrFormat = self.get_encoding_hdr_sdr_format()
 
-        # if encoding_hdr_sdr_format in [HdrSdrFormat.HDR, HdrSdrFormat.HDR10, HdrSdrFormat.DOLBY_VISION]:
-        #     x265_params: list[str] = self._build_hdr_x265_params()
-        #     output_options['x265-params'] = ':'.join(x265_params)
-        # elif encoding_hdr_sdr_format == HdrSdrFormat.SDR:
-        #     x265_params: list[str] = self._build_sdr_x265_params()
-        #     output_options['x265-params'] = ':'.join(x265_params)
+        if encoding_hdr_sdr_format in [HdrSdrFormat.HDR, HdrSdrFormat.HDR10]:
+            output_options['color_primaries'] = 'bt2020'
+            output_options['color_trc'] = 'smpte2084'
+            output_options['colorspace'] = 'bt2020nc'
+            svtav1_params = self._build_hdr_svtav1_params()
+            if svtav1_params:
+                output_options['svtav1-params'] = ':'.join(svtav1_params)
+        elif encoding_hdr_sdr_format == HdrSdrFormat.SDR and self._video.is_hdr_video():
+            # Explicitly set BT.709 flags for HDR→SDR tonemapped output
+            # (base class handles filter chain and metadata:s:v, but not codec-level color signaling)
+            output_options['color_primaries'] = 'bt709'
+            output_options['color_trc'] = 'bt709'
+            output_options['colorspace'] = 'bt709'
 
         return output_options
 
@@ -130,68 +103,48 @@ class LibSvtAV1Codec(VideoCodecBase):
 
         return encoder_max_cll
 
-    def _build_hdr_x265_params(self) -> list[str]:
-        """Build x265 parameters for HDR10 video encoding.
+    def _build_hdr_svtav1_params(self) -> list[str]:
+        """Build SVT-AV1 parameters for HDR video encoding.
 
         Returns:
-            list of x265 parameter strings
+            list of SVT-AV1 parameter strings
         """
-
-        params: list[str] = []
-
+        params: list[str] = ['enable-hdr=1']
         encoding_hdr_sdr_format: HdrSdrFormat = self.get_encoding_hdr_sdr_format()
-        if encoding_hdr_sdr_format == HdrSdrFormat.HDR:
-            params = self.HDR_X265_PARAMS.copy()
-            # remove HDR10 metadata if present
-            params.append('master-display=G(0,0)B(0,0)R(0,0)WP(0,0)L(0,0)')
-            params.append('max-cll=0,0')
-            return params
-
-        params: list[str] = self.HDR10_X265_PARAMS.copy()
-
-        master_display: MasterDisplayMetadata | None = self._get_master_display_for_encoding()
-        if master_display:
-            params.append(f'master-display={build_master_display_string(master_display)}')
-
-            max_cll_max_fll: ContentLightLevelMetadata | None = self._get_max_cll_for_encoding()
-            if max_cll_max_fll:
-                params.append(f'max-cll={build_max_cll_string(max_cll_max_fll)}')
-
-        return params
-
-    def _build_sdr_x265_params(self) -> list[str]:
-        """Build x265 parameters for SDR video encoding.
-
-        Returns:
-            list of x265 parameter strings
-        """
-        params: list[str] = self.SDR_X265_PARAMS.copy()
-        if self._video.is_hdr_video():
-            # remove HDR metadata if present
-            params.append('master-display=G(0,0)B(0,0)R(0,0)WP(0,0)L(0,0)')
-            params.append('max-cll=0,0')
+        if encoding_hdr_sdr_format == HdrSdrFormat.HDR10:
+            master_display = self._get_master_display_for_encoding()
+            if master_display:
+                params.append(f'mastering-display={build_master_display_string(master_display)}')
+            max_cll = self._get_max_cll_for_encoding()
+            if max_cll:
+                params.append(f'content-light-level={build_max_cll_string(max_cll)}')
         return params
 
     def _get_auto_preset(self, hw_preset: Hdr_Forge_AV1_Preset) -> int:
         """Select optimal encoding preset based on parameter priority.
 
         Returns:
-            int
+            SVT-AV1 preset as int (0=slowest, 13=fastest)
         """
-        # # Priority 1: libx265_params from --encoder-params
-        # libx265_params: Libx265Params = self._encoder_settings.libx265_params
-        # if libx265_params.preset is not None:
-        #     return libx265_params.preset
+        # Priority 1: universal_params from --speed
+        universal_params = self._encoder_settings.universal_params
+        if universal_params.speed is not None:
+            # Map HdrForgeSpeedPreset string to AV1 integer (0=slowest, 13=fastest)
+            speed_to_av1 = {
+                "ultrafast": 12,
+                "superfast": 10,
+                "veryfast": 9,
+                "faster": 8,
+                "fast": 7,
+                "medium": 6,
+                "slow": 5,
+                "slower": 4,
+                "veryslow": 3,
+            }
+            return speed_to_av1.get(universal_params.speed.value, 6)
 
-        # # Priority 2: universal_params from --speed
-        # universal_params = self._encoder_settings.universal_params
-        # if universal_params.speed is not None:
-        #     return universal_params.speed
-
-        # Priority 3: Auto-detection from hw_preset
-        preset: HdrForgeSpeedPreset = hw_preset.preset
-
-        return 6
+        # Priority 2: hw_preset integer (from presets.py)
+        return hw_preset.preset
 
     def _get_auto_crf(self, hw_preset: Hdr_Forge_AV1_Preset) -> int:
         """Calculate optimal CRF value based on parameter priority.
@@ -199,34 +152,31 @@ class LibSvtAV1Codec(VideoCodecBase):
         Returns:
             CRF value (lower = higher quality)
         """
-        # # Priority 1: libx265_params from --encoder-params
-        # libx265_params: Libx265Params = self._encoder_settings.libx265_params
-        # if libx265_params.crf is not None:
-        #     return libx265_params.crf
+        # Priority 1: universal_params from --quality
+        universal_params = self._encoder_settings.universal_params
+        if universal_params.quality is not None:
+            return universal_params.quality
 
-        # # Priority 2: universal_params from --quality
-        # universal_params = self._encoder_settings.universal_params
-        # if universal_params.quality is not None:
-        #     return universal_params.quality
-
-        # Priority 3: Auto-detection from hw_preset
+        # Priority 2: Auto-detection from hw_preset
         crf: float = hw_preset.crf
-        # if self.is_hdr_encoding():
-        #     crf += 1.0  # 10-Bit HDR allows slightly higher CRF without quality loss
+        if self.is_hdr_encoding():
+            crf += 1.0  # 10-Bit HDR allows slightly higher CRF without quality loss
 
-        # hdr_forge_preset: HdrForgeEncodingPresets = self._encoder_settings.hdr_forge_encoding_preset.preset
-        # action_crf: float = 2.0 if hdr_forge_preset == HdrForgeEncodingPresets.ACTION else 0.0 # Action preset lowers CRF for better handling of fast motion
-        # action_w = self._calculate_crf_adjustment_weight(
-        #     current_crf=crf,
-        #     crf_delta=action_crf,
-        # )
-        # crf -= action_crf * action_w
+        hdr_forge_preset = self._encoder_settings.hdr_forge_encoding_preset.preset
+        action_crf: float = 2.0 if str(hdr_forge_preset) == "ACTION" else 0.0  # Action preset lowers CRF for better handling of fast motion
+        if action_crf > 0:
+            action_w = self._calculate_crf_adjustment_weight(
+                current_crf=crf,
+                crf_delta=action_crf,
+            )
+            crf -= action_crf * action_w
 
-        # grain_crf: float = self._grain.get_crf_x265_x264_adjustment()
-        # grain_w = self._calculate_crf_adjustment_weight(
-        #     current_crf=crf,
-        #     crf_delta=grain_crf,
-        # )
-        # crf -= grain_crf * grain_w
+        grain_crf: float = self._grain.get_crf_x265_x264_adjustment()
+        if grain_crf > 0:
+            grain_w = self._calculate_crf_adjustment_weight(
+                current_crf=crf,
+                crf_delta=grain_crf,
+            )
+            crf -= grain_crf * grain_w
 
         return round(crf)
