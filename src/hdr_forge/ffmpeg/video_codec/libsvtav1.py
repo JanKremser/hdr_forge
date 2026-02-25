@@ -45,13 +45,13 @@ class LibSvtAV1Codec(VideoCodecBase):
             output_options['colorspace'] = 'bt2020nc'
             output_options['svtav1-params'] = 'enable-hdr=1'
 
-            if encoding_hdr_sdr_format == HdrSdrFormat.HDR10:
-                master_display: MasterDisplayMetadata | None = self._get_master_display_for_encoding()
-                if master_display:
-                    output_options['mastering_display_metadata'] = build_master_display_string(master_display)
-                max_cll: ContentLightLevelMetadata | None = self._get_max_cll_for_encoding()
-                if max_cll:
-                    output_options['content_light_level'] = build_max_cll_string(max_cll)
+            # if encoding_hdr_sdr_format == HdrSdrFormat.HDR10:
+            #     master_display: MasterDisplayMetadata | None = self._get_master_display_for_encoding()
+            #     if master_display:
+            #         output_options['mastering_display_metadata'] = build_master_display_string(master_display)
+            #     max_cll: ContentLightLevelMetadata | None = self._get_max_cll_for_encoding()
+            #     if max_cll:
+            #         output_options['content_light_level'] = build_max_cll_string(max_cll)
         elif encoding_hdr_sdr_format == HdrSdrFormat.SDR and self._video.is_hdr_video():
             # Explicitly set BT.709 flags for HDR→SDR tonemapped output
             # (base class handles filter chain and metadata:s:v, but not codec-level color signaling)
