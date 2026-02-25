@@ -43,9 +43,15 @@ class LibSvtAV1Codec(VideoCodecBase):
             output_options['color_primaries'] = 'bt2020'
             output_options['color_trc'] = 'smpte2084'
             output_options['colorspace'] = 'bt2020nc'
-            svtav1_params = self._build_hdr_svtav1_params()
-            if svtav1_params:
-                output_options['svtav1-params'] = ':'.join(svtav1_params)
+            output_options['svtav1-params'] = 'enable-hdr=1'
+
+            if encoding_hdr_sdr_format == HdrSdrFormat.HDR10:
+                master_display: MasterDisplayMetadata | None = self._get_master_display_for_encoding()
+                if master_display:
+                    output_options['mastering_display_metadata'] = build_master_display_string(master_display)
+                max_cll: ContentLightLevelMetadata | None = self._get_max_cll_for_encoding()
+                if max_cll:
+                    output_options['content_light_level'] = build_max_cll_string(max_cll)
         elif encoding_hdr_sdr_format == HdrSdrFormat.SDR and self._video.is_hdr_video():
             # Explicitly set BT.709 flags for HDR→SDR tonemapped output
             # (base class handles filter chain and metadata:s:v, but not codec-level color signaling)
@@ -102,23 +108,6 @@ class LibSvtAV1Codec(VideoCodecBase):
             encoder_max_cll = self._video.get_content_light_level_metadata()
 
         return encoder_max_cll
-
-    def _build_hdr_svtav1_params(self) -> list[str]:
-        """Build SVT-AV1 parameters for HDR video encoding.
-
-        Returns:
-            list of SVT-AV1 parameter strings
-        """
-        params: list[str] = ['enable-hdr=1']
-        encoding_hdr_sdr_format: HdrSdrFormat = self.get_encoding_hdr_sdr_format()
-        if encoding_hdr_sdr_format == HdrSdrFormat.HDR10:
-            master_display = self._get_master_display_for_encoding()
-            if master_display:
-                params.append(f'mastering-display={build_master_display_string(master_display)}')
-            max_cll = self._get_max_cll_for_encoding()
-            if max_cll:
-                params.append(f'content-light-level={build_max_cll_string(max_cll)}')
-        return params
 
     def _get_auto_preset(self, hw_preset: Hdr_Forge_AV1_Preset) -> int:
         """Select optimal encoding preset based on parameter priority.
