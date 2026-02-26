@@ -62,11 +62,11 @@ hdr_forge inject-metadata -i video.mkv -o output.mkv \
 
 ## Version History
 
-**Current: v1.0.0**
+**v1.0.0**
 
 -   **AV1 Encoding (Beta):** AV1 codec support via libsvtav1 encoder with HDR10 support (stream metadata flags)
 
-**Current: v0.7.11**
+**v0.7.11**
 
 -   **Audio Encoding:** Per-track audio codec selection with language and ID-based targeting
 -   **Audio Default Track:** Set default audio track by language or track ID
