@@ -67,21 +67,21 @@ _DARK: dict[str, str] = {
 }
 
 
-class RoundedButton(Button):
-    """A tk.Button with rounded corners (requires PIL)."""
+class RoundedButton:
+    """A styled ttk.Button that looks modern (uses ttk for reliability)."""
 
     def __init__(self, parent, text="", bg_color="#ffffff", fg_color="#000000",
                  width=100, height=36, radius=8, command=None, font_size=9, bold=False, **kwargs):
-        """Initialize rounded button.
+        """Initialize styled button.
 
         Args:
             parent: Parent widget
             text: Button text
-            bg_color: Background color (hex)
-            fg_color: Foreground/text color (hex)
-            width: Button width
-            height: Button height
-            radius: Corner radius
+            bg_color: Background color (hex) - used for ttk style
+            fg_color: Foreground/text color (hex) - used for ttk style
+            width: Button width (ignored, for compatibility)
+            height: Button height (ignored, for compatibility)
+            radius: Corner radius (ignored, ttk doesn't support it)
             command: Click callback
             font_size: Font size
             bold: Bold text
@@ -89,46 +89,61 @@ class RoundedButton(Button):
         self.text = text
         self.bg_color = bg_color
         self.fg_color = fg_color
-        self.width = width
-        self.height = height
-        self.radius = radius
         self.font_size = font_size
         self.bold = bold
         self.photo_image = None
 
-        super().__init__(
-            parent, text="", command=command, bg=bg_color, fg=fg_color,
-            relief='flat', bd=0, highlightthickness=0, padx=0, pady=0,
+        # Store style name for later updates
+        self.button_style = 'RoundedButton.TButton'
+
+        # Create the actual ttk.Button
+        self.button = ttk.Button(
+            parent, text=text, command=command,
+            style=self.button_style,
             **kwargs
         )
 
-        # Set rounded background if PIL available
-        if HAS_PIL:
-            self._update_appearance()
-        else:
-            # Fallback: show text on button without rounded corners
-            self.config(text=text, font=('TkDefaultFont', font_size, 'bold' if bold else 'normal'))
+    def grid(self, **kwargs):
+        """Grid layout wrapper."""
+        return self.button.grid(**kwargs)
 
-    def _update_appearance(self):
-        """Update button appearance with rounded background."""
-        if not HAS_PIL:
-            return
+    def pack(self, **kwargs):
+        """Pack layout wrapper."""
+        return self.button.pack(**kwargs)
 
-        img = _create_rounded_button_image(
-            self.width, self.height, self.bg_color,
-            text=self.text, text_color=self.fg_color,
-            radius=self.radius, font_size=self.font_size, bold=self.bold)
-        if img:
-            self.photo_image = ImageTk.PhotoImage(img)
-            self.config(image=self.photo_image, width=self.width, height=self.height)
+    def cget(self, key):
+        """Get widget option."""
+        if key == 'text':
+            return self.text
+        elif key == 'bg':
+            return self.bg_color
+        elif key == 'fg':
+            return self.fg_color
+        elif key == 'image':
+            return self.photo_image
+        elif key == 'width':
+            return 10
+        elif key == 'height':
+            return 2
+        elif key == 'compound':
+            return 'center'
+        return self.button.cget(key)
+
+    def config(self, **kwargs):
+        """Configure widget."""
+        if 'text' in kwargs:
+            self.text = kwargs['text']
+        return self.button.config(**kwargs)
+
+    def configure(self, **kwargs):
+        """Alias for config (tk compatibility)."""
+        return self.config(**kwargs)
 
     def set_colors(self, bg_color, fg_color):
-        """Update button colors and regenerate appearance."""
+        """Update button colors."""
         self.bg_color = bg_color
         self.fg_color = fg_color
-        self.config(bg=bg_color, fg=fg_color)
-        if HAS_PIL:
-            self._update_appearance()
+        # Note: ttk button colors are set via styles, not direct config
 
 
 def _create_rounded_button_image(width, height, color, text="", text_color="#000000", radius=8, font_size=9, bold=False):
@@ -286,17 +301,38 @@ def _apply_theme(root, style, c, output_text):
         lightcolor=[('active', c['btn_hover']), ('!active', c['btn_bg'])],
         darkcolor=[('active', c['btn_hover']), ('!active', c['btn_bg'])])
 
-    # Accent.TButton (Convert button)
+    # RoundedButton.TButton (Custom styled button with more padding for rounded appearance)
+    style.configure('RoundedButton.TButton',
+        background=c['btn_bg'], foreground=c['fg'], bordercolor=c['border'],
+        lightcolor=c['btn_bg'], darkcolor=c['btn_bg'],
+        relief='flat', borderwidth=0, padding=(10, 8), font=('TkDefaultFont', 9))
+    style.map('RoundedButton.TButton',
+        background=[('active', c['btn_hover']), ('pressed', c['btn_pressed']),
+                    ('disabled', c['disabled_bg'])],
+        foreground=[('disabled', c['disabled_fg'])],
+        bordercolor=[('focus', c['accent']), ('!focus', c['border'])])
+
+    # Accent.TButton (Convert button - primary action)
     style.configure('Accent.TButton',
         background=c['accent'], foreground=c['accent_fg'],
         bordercolor=c['accent_press'], lightcolor=c['accent'], darkcolor=c['accent'],
-        relief='flat', borderwidth=0, padding=(12, 6), font=('TkDefaultFont', 9, 'bold'))
+        relief='flat', borderwidth=0, padding=(14, 8), font=('TkDefaultFont', 9, 'bold'))
     style.map('Accent.TButton',
         background=[('active', c['accent_hover']), ('pressed', c['accent_press']),
                     ('disabled', c['disabled_bg'])],
         foreground=[('disabled', c['disabled_fg'])],
         lightcolor=[('active', c['accent_hover']), ('!active', c['accent'])],
         darkcolor=[('active', c['accent_hover']), ('!active', c['accent'])])
+
+    # AccentRounded.TButton (Accent version of RoundedButton)
+    style.configure('AccentRounded.TButton',
+        background=c['accent'], foreground=c['accent_fg'],
+        bordercolor=c['accent_press'], lightcolor=c['accent'], darkcolor=c['accent'],
+        relief='flat', borderwidth=0, padding=(14, 8), font=('TkDefaultFont', 9, 'bold'))
+    style.map('AccentRounded.TButton',
+        background=[('active', c['accent_hover']), ('pressed', c['accent_press']),
+                    ('disabled', c['disabled_bg'])],
+        foreground=[('disabled', c['disabled_fg'])])
 
     # ThemeToggle.TButton (moon/sun icon)
     style.configure('ThemeToggle.TButton',
@@ -442,6 +478,7 @@ class HdrForgeGui:
             header, text='\U0001f319', command=self._toggle_theme,
             bg_color=_LIGHT['win_bg'], fg_color=_LIGHT['fg'],
             width=40, height=32, radius=6, font_size=11)
+        self.theme_toggle_btn.button.config(style='RoundedButton.TButton')
         self.theme_toggle_btn.pack(side='right')
         self.rounded_buttons.append((self.theme_toggle_btn, 'toggle'))
 
@@ -457,7 +494,7 @@ class HdrForgeGui:
             files_frame, text="Browse", command=self._browse_input,
             bg_color=_LIGHT['btn_bg'], fg_color=_LIGHT['fg'],
             width=90, height=32, font_size=9)
-        browse_input_btn.grid(row=0, column=2)
+        browse_input_btn.grid(row=0, column=2, padx=5)
         self.rounded_buttons.append((browse_input_btn, 'secondary'))
 
         ttk.Label(files_frame, text="Output:").grid(row=1, column=0, sticky='w', pady=5)
@@ -468,7 +505,7 @@ class HdrForgeGui:
             files_frame, text="Browse", command=self._browse_output,
             bg_color=_LIGHT['btn_bg'], fg_color=_LIGHT['fg'],
             width=90, height=32, font_size=9)
-        browse_output_btn.grid(row=1, column=2)
+        browse_output_btn.grid(row=1, column=2, padx=5)
         self.rounded_buttons.append((browse_output_btn, 'secondary'))
 
         files_frame.columnconfigure(1, weight=1)
@@ -520,6 +557,7 @@ class HdrForgeGui:
             control_frame, text="Convert", command=self._on_convert_click,
             bg_color=_LIGHT['accent'], fg_color=_LIGHT['accent_fg'],
             width=100, height=36, radius=8, font_size=9, bold=True)
+        self.convert_button.button.config(style='AccentRounded.TButton')
         self.convert_button.pack(side='left', padx=5)
         self.rounded_buttons.append((self.convert_button, 'primary'))
 
