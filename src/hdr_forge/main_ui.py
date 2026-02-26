@@ -129,7 +129,7 @@ class RoundedButton:
     """A styled ttk.Button that looks modern (uses ttk for reliability)."""
 
     def __init__(self, parent, text="", bg_color="#ffffff", fg_color="#000000",
-                 width=100, height=36, radius=8, command=None, font_size=9, bold=False, **kwargs):
+                 width=100, height=36, radius=8, command=None, font_size=9, bold=False):
         """Initialize styled button.
 
         Args:
@@ -140,7 +140,7 @@ class RoundedButton:
             width: Button width (ignored, for compatibility)
             height: Button height (ignored, for compatibility)
             radius: Corner radius (ignored, ttk doesn't support it)
-            command: Click callback
+            command: Click callback (optional)
             font_size: Font size
             bold: Bold text
         """
@@ -155,11 +155,16 @@ class RoundedButton:
         self.button_style = 'RoundedButton.TButton'
 
         # Create the actual ttk.Button
-        self.button = ttk.Button(
-            parent, text=text, command=command,
-            style=self.button_style,
-            **kwargs
-        )
+        if command is not None:
+            self.button = ttk.Button(
+                parent, text=text, command=command,
+                style=self.button_style
+            )
+        else:
+            self.button = ttk.Button(
+                parent, text=text,
+                style=self.button_style
+            )
 
     def grid(self, **kwargs):
         """Grid layout wrapper."""
@@ -519,13 +524,14 @@ class HdrForgeGui:
 
         # Theme state
         self.current_theme = _detect_system_theme()
-        self.theme_toggle_btn = None
+        self.theme_toggle_btn: ttk.Button
         self.rounded_buttons = []  # Track rounded buttons for theme updates
 
         # State flags
         self.encoding_in_progress = False
         self.stdout_redirect = None
         self.original_stdout = None
+        self.output_text: ScrolledText
 
         # Build UI
         self._build_ui()
