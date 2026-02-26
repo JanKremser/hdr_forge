@@ -36,6 +36,7 @@ Issues = "https://github.com/jankremser/hdr_forge/issues"
 
 [project.scripts]
 hdr_forge = "hdr_forge.main:main"
+hdr_forge_ui = "hdr_forge.main_ui:main_ui"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

@@ -2,7 +2,6 @@ import os
 from pathlib import Path
 import sys
 
-from hdr_forge.cli.cli_output import print_warn
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 
