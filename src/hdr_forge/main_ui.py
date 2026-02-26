@@ -67,6 +67,64 @@ _DARK: dict[str, str] = {
 }
 
 
+def _detect_system_theme() -> str:
+    """Detect the OS dark/light mode preference. Returns 'dark' or 'light'."""
+    # Linux: gsettings (GNOME/GTK)
+    try:
+        import subprocess
+        result = subprocess.run(
+            ['gsettings', 'get', 'org.gnome.desktop.interface', 'color-scheme'],
+            capture_output=True, text=True, timeout=2
+        )
+        if result.returncode == 0 and 'dark' in result.stdout.lower():
+            return 'dark'
+        if result.returncode == 0:
+            return 'light'
+    except Exception:
+        pass
+
+    # Linux: GTK4 settings.ini fallback
+    try:
+        import configparser
+        from pathlib import Path
+        settings_paths = [
+            Path.home() / '.config/gtk-4.0/settings.ini',
+            Path.home() / '.config/gtk-3.0/settings.ini',
+        ]
+        for settings_path in settings_paths:
+            if settings_path.exists():
+                cfg = configparser.ConfigParser()
+                cfg.read(settings_path)
+                if cfg.getboolean('Settings', 'gtk-application-prefer-dark-theme', fallback=False):
+                    return 'dark'
+    except Exception:
+        pass
+
+    # Windows: registry
+    try:
+        import winreg
+        key = winreg.OpenKey(winreg.HKEY_CURRENT_USER,
+            r'SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize')
+        value, _ = winreg.QueryValueEx(key, 'AppsUseLightTheme')
+        return 'light' if value == 1 else 'dark'
+    except Exception:
+        pass
+
+    # macOS: defaults
+    try:
+        import subprocess
+        result = subprocess.run(
+            ['defaults', 'read', '-g', 'AppleInterfaceStyle'],
+            capture_output=True, text=True, timeout=2
+        )
+        if result.returncode == 0 and 'dark' in result.stdout.lower():
+            return 'dark'
+    except Exception:
+        pass
+
+    return 'light'  # safe default
+
+
 class RoundedButton:
     """A styled ttk.Button that looks modern (uses ttk for reliability)."""
 
@@ -450,7 +508,7 @@ class HdrForgeGui:
         self.style.theme_use('clam')
 
         # Theme state
-        self.current_theme = 'light'
+        self.current_theme = _detect_system_theme()
         self.theme_toggle_btn = None
         self.rounded_buttons = []  # Track rounded buttons for theme updates
 
@@ -463,8 +521,12 @@ class HdrForgeGui:
         self._build_ui()
 
         # Apply initial theme
-        _apply_theme(self.root, self.style, _LIGHT, self.output_text)
-        self._update_rounded_buttons(_LIGHT)
+        initial_colors = _DARK if self.current_theme == 'dark' else _LIGHT
+        initial_icon = '\u2600' if self.current_theme == 'dark' else '\U0001f319'
+        self.theme_toggle_btn.configure(text=initial_icon)
+        _apply_theme(self.root, self.style, initial_colors, self.output_text)
+        self._update_rounded_buttons(initial_colors)
+        self._update_convert_state()
 
     def _build_ui(self):
         """Build the user interface."""
@@ -474,13 +536,13 @@ class HdrForgeGui:
 
         ttk.Label(header, text="HDR Forge", font=('TkDefaultFont', 11, 'bold')).pack(side='left')
 
-        self.theme_toggle_btn = RoundedButton(
-            header, text='\U0001f319', command=self._toggle_theme,
-            bg_color=_LIGHT['win_bg'], fg_color=_LIGHT['fg'],
-            width=40, height=32, radius=6, font_size=11)
-        self.theme_toggle_btn.button.config(style='RoundedButton.TButton')
-        self.theme_toggle_btn.pack(side='right')
-        self.rounded_buttons.append((self.theme_toggle_btn, 'toggle'))
+        toggle_frame = ttk.Frame(header, width=32, height=32)
+        toggle_frame.pack_propagate(False)
+        toggle_frame.pack(side='right', padx=4)
+        self.theme_toggle_btn = ttk.Button(
+            toggle_frame, text='\U0001f319', command=self._toggle_theme,
+            style='ThemeToggle.TButton')
+        self.theme_toggle_btn.pack(fill='both', expand=True)
 
         # Files section
         files_frame = ttk.LabelFrame(self.root, text="Files", padding=10)
@@ -488,6 +550,7 @@ class HdrForgeGui:
 
         ttk.Label(files_frame, text="Input:").grid(row=0, column=0, sticky='w')
         self.input_var = StringVar()
+        self.input_var.trace_add('write', self._update_convert_state)
         self.input_entry = ttk.Entry(files_frame, textvariable=self.input_var)
         self.input_entry.grid(row=0, column=1, sticky='ew', padx=5)
         browse_input_btn = RoundedButton(
@@ -499,6 +562,7 @@ class HdrForgeGui:
 
         ttk.Label(files_frame, text="Output:").grid(row=1, column=0, sticky='w', pady=5)
         self.output_var = StringVar()
+        self.output_var.trace_add('write', self._update_convert_state)
         self.output_entry = ttk.Entry(files_frame, textvariable=self.output_var)
         self.output_entry.grid(row=1, column=1, sticky='ew', padx=5)
         browse_output_btn = RoundedButton(
@@ -667,8 +731,14 @@ class HdrForgeGui:
                 btn.set_colors(colors['accent'], colors['accent_fg'])
             elif btn_type == 'secondary':  # Browse buttons
                 btn.set_colors(colors['btn_bg'], colors['fg'])
-            elif btn_type == 'toggle':  # Theme toggle button
-                btn.set_colors(colors['win_bg'], colors['fg'])
+
+    def _update_convert_state(self, *_args):
+        """Enable Convert button only when both input and output are non-empty."""
+        has_input = bool(self.input_var.get().strip())
+        has_output = bool(self.output_var.get().strip())
+        can_convert = has_input and has_output and not self.encoding_in_progress
+        state = 'normal' if can_convert else 'disabled'
+        self.convert_button.button.config(state=state)
 
     def _toggle_theme(self):
         """Toggle between light and dark theme."""
@@ -805,8 +875,8 @@ class HdrForgeGui:
             error_msg: Error message if encoding failed, None otherwise
         """
         self.progress_bar.stop()
-        self.convert_button.config(state='normal')
         self.encoding_in_progress = False
+        self._update_convert_state()
 
         if error_msg:
             self.status_var.set(error_msg)
