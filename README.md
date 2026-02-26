@@ -8,11 +8,11 @@ A powerful command-line tool for converting video files with hardware-accelerate
 ## Features
 
 -   **Multiple Encoder Support:** CPU (libx265, libx264, libsvtav1) and GPU-accelerated encoding (NVIDIA NVENC)
--   **AV1 Encoding (Beta):** Next-generation codec with superior compression efficiency
+-   **AV1 Encoding (Beta):** Next-generation codec with superior compression, HDR10 support (stream metadata)
 -   **Hardware Acceleration:** NVIDIA NVENC support for H.265/HEVC and H.264 encoding
--   **Multiple Format Support:** Convert between Dolby Vision, HDR10, and SDR formats
--   **Format Conversion:** DV → HDR10 → SDR with tone mapping support
--   **Dolby Vision Profiles:** Support for Profile 5, 7 (with EL), and 8
+-   **Multiple Format Support:** Convert between Dolby Vision, HDR/HDR10, and SDR formats
+-   **Format Conversion:** DV → HDR/HDR10 → SDR with tone mapping support
+-   **Dolby Vision Profiles:** Support for Profile 5, 7 (with EL), and 8.1
 -   **HDR Metadata Injection:** Add or update HDR10/HDR10+/Dolby Vision metadata without re-encoding
 -   **Advanced Cropping:** Automatic black bar detection, manual cropping, aspect ratio presets
 -   **Flexible Scaling:** Height-based and adaptive scaling modes
@@ -43,7 +43,7 @@ hdr_forge convert -i input.mkv -o output.mkv --hw-preset gpu:balanced
 hdr_forge convert -i input.mkv -o output.mkv --hw-preset cpu:quality
 
 # AV1 encoding (Beta - next-generation codec)
-hdr_forge convert -i input.mkv -o output.mkv --encoder libsvtav1
+hdr_forge convert -i input.mkv -o output.mkv -v av1
 
 # Convert Dolby Vision to HDR10
 hdr_forge convert -i dv.mkv -o output.mkv --hdr-sdr-format hdr10
@@ -62,10 +62,17 @@ hdr_forge inject-metadata -i video.mkv -o output.mkv \
 
 ## Version History
 
+**Current: v1.0.0**
+
+### New Features
+-   **AV1 Encoding (Beta):** AV1 codec support via libsvtav1 encoder with HDR10 support (stream metadata flags)
+
 **Current: v0.7.11**
 
 ### New Features
--   **AV1 Encoding (Beta):** AV1 codec support via libsvtav1 encoder (SDR only, HDR10/Dolby Vision not yet supported)
+-   **Audio Encoding:** Per-track audio codec selection with language and ID-based targeting
+-   **Audio Default Track:** Set default audio track by language or track ID
+-   **Subtitle Management:** Intelligent subtitle handling with auto-detection and custom flags
 -   **Logo Removal:** Automatic logo detection and removal with two algorithms:
     -   `delogo` - FFmpeg delogo filter (fast)
     -   `mask` - Mask-based removal (better quality)
@@ -116,11 +123,10 @@ HDR Forge now supports AV1 encoding via libsvtav1 (SVT-AV1 encoder). AV1 is a ne
 -   **Royalty-Free:** Open-source codec with no licensing fees
 -   **Future-Proof:** Growing platform support (YouTube, Netflix, modern browsers)
 
-**Beta Status and Current Limitations:**
--   **SDR Only:** Currently only SDR encoding is supported
--   **No HDR10/Dolby Vision:** HDR10 and Dolby Vision encoding not yet implemented
--   **In Development:** Full HDR support planned for future releases
--   The encoder is stable for SDR content and produces excellent results
+**Beta Status and Current Capabilities:**
+-   **HDR10 Support:** Full HDR10 encoding support via stream metadata flags (Site Data)
+-   **HDR10 Limitations:** Stream metadata only (no OBU-based HDR), Dolby Vision encoding not supported
+-   **Stable and Production-Ready:** Mature encoder with excellent SDR and HDR10 results
 
 ```bash
 # Basic AV1 encoding
@@ -312,14 +318,26 @@ hdr_forge convert -i input.mkv -o output.mkv --hw-preset cpu:quality
 # This is not the same as the preset from the video codec. Use the video preset for this.
 hdr_forge convert -i film.mkv -o output.mkv --preset film
 
+# Film at high resolution (4K optimized)
+hdr_forge convert -i film4k.mkv -o output.mkv --preset film4k
+
+# Film4K with faster encoding
+hdr_forge convert -i film4k.mkv -o output.mkv --preset film4k:fast
+
 hdr_forge convert -i action.mkv -o output.mkv --preset action
 
 hdr_forge convert -i anime.mkv -o output.mkv --preset animation
 
+# Grain preservation presets
+hdr_forge convert -i grainy_film.mkv -o output.mkv --preset grain
+
+# Grain with FFmpeg grain analysis
+hdr_forge convert -i grainy_film.mkv -o output.mkv --preset grain:ffmpeg
+
 # Banding reduction (and 8-bit to 10-bit for SDR)
 hdr_forge convert -i input.mkv -o output.mkv --preset banding
 
-# Neutral preset for mixed content (default prest from codec)
+# Neutral preset for mixed content (default preset from codec)
 hdr_forge convert -i input.mkv -o output.mkv --preset video
 
 # Combine with hardware presets
@@ -431,11 +449,14 @@ hdr_forge convert -i dolby_vision.mkv -o output.mkv --hdr-sdr-format sdr
 # Convert HDR10 to SDR with tone mapping
 hdr_forge convert -i hdr10_video.mkv -o output.mkv --hdr-sdr-format sdr
 
+# Preserve HDR without metadata (metadata flags only)
+hdr_forge convert -i hdr10_video.mkv -o output.mkv --hdr-sdr-format hdr
+
 # Keep source format (default)
 hdr_forge convert -i input.mkv -o output.mkv --hdr-sdr-format auto
 ```
 
-**Format hierarchy:** Dolby Vision → HDR10 → SDR (only downgrades supported)
+**Format hierarchy:** Dolby Vision → HDR10 → HDR (metadata only) → SDR (only downgrades supported)
 
 ### Video Sampling
 
@@ -458,6 +479,66 @@ hdr_forge convert -i input.mkv -o sample_av1.mkv \
   --sample auto \
   --encoder libsvtav1
 ```
+
+### Audio Encoding
+
+Configure audio codec per track using language, track ID, or format conversion:
+
+```bash
+# Copy all audio tracks (default)
+hdr_forge convert -i input.mkv -o output.mkv
+
+# Convert all audio to AAC
+hdr_forge convert -i input.mkv -o output.mkv --audio-codec aac
+
+# Per-language encoding
+hdr_forge convert -i input.mkv -o output.mkv --audio-codec "ger:aac;eng:ac3"
+
+# Per-track ID encoding
+hdr_forge convert -i input.mkv -o output.mkv --audio-codec "1:aac;2:ac3"
+
+# Format conversion (DTS → AAC)
+hdr_forge convert -i input.mkv -o output.mkv --audio-codec "dts>aac"
+
+# Language-specific format conversion
+hdr_forge convert -i input.mkv -o output.mkv --audio-codec "eng:dts>aac;ger:copy"
+
+# Remove specific tracks
+hdr_forge convert -i input.mkv -o output.mkv --audio-codec "1:remove;2:copy"
+
+# Set default audio track
+hdr_forge convert -i input.mkv -o output.mkv --audio-default ger
+
+# Set default by track ID
+hdr_forge convert -i input.mkv -o output.mkv --audio-default 2
+
+# Supported codecs: copy, remove, aac, ac3, eac3, flac
+```
+
+### Subtitle Management
+
+Intelligently manage subtitles with auto-detection and custom flags:
+
+```bash
+# Copy all subtitles (default)
+hdr_forge convert -i input.mkv -o output.mkv
+
+# Auto-detect subtitle types and set flags
+hdr_forge convert -i input.mkv -o output.mkv --subtitle-flags auto
+
+# Auto-detect with default language preference
+hdr_forge convert -i input.mkv -o output.mkv --subtitle-flags auto>ger
+
+# Remove all subtitles
+hdr_forge convert -i input.mkv -o output.mkv --subtitle-flags remove
+
+# Copy all subtitles (explicit)
+hdr_forge convert -i input.mkv -o output.mkv --subtitle-flags copy
+
+# Supported options: copy, remove, auto, auto>LANG (e.g., auto>ger, auto>eng)
+```
+
+**Note:** Some players (like VLC) may have issues with FFmpeg-set subtitle titles. Use `dovi_tool` or external tools for better compatibility if needed.
 
 ### Custom Quality Settings
 
@@ -581,6 +662,7 @@ hdr_forge extract-metadata -i INPUT   Extract DV/HDR10/HDR10+ metadata
 Options:
   -i, --input INPUT         Input video file
   -o, --output FOLDER       Output folder for metadata files
+  --to-dv-8                 Convert extracted DV metadata to Profile 8.1
   -d, --debug               Enable debug output
 ```
 
@@ -618,11 +700,23 @@ Encoder Selection:
   --encoder CODEC           Force specific encoder: auto, libx265, libx264,
                             libsvtav1, hevc_nvenc, h264_nvenc (default: auto)
 
+Audio Options:
+  -a, --audio-codec CODEC   Audio codec per track: copy, remove, aac, ac3,
+                            eac3, flac. Use language/ID targeting:
+                            ger:aac, eng:ac3, 1:remove, dts>aac (default: copy)
+  --audio-default LANG_ID   Set default audio track by language (ger, eng)
+                            or track ID (1, 2, etc.)
+
+Subtitle Options:
+  -s, --subtitle-flags MODE Subtitle management: copy, remove, auto,
+                            auto>LANG (e.g., auto>ger) (default: copy)
+
 Encoding Presets:
-  -p, --preset PRESET       Content preset: auto, film, banding, video, action,
+  -p, --preset PRESET       Content preset: auto, film, film4k, film4k:fast,
+                            grain, grain:ffmpeg, banding, video, action,
                             animation (default: auto)
-  --hw-preset PRESET        Hardware preset: cpu:balanced, cpu:quality,
-                            gpu:balanced, gpu:quality, balanced, quality
+  --hw-preset PRESET        Hardware preset: cpu, cpu:balanced, cpu:quality,
+                            gpu, gpu:balanced, gpu:quality, balanced, quality
                             (default: cpu:balanced)
 
 Quality Settings:
@@ -648,13 +742,18 @@ Content Analysis & Filtering:
   --vfilter FILTERS         Custom FFmpeg video filters
 
 Format Conversion:
-  --hdr-sdr-format FORMAT   Target format: auto, hdr10, sdr (default: auto)
+  --hdr-sdr-format FORMAT   Target format: auto, hdr, hdr10, sdr (default: auto)
   --dv-profile PROFILE      Dolby Vision profile: auto, 8 (default: auto)
 
 Expert Options:
   --encoder-params PARAMS   Encoder-specific parameters
   --master-display STRING   Custom master display metadata
   --max-cll STRING          Custom MaxCLL/MaxFALL values
+  --bit-depth DEPTH         Bit depth override for SDR: auto, 8, 10
+  --color-primaries-flag PRIM  Color primaries (libx265/libx264 only):
+                            bt470bg, smpte170m, bt709, bt2020
+  --try-fix                 Ignore non-fatal errors during video import
+  --threads COUNT           Number of threads for encoding
 
 Debug:
   -d, --debug               Enable debug output
