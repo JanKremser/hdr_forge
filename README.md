@@ -64,18 +64,16 @@ hdr_forge inject-metadata -i video.mkv -o output.mkv \
 
 **Current: v1.0.0**
 
-### New Features
 -   **AV1 Encoding (Beta):** AV1 codec support via libsvtav1 encoder with HDR10 support (stream metadata flags)
 
 **Current: v0.7.11**
 
-### New Features
 -   **Audio Encoding:** Per-track audio codec selection with language and ID-based targeting
 -   **Audio Default Track:** Set default audio track by language or track ID
 -   **Subtitle Management:** Intelligent subtitle handling with auto-detection and custom flags
 -   **Logo Removal:** Automatic logo detection and removal with two algorithms:
     -   `delogo` - FFmpeg delogo filter (fast)
-    -   `mask` - Mask-based removal (better quality)
+    -   `mask` - Mask-based removal (better quality) (beta)
 -   **New Presets:**
     -   `banding` - Banding reduction preset (8-bit → 10-bit for SDR)
     -   `video` - Neutral preset for mixed content
@@ -90,11 +88,6 @@ hdr_forge inject-metadata -i video.mkv -o output.mkv \
     -   `detect-logo` - Analyze and detect logos in videos
     -   `extract-metadata` - Extract Dolby Vision/HDR10/HDR10+ metadata
     -   `inject-metadata` - Inject Dolby Vision/HDR10/HDR10+ metadata without re-encoding
-
-### Improvements
--   Master-display support for GPU encoded videos
--   Extended metadata injection capabilities (HDR10+, Dolby Vision EL)
--   Improved preset system with more granular control
 
 **v0.6.0**
 
