@@ -107,6 +107,8 @@ def _get_video_codec_from_string(codec_str: str | None) -> VideoCodec:
         return VideoCodec.COPY
     elif codec_str == 'h264':
         return VideoCodec.H264
+    elif codec_str == 'av1':
+        return VideoCodec.AV1
 
     return VideoCodec.H265
 

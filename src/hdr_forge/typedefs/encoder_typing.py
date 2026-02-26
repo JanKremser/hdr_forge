@@ -48,6 +48,7 @@ class VideoCodec(Enum):
     """Video encoder mode."""
     H265 = "h265"
     H264 = "h264"
+    AV1 = "av1"
     COPY = "copy"
 
 class AudioCodec(Enum):

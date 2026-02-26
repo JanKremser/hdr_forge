@@ -149,7 +149,11 @@ class Encoder:
                     sys.exit(1)
             else:
                 return Libx264Codec(encoder_settings=encoder_settings, video=video, scale=scale_tuple)
-
+        elif encoder_settings.video_codec == VideoCodec.AV1:
+            if encoder_settings.enable_gpu_acceleration:
+                print_err("Hardware acceleration is not supported for AV1 encoding.")
+                sys.exit(1)
+            return LibSvtAV1Codec(encoder_settings=encoder_settings, video=video, scale=scale_tuple)
         return None
 
     def _get_codec_from_override(

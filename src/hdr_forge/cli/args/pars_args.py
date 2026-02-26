@@ -146,12 +146,13 @@ Examples:
 
     convert_parser.add_argument(
         '-v', '--video-codec',
-        choices=['h265', 'h264', 'copy'],
+        choices=['h265', 'h264', 'av1', 'copy'],
         default='h265',
         help=f"""{sdr_dot} {hdr_dot} {dolby_vision_dot}
 Video codec to use for encoding.
 [h265]  : h265 encoding for HDR/DolbyVision and SDR outputs.
 [h264]  : h264 encoding for SDR outputs. Not recommended for HDR content.
+[av1]   : AV1 encoding for HDR and SDR outputs. Hardware encoding is not supported.
 [copy]  : Copy stream without re-encoding\n
 """
     )
