@@ -96,10 +96,10 @@ def _detect_system_theme() -> str:
 
     # Windows: registry
     try:
-        import winreg
-        key = winreg.OpenKey(winreg.HKEY_CURRENT_USER,
+        import winreg  # type: ignore[import]
+        key = winreg.OpenKey(winreg.HKEY_CURRENT_USER,  # type: ignore[attr-defined]
             r'SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize')
-        value, _ = winreg.QueryValueEx(key, 'AppsUseLightTheme')
+        value, _ = winreg.QueryValueEx(key, 'AppsUseLightTheme')  # type: ignore[attr-defined]
         return 'light' if value == 1 else 'dark'
     except Exception:
         pass
