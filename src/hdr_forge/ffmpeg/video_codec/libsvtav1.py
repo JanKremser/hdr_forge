@@ -1,7 +1,7 @@
 from typing import Optional, Tuple
 from hdr_forge.ffmpeg.video_codec.service.presets import Hdr_Forge_AV1_Preset
 from hdr_forge.ffmpeg.video_codec.video_codec_base import VideoCodecBase
-from hdr_forge.typedefs.encoder_typing import EncoderSettings, HdrForgeSpeedPreset, HdrSdrFormat
+from hdr_forge.typedefs.encoder_typing import EncoderSettings, HdrSdrFormat
 from hdr_forge.typedefs.video_typing import ContentLightLevelMetadata, HdrMetadata, MasterDisplayMetadata, build_master_display_string, build_max_cll_string
 from hdr_forge.typedefs.codec_typing import PIXEL_FORMAT_YUV420_10_BIT, PIXEL_FORMAT_YUV420_8_BIT, VideoEncoderLibrary
 from hdr_forge.video import Video
@@ -45,6 +45,8 @@ class LibSvtAV1Codec(VideoCodecBase):
             output_options['colorspace'] = 'bt2020nc'
             output_options['svtav1-params'] = 'enable-hdr=1'
 
+            # No OBU-based HDR10 metadata support in SVT-AV1, so we have to pass it via FFmpeg's metadata:s:v:0 options if available for HDR10 output
+            # SVT-AV1 set a Site Data flag in the bitstream for HDR10 content. This is a Site Date form a input Video.
             if encoding_hdr_sdr_format == HdrSdrFormat.HDR10:
                 metadata_sv0: list[str] = []
                 master_display: MasterDisplayMetadata | None = self._get_master_display_for_encoding()
