@@ -5,7 +5,7 @@ import sys
 import threading
 from argparse import Namespace
 from pathlib import Path
-from tkinter import Tk, messagebox, filedialog, StringVar, Button, Frame
+from tkinter import Tk, messagebox, filedialog, StringVar, IntVar, Button, Frame
 from tkinter import ttk
 from tkinter.scrolledtext import ScrolledText
 
@@ -312,12 +312,15 @@ def _apply_theme(root, style, c, output_text):
         background=c['win_bg'], foreground=c['label_title'],
         font=('TkDefaultFont', 9))
 
-    # TLabel / Status.TLabel
+    # TLabel / Status.TLabel / Hint.TLabel
     style.configure('TLabel',
         background=c['win_bg'], foreground=c['fg'], font=('TkDefaultFont', 9))
     style.configure('Status.TLabel',
         background=c['status_bg'], foreground=c['fg'],
         relief='flat', padding=(6, 3), font=('TkDefaultFont', 9))
+    style.configure('Hint.TLabel',
+        background=c['win_bg'], foreground=c['label_title'],
+        font=('TkDefaultFont', 8))
 
     # TEntry
     style.configure('TEntry',
@@ -408,6 +411,13 @@ def _apply_theme(root, style, c, output_text):
         background=c['accent'], troughcolor=c['trough'],
         bordercolor=c['border'], lightcolor=c['accent'], darkcolor=c['accent'],
         relief='flat', thickness=6)
+
+    # Horizontal.TScale
+    style.configure('Horizontal.TScale',
+        background=c['win_bg'], troughcolor=c['trough'],
+        sliderlength=14, sliderrelief='flat')
+    style.map('Horizontal.TScale',
+        background=[('active', c['accent'])])
 
     # TScrollbar
     style.configure('TScrollbar',
@@ -611,6 +621,45 @@ class HdrForgeGui:
         )
         self.subtitle_combo.grid(row=2, column=1, sticky='w', padx=5)
 
+        ttk.Label(settings_frame, text="Preset:").grid(row=3, column=0, sticky='w', pady=5)
+        self.preset_var = StringVar(value='auto')
+        self.preset_combo = ttk.Combobox(
+            settings_frame,
+            textvariable=self.preset_var,
+            values=['auto', 'film', 'film4k', 'film4k:fast', 'banding', 'video',
+                    'action', 'animation', 'grain', 'grain:ffmpeg'],
+            state='readonly',
+            width=20
+        )
+        self.preset_combo.grid(row=3, column=1, sticky='w', padx=5)
+
+        ttk.Label(settings_frame, text="Quality (CRF):").grid(row=4, column=0, sticky='w', pady=5)
+        self.quality_scale_var = IntVar(value=0)
+        self.quality_label_var = StringVar(value='Auto')
+        self.quality_scale = ttk.Scale(
+            settings_frame,
+            variable=self.quality_scale_var,
+            from_=0, to=51,
+            orient='horizontal',
+            length=160,
+            command=self._on_quality_change
+        )
+        self.quality_scale.grid(row=4, column=1, sticky='w', padx=5)
+        ttk.Label(settings_frame, textvariable=self.quality_label_var,
+                  style='Hint.TLabel', width=5).grid(row=4, column=2, sticky='w', padx=2)
+
+        ttk.Label(settings_frame, text="Speed:").grid(row=5, column=0, sticky='w', pady=5)
+        self.speed_var = StringVar(value='')
+        self.speed_combo = ttk.Combobox(
+            settings_frame,
+            textvariable=self.speed_var,
+            values=['', 'ultrafast', 'superfast', 'veryfast', 'faster', 'fast',
+                    'medium', 'medium:plus', 'slow', 'slow:plus', 'slower', 'veryslow'],
+            state='readonly',
+            width=20
+        )
+        self.speed_combo.grid(row=5, column=1, sticky='w', padx=5)
+
         settings_frame.columnconfigure(1, weight=1)
 
         # Control section (Convert button + progress bar)
@@ -740,6 +789,12 @@ class HdrForgeGui:
         state = 'normal' if can_convert else 'disabled'
         self.convert_button.button.config(state=state)
 
+    def _on_quality_change(self, value: str) -> None:
+        """Update the quality label when the slider moves."""
+        int_val = int(float(value))
+        self.quality_scale_var.set(int_val)   # snap to integer
+        self.quality_label_var.set('Auto' if int_val == 0 else str(int_val))
+
     def _toggle_theme(self):
         """Toggle between light and dark theme."""
         if self.current_theme == 'light':
@@ -787,10 +842,10 @@ class HdrForgeGui:
                 subtitle_flags=self.subtitle_var.get(),
                 hdr_sdr_format='auto',
                 dv_profile='auto',
-                preset='auto',
+                preset=self.preset_var.get() or 'auto',
                 hw_preset='cpu:balanced',
-                quality=None,
-                speed=None,
+                quality=self.quality_scale_var.get() if self.quality_scale_var.get() > 0 else None,
+                speed=self.speed_var.get() if self.speed_var.get().strip() else None,
                 grain=None,
                 crop=None,
                 scale=None,
