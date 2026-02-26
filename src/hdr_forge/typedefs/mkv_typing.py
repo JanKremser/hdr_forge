@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field, fields, is_dataclass
+from email.mime import audio
 from enum import Enum
 from typing import Dict, List, Optional, Any, Type, TypeVar, Tuple
 
@@ -162,6 +163,7 @@ class MkvTrack:
     """Track information of an MKV file."""
     codec: str
     id: int
+    ffmpeg_index: int | None
     properties: MkvTrackProperties
     type: MkvTrackType
 
@@ -206,6 +208,9 @@ def parse_mkv_info(info_dict: Dict) -> MkvInfo:
         supported=container_dict.get('supported', False),
         type=container_dict.get('type', 'Unknown')
     )
+    video_index_counter = 0
+    audio_index_counter = 0
+    subtitle_index_counter = 0
 
     # Process tracks
     tracks: list = []
@@ -216,12 +221,25 @@ def parse_mkv_info(info_dict: Dict) -> MkvInfo:
         track_props = MkvTrackProperties(**known_track_props)
         #add_dynamic_attributes(track_props, unknown_track_props)
 
+        track_type = string_to_track_type(track_dict.get('type', 'unknown'))
+        ffmpeg_index = None
+        if track_type == MkvTrackType.VIDEO:
+            ffmpeg_index = video_index_counter
+            video_index_counter += 1
+        elif track_type == MkvTrackType.AUDIO:
+            ffmpeg_index = audio_index_counter
+            audio_index_counter += 1
+        elif track_type == MkvTrackType.SUBTITLES:
+            ffmpeg_index = subtitle_index_counter
+            subtitle_index_counter += 1
+
         # Create track with automatic track type conversion
         track = MkvTrack(
             codec=track_dict.get('codec', 'Unknown'),
             id=track_dict.get('id', 0),
+            ffmpeg_index=ffmpeg_index,
             properties=track_props,
-            type=string_to_track_type(track_dict.get('type', 'unknown'))
+            type=track_type
         )
         tracks.append(track)
 

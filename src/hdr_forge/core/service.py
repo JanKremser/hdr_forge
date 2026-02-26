@@ -31,10 +31,12 @@ def build_ffmpeg_cmd_dict_to_str(cmd: dict[str, list[str] | str]) -> str:
     parts = []
     for key, value in cmd.items():
         if isinstance(value, list):
-            value_str = ' '.join(f'"{arg}"' if ' ' in arg else arg for arg in value)
+            for v in value:
+                value_str = f'"{v}"' if ' ' in v else v
+                parts.append(f'-{key} {value_str}')
         else:
             value_str = f'"{value}"' if ' ' in value else value
-        parts.append(f'-{key} {value_str}')
+            parts.append(f'-{key} {value_str}')
     return ' '.join(parts)
 
 def shutdown_system() -> None:

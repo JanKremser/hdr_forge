@@ -5,22 +5,22 @@ import numpy as np
 
 def _print_mask_unicode(mask: np.ndarray, max_width=70):
     """
-    Gibt ein ndarray als Maske mit Unicode-Halbblock-Zeichen (▀▄█) aus.
-    Erzeugt quadratische Pixel im Terminal ohne Verzerrung.
+    Outputs an ndarray as a mask with Unicode half-block characters (▀▄█).
+    Creates square pixels in the terminal without distortion.
 
-    Zwei vertikale Pixel (oben/unten) werden zu einem Zeichen kombiniert:
+    Two vertical pixels (top/bottom) are combined into one character:
     - 0,0 -> ' '
     - 1,0 -> '▀'
     - 0,1 -> '▄'
     - 1,1 -> '█'
     """
 
-    # In bool konvertieren
+    # Convert to bool
     mask = mask.astype(bool)
 
     h, w = mask.shape
 
-    # Breite begrenzen (proportional)
+    # Limit width (proportional)
     if w > max_width:
         scale = max_width / w
         new_w = max_width
@@ -39,12 +39,12 @@ def _print_mask_unicode(mask: np.ndarray, max_width=70):
         mask = resized
         h, w = mask.shape
 
-    # Höhe auf gerade Anzahl bringen
+    # Make height an even number
     if h % 2 == 1:
         mask = mask[:-1]
         h -= 1
 
-    # Zeichenmapping
+    # Character mapping
     for y in range(0, h, 2):
         upper = mask[y]
         lower = mask[y + 1]

@@ -17,6 +17,20 @@ class HdrForgeSpeedPreset(Enum):
     SLOWER = "slower"
     VERYSLOW = "veryslow"
 
+BT_601_PAL_FLAGS: list[str] = [
+    'colorprim=bt470bg',
+    'transfer=bt470bg',
+    'colormatrix=smpte170m',
+    'range=limited',
+]
+
+BT_601_NTSC_FLAGS: list[str] = [
+    'colorprim=smpte170m',
+    'transfer=smpte170m',
+    'colormatrix=smpte170m',
+    'range=limited',
+]
+
 BT_709_FLAGS: list[str] = [
     'colorprim=bt709',
     'transfer=bt709',
@@ -28,6 +42,25 @@ BT_2020_FLAGS: list[str] = [
     'transfer=smpte2084',
     'colormatrix=bt2020nc',
 ]
+
+# BT_2020_FLAGS_SDR: list[str] = [
+#     'colorprim=bt2020',
+#     'transfer=bt709',# SDR transfer characteristic
+#     'colormatrix=bt2020nc',
+# ]
+
+class ColorPrimaries(Enum):
+    BT709 = "bt709"
+    BT2020 = "bt2020"
+    BT601_PAL = "bt470bg"
+    BT601_NTSC = "smpte170m"
+
+COLOR_PRIMARIES_FLAG_MAP: dict[ColorPrimaries, list[str]] = {
+    ColorPrimaries.BT709: BT_709_FLAGS,
+    ColorPrimaries.BT2020: BT_2020_FLAGS,
+    ColorPrimaries.BT601_PAL: BT_601_PAL_FLAGS,
+    ColorPrimaries.BT601_NTSC: BT_601_NTSC_FLAGS,
+}
 
 class VideoEncoderLibrary(Enum):
     """Video encoder library for FFmpeg."""
@@ -195,11 +228,11 @@ HDR_FORGE_SPEED_PRESET: dict[HdrForgeSpeedPreset, list[CodecPreset]] = {
             ffmpeg_params={
                 'x264-params': {
                     'aq-mode': '2',
-                    'ref': '5',
+                    'ref': '4',
                     'bframes': '8',
                     'b-adapt': '2',
                     'trellis': '2',
-                    'subme': '8',  # default bei slow ist 7
+                    'subme': '8',  # default for slow is 7
                     'me': 'umh',
                     'merange': '24',
                 }
@@ -210,14 +243,18 @@ HDR_FORGE_SPEED_PRESET: dict[HdrForgeSpeedPreset, list[CodecPreset]] = {
             codec_preset=x265_x264_Preset.SLOW.value,
             ffmpeg_params={
                 'x265-params': {
-                    'aq-mode': '2', # 2 frame schneller bei 2
-                    'ref': '4', # 1 frame schneller bei 3
-                    'bframes': '8', # 4 frame schneller bei 4
+                    # 'ref': '4',
+                    # 'bframes': '8',
+                    # 'rdoq-level': '2',
+
+                    'aq-mode': '2',
+                    'ref': '3',
+                    'bframes': '4',
                     'b-adapt': '2',
-                    'rdoq-level': '2', # 1 frame schneller bei 1
-                    'subme': '2', # default is 3 / 3-4 frame schneller bei 2
-                    'me': 'hex', # default is star / 3 frame schneller bei hex
-                    'lookahead-slices': '4', # default is 4
+                    'rdoq-level': '1', # 2-3 frames faster at 1, default 2
+                    'subme': '2',
+                    'me': 'hex',
+                    'lookahead-slices': '4',
                 }
             },
         ),

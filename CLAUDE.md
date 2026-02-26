@@ -103,7 +103,7 @@ Key methods:
 **Dolby Vision RPU/EL handling**
 
 Key functions:
-- `extract_base_layer()` - Extract HDR10 base layer without RPU
+- `extract_base_layer()` - Extract base layer without RPU
 - `extract_rpu()` - Extract RPU with profile conversion
 - `inject_rpu()` - Inject RPU into HEVC
 - `extract_enhancement_layer()` - Extract EL for Profile 7

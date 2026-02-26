@@ -1,13 +1,15 @@
 """Parse encoder settings from command-line arguments."""
 
+import locale
+import multiprocessing
 import sys
 from typing import Tuple
 
 
 from hdr_forge import __version__
 from hdr_forge.cli.cli_output import print_err, print_warn
-from hdr_forge.typedefs.codec_typing import HEVC_NVENC_Preset, VideoEncoderLibrary, x265_x264_Preset
-from hdr_forge.typedefs.encoder_typing import CropMode, CropSettings, EncoderOverride, GrainMode, HdrForgeEncodingHardwarePresets, HdrForgeEncodingPresetSettings, HdrForgeEncodingTuningPresets, HdrForgeSpeedPreset, HdrSdrFormat, EncoderSettings, LogoRemovalAutoDetectMode, LogoRemovalMode, LogoRemovelSettings, NvencParams, NvencRcMode, SampleSettings, ScaleMode, UniversalEncoderParams, VideoCodec, Libx264Params, X264Tune, Libx265Params, X265Tune
+from hdr_forge.typedefs.codec_typing import ColorPrimaries, HEVC_NVENC_Preset, VideoEncoderLibrary, x265_x264_Preset
+from hdr_forge.typedefs.encoder_typing import AudioCodec, AudioCodecItem, CropMode, CropSettings, EncoderOverride, GrainMode, HdrForgeEncodingHardwarePresets, HdrForgeEncodingPresetSettings, HdrForgeEncodingTuningPresets, HdrForgeSpeedPreset, HdrSdrFormat, EncoderSettings, LogoRemovalAutoDetectMode, LogoRemovalMode, LogoRemovelSettings, NvencParams, NvencRcMode, SampleSettings, ScaleMode, SubtitleMode, SubtitleModeItem, UniversalEncoderParams, VideoCodec, Libx264Params, X264Tune, Libx265Params, X265Tune
 from hdr_forge.typedefs.dolby_vision_typing import DolbyVisionProfileEncodingMode
 from hdr_forge.typedefs.video_typing import BT_2020_MASTER_DISPLAY, BT_709_MASTER_DISPLAY, DISPLAY_P3_MASTER_DISPLAY, ContentLightLevelMetadata, HdrMetadata, MasterDisplayMetadata
 
@@ -105,8 +107,132 @@ def _get_video_codec_from_string(codec_str: str | None) -> VideoCodec:
         return VideoCodec.COPY
     elif codec_str == 'h264':
         return VideoCodec.H264
+    elif codec_str == 'av1':
+        return VideoCodec.AV1
 
     return VideoCodec.H265
+
+def _get_audio_codec_from_string(codec_str: str | None) -> dict[str, AudioCodecItem]:
+    """Convert string to AudioEncoder enum.
+
+    Args:
+        codec_str: Audio codec string
+
+    Returns:
+        Corresponding AudioEncoder enum value
+    """
+    supported_codec: list[str] = ['aac', 'ac3', 'eac3', 'flac', 'copy', 'remove']
+    if codec_str is None:
+        return {
+            'default': AudioCodecItem(from_codec=None, to_codec=AudioCodec.COPY)
+        }
+
+    codec_str_norm = codec_str.lower().replace('-', '')
+    if codec_str_norm in supported_codec:
+        # convert all tracks to codec
+        return {
+            'default': AudioCodecItem(from_codec=None, to_codec=AudioCodec(codec_str_norm))
+        }
+
+    codec_map: dict[str, AudioCodecItem] = {}
+
+    def _build_codec_convertion(codec: str) -> AudioCodecItem:
+        from_to = codec.split(">")
+        if len(from_to) != 2:
+            print_err(f"Invalid audio codec value '{codec_str}', using default")
+            sys.exit(1)
+        from_codec, to_codec = from_to
+        from_codec_norm = from_codec.lower().replace('-', '')
+        to_codec_norm = to_codec.lower().replace('-', '')
+        if to_codec_norm.lower() not in supported_codec:
+            print_err(f"Invalid audio codec value '{to_codec}', using default")
+            sys.exit(1)
+        return AudioCodecItem(
+            from_codec=from_codec_norm,
+            to_codec=AudioCodec(to_codec_norm)
+        )
+
+    def _build_map(codec: str) -> AudioCodecItem:
+        if ">" in codec:
+            return _build_codec_convertion(codec)
+        elif codec.lower() not in supported_codec:
+            print_err(f"Invalid audio codec value '{codec}', using default")
+            sys.exit(1)
+        return AudioCodecItem(
+            from_codec=None,
+            to_codec=AudioCodec(codec.lower())
+        )
+
+    # example: eng:aac;ger:dts>aac
+    if ";" in codec_str:
+        parts = codec_str.split(";")
+        for part in parts:
+            if ':' in part:
+                lang_or_track_id, codec = part.split(":")
+                codec_map[lang_or_track_id.lower()] = _build_map(codec)
+    elif ':' in codec_str:
+        lang_or_track_id, codec = codec_str.split(":")
+        codec_map[lang_or_track_id.lower()] = _build_map(codec)
+    elif '>' in codec_str:
+        # apply to all tracks
+        codec_map['default'] = _build_codec_convertion(codec=codec_str)
+
+    if codec_map == {}:
+        print_err(f"Invalid audio codec value '{codec_str}', using default")
+        sys.exit(1)
+
+    return codec_map
+
+def _get_subtitle_flags_from_string(flag_str: str | None) -> SubtitleModeItem:
+    """Convert string to SubtitleEncoder enum.
+
+    Args:
+        codec_str: Subtitle codec string
+
+    Returns:
+        Corresponding SubtitleEncoder enum value
+    """
+    def get_default_lang() -> str | None:
+        ISO_639_1_TO_2: dict = {
+            "de": "ger",
+            "en": "eng",
+            "fr": "fra",
+            "es": "spa",
+            "it": "ita",
+            "nl": "nld",
+            "pl": "pol",
+            "pt": "por",
+            "ja": "jpn",
+            "zh": "zho",
+        }
+        locale.setlocale(locale.LC_ALL, '')
+        lang, _ = locale.getlocale()
+
+        _default_lang = None
+        if lang:
+            iso1 = lang.split('_')[0]
+            _default_lang: str | None = ISO_639_1_TO_2.get(iso1, None)  # und = undefined
+        return _default_lang
+
+    supported_modi: list[str] = ['copy', 'remove', 'auto']
+    if flag_str is None:
+        return SubtitleModeItem(mode=SubtitleMode.COPY, default_lang=None)
+
+    codec_str_norm = flag_str.lower().replace('-', '')
+    if codec_str_norm in supported_modi:
+        if 'auto' in codec_str_norm:
+            default_lang: str | None = get_default_lang()
+            return SubtitleModeItem(mode=SubtitleMode.AUTO, default_lang=default_lang)
+
+        return SubtitleModeItem(mode=SubtitleMode(codec_str_norm), default_lang=None)
+    elif "auto>" in codec_str_norm:
+        auto_lang: list[str] = codec_str_norm.split(">")
+        if len(auto_lang) != 2:
+            print_err(f"Invalid subtitle codec value '{flag_str}', using default")
+            sys.exit(1)
+        return SubtitleModeItem(mode=SubtitleMode(auto_lang[0]), default_lang=auto_lang[1])
+
+    return SubtitleModeItem(mode=SubtitleMode.COPY, default_lang=None)
 
 
 def _get_crop_settings_from_string(crop_str: str | None) -> CropSettings:
@@ -680,10 +806,51 @@ def create_encoder_settings_from_args(args) -> EncoderSettings:
     # Get validated hardware preset settings (includes encoder compatibility check)
     hdr_forge_preset_settings: HdrForgeEncodingPresetSettings = _get_hdr_forge_encoder_presets_from_args(args, encoder_override)
 
+    # Parse and validate threads setting
+    encoding_threads: str | None = getattr(args, 'threads', None)
+    if encoding_threads == "auto":
+        encoding_threads = None
+    try:
+        encoding_threads_int: int | None = int(encoding_threads) if encoding_threads is not None else None
+    except ValueError:
+        print_err(f"Invalid threads value '{encoding_threads}', must be 'auto' or an integer.")
+        sys.exit(1)
+    max_cpu_threads: int = multiprocessing.cpu_count()
+    if encoding_threads_int is not None and encoding_threads_int > max_cpu_threads:
+        print_err(f"Invalid threads value '{encoding_threads_int}', maximum is {max_cpu_threads} on your system.")
+        sys.exit(1)
+
+    # Validate bit depth
+    bit_depth = getattr(args, 'bit_depth', None)
+    if bit_depth == "auto":
+        bit_depth = None
+    bit_depth_int: int | None = None
+    if bit_depth is not None:
+        bit_depth_int = int(bit_depth)
+        if bit_depth_int not in [8, 10]:
+            print_err(f"Invalid bit depth value '{bit_depth_int}', must be 'auto', 8, or 10.")
+            sys.exit(1)
+
+    # Validate color primaries flag
+    color_primaries_flag = getattr(args, 'color_primaries_flag', None)
+    if color_primaries_flag == "auto":
+        color_primaries_flag = None
+    color_primaries_flag_override: ColorPrimaries | None = None
+    if color_primaries_flag is not None:
+        try:
+            color_primaries_flag_override = ColorPrimaries(color_primaries_flag)
+        except ValueError:
+            print_err(f"Invalid color primaries flag value '{color_primaries_flag}', must be one of {[cp.value for cp in ColorPrimaries]}.")
+            sys.exit(1)
+
     return EncoderSettings(
         video_codec=_get_video_codec_from_string(codec_str=args.video_codec),
+        audio_codecs=_get_audio_codec_from_string(codec_str=getattr(args, 'audio_codec', None)),
+        audio_default_track=getattr(args, 'audio_default', None),
+        subtitle_flags=_get_subtitle_flags_from_string(flag_str=getattr(args, 'subtitle_flags', None)),
         vfilter=getattr(args, 'vfilter', None),
         dar_ratio=_get_dar_ratio_settings_from_string(getattr(args, 'dar_ratio', None)),
+        try_fix=getattr(args, 'try_fix', False) or False,
         hdr_forge_encoding_preset=hdr_forge_preset_settings,
         hdr_sdr_format=_get_hdr_sdr_format_from_string(format_str=args.hdr_sdr_format),
         enable_gpu_acceleration=hdr_forge_preset_settings.hardware_preset.value.startswith('gpu:'),
@@ -693,6 +860,8 @@ def create_encoder_settings_from_args(args) -> EncoderSettings:
         nvenc_params=nvenc_params,
         universal_params=universal_params,
         encoder_override=encoder_override,
+        override_bit_depth=bit_depth_int,
+        override_color_primaries_flag=color_primaries_flag_override,
         scale_height=_get_scale_height(scale=args.scale),
         scale_mode=ScaleMode(args.scale_mode),
         crop=_get_crop_settings_from_string(crop_str=args.crop),
@@ -700,6 +869,7 @@ def create_encoder_settings_from_args(args) -> EncoderSettings:
         logo_removal=_get_logo_removal_mode_from_string(logo_str=args.remove_logo),
         sample=_get_sample_settings_from_string(sample_str=args.sample),
         hdr_metadata=hdr_metadata,
+        threads=encoding_threads_int,
     )
 
 

@@ -18,8 +18,8 @@ class DolbyVisionRpuInfo:
     frames: int
     profile: int
     profile_el: Optional[str]  # e.g., "FEL", "MEL", None for non-EL profiles
-    dm_version: int
-    cm_version: str  # e.g., "CM v2.9"
+    dm_version: Optional[int]
+    cm_version: Optional[str]  # e.g., "CM v2.9"
     scene_shot_count: int
     rpu_min_nits: float
     rpu_max_nits: float
@@ -57,6 +57,8 @@ class DolbyVisionInfo:
     dv_profile: int
     dv_profile_el: Optional[str]
     dv_level: Optional[int]
-    dm_version: int
-    cm_version: str
     dv_layout: str
+    el_preset: bool
+    rpu_preset: bool
+    dm_version: Optional[int]
+    cm_version: Optional[str]

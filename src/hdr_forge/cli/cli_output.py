@@ -305,6 +305,7 @@ def print_progress_info(first_update: bool, current_frame: int, total_frames: in
         word_len = len(process_name)
         if word_len >= bar_len - 4:
             process_name = process_name[:bar_len - 10] + "..."
+            process_name = process_name.strip()
         new_bar_len: int = bar_len - (len(process_name) + 4)
         bar_str = color_str(f"-- {process_name} " + ("-" * new_bar_len), ANSI_GREEN)
     # Format for multi-line output

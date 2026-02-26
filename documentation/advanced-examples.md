@@ -6,6 +6,8 @@ This document provides comprehensive examples for complex encoding scenarios wit
 
 - [Hardware Acceleration](#hardware-acceleration)
 - [AV1 Encoding (Beta)](#av1-encoding-beta)
+- [Audio Encoding](#audio-encoding)
+- [Subtitle Management](#subtitle-management)
 - [Encoding Presets](#encoding-presets)
 - [Cropping Examples](#cropping-examples)
 - [Grain Analysis](#grain-analysis)
@@ -100,20 +102,32 @@ hdr_forge convert -i 4k_video.mkv -o 1080p_av1.mkv \
 
 ### AV1 with HDR Input
 
-**Note:** AV1 currently only supports SDR output. HDR10 and Dolby Vision encoding not yet implemented.
+AV1 supports both HDR10 and SDR encoding:
 
 ```bash
+# HDR10 to HDR10 with AV1 (stream metadata)
+hdr_forge convert -i hdr10_video.mkv -o hdr10_av1.mkv \
+  --encoder libsvtav1 \
+  --quality 23
+
 # Convert HDR10 to SDR with AV1 (tone mapping)
 hdr_forge convert -i hdr10_video.mkv -o sdr_av1.mkv \
   --encoder libsvtav1 \
   --hdr-sdr-format sdr \
   --quality 23
 
+# Dolby Vision to HDR10 with AV1
+hdr_forge convert -i dolby_vision.mkv -o hdr10_av1.mkv \
+  --encoder libsvtav1 \
+  --hdr-sdr-format hdr10
+
 # Dolby Vision to SDR with AV1
 hdr_forge convert -i dolby_vision.mkv -o sdr_av1.mkv \
   --encoder libsvtav1 \
   --hdr-sdr-format sdr
 ```
+
+**Note:** AV1 HDR10 support uses stream metadata flags (Site Data). Dolby Vision encoding not supported.
 
 ### AV1 Comparison with HEVC
 
@@ -148,7 +162,112 @@ hdr_forge convert -i ./videos -o ./av1_streams \
 - Targeting modern platforms (YouTube, Netflix, etc.)
 - Creating long-term SDR archival copies
 
-**Current Limitations:** AV1 only supports SDR output. HDR10/Dolby Vision encoding not yet implemented.
+**Current Limitations:** AV1 HDR10 support uses stream metadata flags only. Dolby Vision encoding not yet implemented.
+
+## Audio Encoding
+
+Audio tracks can be selectively encoded, removed, or converted using per-track targeting.
+
+### Per-Language Audio Encoding
+
+```bash
+# Convert German audio to AAC, keep English as-is
+hdr_forge convert -i input.mkv -o output.mkv --audio-codec "ger:aac;eng:copy"
+
+# Convert all German tracks to FLAC, remove others
+hdr_forge convert -i input.mkv -o output.mkv --audio-codec "ger:flac;*:remove"
+
+# Audio priority: German AAC, English AC3, fallback FLAC
+hdr_forge convert -i input.mkv -o output.mkv --audio-codec "ger:aac;eng:ac3;*:flac"
+```
+
+### Per-Track ID Audio Encoding
+
+```bash
+# Encode by track ID
+hdr_forge convert -i input.mkv -o output.mkv --audio-codec "1:aac;2:ac3;3:remove"
+
+# Keep only tracks 1 and 2, remove the rest
+hdr_forge convert -i input.mkv -o output.mkv --audio-codec "1:copy;2:copy;*:remove"
+```
+
+### Format Conversion
+
+```bash
+# Convert DTS to AAC globally
+hdr_forge convert -i input.mkv -o output.mkv --audio-codec "dts>aac"
+
+# Language-specific format conversion
+hdr_forge convert -i input.mkv -o output.mkv --audio-codec "eng:dts>aac;ger:copy;*:ac3"
+
+# Remove DTS tracks specifically
+hdr_forge convert -i input.mkv -o output.mkv --audio-codec "dts:remove;*:copy"
+```
+
+### Setting Default Audio Track
+
+```bash
+# Set German as default
+hdr_forge convert -i input.mkv -o output.mkv --audio-default ger
+
+# Set English as default
+hdr_forge convert -i input.mkv -o output.mkv --audio-default eng
+
+# Set track 2 as default
+hdr_forge convert -i input.mkv -o output.mkv --audio-default 2
+```
+
+**Supported Codecs:** `copy`, `remove`, `aac`, `ac3`, `eac3`, `flac`
+
+## Subtitle Management
+
+Intelligently manage subtitle tracks with auto-detection of special types.
+
+### Auto-Detection Mode
+
+```bash
+# Auto-detect forced, SDH, and commentary tracks
+hdr_forge convert -i input.mkv -o output.mkv --subtitle-flags auto
+
+# Auto-detect with German preference
+hdr_forge convert -i input.mkv -o output.mkv --subtitle-flags auto>ger
+
+# Auto-detect with English preference
+hdr_forge convert -i input.mkv -o output.mkv --subtitle-flags auto>eng
+```
+
+### Manual Subtitle Management
+
+```bash
+# Copy all subtitles (default behavior)
+hdr_forge convert -i input.mkv -o output.mkv --subtitle-flags copy
+
+# Remove all subtitles
+hdr_forge convert -i input.mkv -o output.mkv --subtitle-flags remove
+```
+
+### Common Workflows
+
+```bash
+# Film with forced subtitles and English SDH
+hdr_forge convert -i input.mkv -o output.mkv \
+  --subtitle-flags auto>eng \
+  --audio-codec "eng:copy"
+
+# Anime with German and English subtitles
+hdr_forge convert -i input.mkv -o output.mkv \
+  --subtitle-flags auto \
+  --audio-codec "ger:aac;eng:ac3"
+
+# Remove Japanese audio, keep English subtitles only
+hdr_forge convert -i input.mkv -o output.mkv \
+  --audio-codec "jpn:remove;eng:copy;*:remove" \
+  --subtitle-flags auto>eng
+```
+
+**Supported Modes:** `copy`, `remove`, `auto`, `auto>LANG` (e.g., `auto>ger`, `auto>eng`, `auto>jpn`)
+
+**Note:** Some players (particularly VLC) may have rendering issues with FFmpeg-set subtitle titles.
 
 ## Encoding Presets
 

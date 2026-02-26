@@ -6,7 +6,8 @@ import threading
 from pathlib import Path
 from typing import Callable, Dict, Optional
 
-from hdr_forge.cli.cli_output import print_err
+from hdr_forge.cli.cli_output import print_debug, print_err
+from hdr_forge.core.service import build_ffmpeg_cmd_dict_to_str
 from hdr_forge.typedefs.ffmpeg_typing import FfmpegProgressInfo
 
 
@@ -137,9 +138,11 @@ def _progress_reader_thread(pipe, progress_callback: Callable[[FfmpegProgressInf
 def run_ffmpeg(
     input_file: Path,
     output_file: Path,
-    output_options: Dict[str, str],
+    output_options: dict[str, list[str] | str],
     progress_callback: Optional[Callable[[FfmpegProgressInfo], None]] = None,
-    timeout: Optional[float] = None
+    timeout: Optional[float] = None,
+    try_fix: bool = False,
+    init_hw_device_vulkan: bool = False,
 ) -> bool:
     """Execute FFmpeg with progress tracking.
 
@@ -157,11 +160,13 @@ def run_ffmpeg(
         RuntimeError: If FFmpeg execution fails
     """
     # Build FFmpeg command
-    cmd = ['ffmpeg', '-y']
+    cmd = []
 
-    # Add progress reporting to stderr
-    if progress_callback:
-        cmd.extend(['-progress', 'pipe:2'])
+    if init_hw_device_vulkan:
+        cmd.extend(['-init_hw_device', 'vulkan'])
+
+    if try_fix:
+        cmd.extend(['-err_detect', 'ignore_err'])
 
     # Add input file
     cmd.extend(['-i', str(input_file)])
@@ -178,6 +183,17 @@ def run_ffmpeg(
 
     # Add output file
     cmd.append(str(output_file))
+
+    # Debug output
+    debug_ffmpeg: str = ' '.join(cmd)
+    print_debug(f'Run command: ffmpeg -y {debug_ffmpeg}')
+
+    # Add progress reporting to stderr
+    cmd_prefix = ['ffmpeg', '-y']
+    if progress_callback:
+        cmd_prefix.extend(['-progress', 'pipe:2'])
+    # Final
+    cmd: list[str] = cmd_prefix + cmd
 
     # Buffer to store stderr for error reporting
     stderr_buffer = []

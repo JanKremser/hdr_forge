@@ -5,7 +5,7 @@ from typing import Optional
 
 
 
-from hdr_forge.typedefs.codec_typing import HEVC_NVENC_Preset, HdrForgeSpeedPreset, x265_x264_Preset
+from hdr_forge.typedefs.codec_typing import ColorPrimaries, HEVC_NVENC_Preset, HdrForgeSpeedPreset, x265_x264_Preset
 from hdr_forge.typedefs.dolby_vision_typing import DolbyVisionProfileEncodingMode
 from hdr_forge.typedefs.video_typing import HdrMetadata
 
@@ -48,7 +48,38 @@ class VideoCodec(Enum):
     """Video encoder mode."""
     H265 = "h265"
     H264 = "h264"
+    AV1 = "av1"
     COPY = "copy"
+
+class AudioCodec(Enum):
+    """Audio codec options for encoding."""
+    COPY = "copy"
+    REMOVE = "remove"
+    AAC = "aac"
+    AC3 = "ac3"
+    EAC3 = "eac3"
+    OPUS = "opus"
+    VORBIS = "vorbis"
+    FLAC = "flac"
+    MP3 = "mp3"
+
+@dataclass
+class AudioCodecItem():
+    """Audio codec configuration for encoding."""
+    from_codec: Optional[str | AudioCodec] = None
+    to_codec: AudioCodec = AudioCodec.COPY
+
+class SubtitleMode(Enum):
+    """Subtitle mode options for encoding."""
+    COPY = "copy"
+    REMOVE = "remove"
+    AUTO = "auto"
+
+@dataclass
+class SubtitleModeItem():
+    """Subtitle mode configuration for encoding."""
+    mode: SubtitleMode = SubtitleMode.AUTO
+    default_lang: Optional[str] = None
 
 class ScaleMode(Enum):
     """Scaling mode for video resizing after cropping."""
@@ -143,6 +174,10 @@ class HdrForgeEncodingTuningPresets(Enum):
     BANDING = "banding"
     ACTION = "action"
     ANIMATION = "animation"
+    GRAIN = "grain"
+    GRAIN_FFMPEG = "grain:ffmpeg"
+    FILM4K = "film4k"
+    FILM4K_FAST = "film4k:fast"
 
 class HdrForgeEncodingHardwarePresets(Enum):
     # Prefixed presets (explicit hardware specification)
@@ -186,10 +221,17 @@ class EncoderSettings:
     making it easier to pass configuration to the convert_video function.
     """
     video_codec: VideoCodec = VideoCodec.H265
+    audio_codecs: dict[str, AudioCodecItem] = field(default_factory=lambda: {}) # { lang or track id: AudioCodecItem }
+    audio_default_track: Optional[str] = None  # Default audio track language or ID
+    subtitle_flags: SubtitleModeItem = field(default_factory=lambda: SubtitleModeItem(
+        mode=SubtitleMode.COPY, default_lang=None
+    ))
 
     # Video filter settings
     vfilter: Optional[str] = None
     dar_ratio: Optional[tuple[int, int]] = None  # Display Aspect Ratio (width, height)
+
+    try_fix: bool = False  # Try to repair damaged video input during processing
 
     # General encoding settings
     hdr_forge_encoding_preset: HdrForgeEncodingPresetSettings = field(
@@ -208,6 +250,8 @@ class EncoderSettings:
     # Universal parameters and encoder override
     universal_params: UniversalEncoderParams = field(default_factory=UniversalEncoderParams)
     encoder_override: EncoderOverride = EncoderOverride.AUTO
+    override_bit_depth: Optional[int] = None  # Override bit depth (8 or 10), None for auto
+    override_color_primaries_flag: Optional[ColorPrimaries] = None  # Override color primaries flag
 
     crop: CropSettings = field(default_factory=lambda: CropSettings(mode=CropMode.AUTO))
     grain: GrainMode = GrainMode.OFF
@@ -216,3 +260,5 @@ class EncoderSettings:
     scale_height: Optional[int] = None
     scale_mode: ScaleMode = ScaleMode.HEIGHT
     sample: SampleSettings = field(default_factory=lambda: SampleSettings(enabled=False))
+
+    threads: Optional[int] = None  # Number of threads to use for encoding (None for auto)

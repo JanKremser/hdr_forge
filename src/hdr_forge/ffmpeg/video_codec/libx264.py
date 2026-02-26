@@ -3,7 +3,7 @@ from hdr_forge.ffmpeg.video_codec.service.presets import Hdr_Forge_X265_X264_Pre
 from hdr_forge.ffmpeg.video_codec.video_codec_base import VideoCodecBase
 from hdr_forge.typedefs.encoder_typing import EncoderSettings, HdrForgeEncodingTuningPresets, HdrForgeSpeedPreset, HdrSdrFormat, Libx264Params, X264Tune
 from hdr_forge.typedefs.video_typing import HdrMetadata
-from hdr_forge.typedefs.codec_typing import BT_709_FLAGS, PIXEL_FORMAT_YUV420_10_BIT, PIXEL_FORMAT_YUV420_8_BIT, CodecPreset, VideoEncoderLibrary
+from hdr_forge.typedefs.codec_typing import BT_709_FLAGS, COLOR_PRIMARIES_FLAG_MAP, PIXEL_FORMAT_YUV420_10_BIT, PIXEL_FORMAT_YUV420_8_BIT, CodecPreset, ColorPrimaries, VideoEncoderLibrary
 from hdr_forge.video import Video
 
 class Libx264Codec(VideoCodecBase):
@@ -59,62 +59,62 @@ class Libx264Codec(VideoCodecBase):
         params: dict[str, str | None] = {
             'aq-mode': None,
             # default is 1
-            # x264: 1 = variance AQ (standard), 2 = auto-variance AQ (empfohlen für die meisten Fälle)
+            # x264: 1 = variance AQ (standard), 2 = auto-variance AQ (recommended for most cases)
             'aq-strength': None,
-            # - Default ist 1.0
-            # - 0.8–1.2 → sehr stabil für die meisten Filme, guter Kompromiss
+            # - Default is 1.0
+            # - 0.8–1.2 → very stable for most films, good compromise
             #   1.0 → universal
-            #   1.5+ → sehr aggressiv, manchmal für HDR oder stark texturierte Inhalte
+            #   1.5+ → very aggressive, sometimes for HDR or heavily textured content
             'psy-rd': None,
             # Psychovisual Rate-Distortion Optimization
-            # - Default ist 1.0:0.0 (psy-rd:psy-trellis)
+            # - Default is 1.0:0.0 (psy-rd:psy-trellis)
             # - Format: psy-rd=X.X:Y.Y
-            # - Werte zwischen 0.8:0.0 und 1.2:0.15 sind üblich
+            # - Values between 0.8:0.0 and 1.2:0.15 are common
             'ref': None,
-            # Anzahl der Referenzbilder
-            # - default ist 1 für veryfast, 3 für medium, 5 für slow
-            # - 4-5 = optimaler Allround-Wert
-            # - 6-8 = leichte Optimierung, aber langsamer
-            # - >8 = kaum Mehrwert außer für Anime oder sehr saubere 4K-Master (max 16)
+            # Number of reference frames
+            # - default is 1 for veryfast, 3 for medium, 5 for slow
+            # - 4-5 = optimal all-round value
+            # - 6-8 = slight optimization, but slower
+            # - >8 = hardly any added value except for anime or very clean 4K masters (max 16)
             'bframes': '4',
-            # Anzahl der B-Frames
-            # - default ist 3 für medium/slow
-            # - 4-8 = optimaler Bereich
+            # Number of B-frames
+            # - default is 3 for medium/slow
+            # - 4-8 = optimal range
             'b-adapt': '2',
-            # B-Frame-Adaptionsmodus
-            # - default ist 1
-            # - 0 = deaktiviert
-            # - 1 = schnell (fast algorithm)
-            # - 2 = optimal (optimal algorithm), langsamer aber bessere Entscheidungen
+            # B-frame adaptation mode
+            # - default is 1
+            # - 0 = disabled
+            # - 1 = fast (fast algorithm)
+            # - 2 = optimal (optimal algorithm), slower but better decisions
             'trellis': None,
-            # Trellis-Quantisierung (ähnlich wie rdoq-level bei x265)
-            # - 0 = deaktiviert (default bei fast/faster)
-            # - 1 = nur am Ende der Codierung
-            # - 2 = immer aktiv (default bei slow/slower), besser für dunkle Szenen
+            # Trellis quantization (similar to rdoq-level in x265)
+            # - 0 = disabled (default for fast/faster)
+            # - 1 = only at end of encoding
+            # - 2 = always active (default for slow/slower), better for dark scenes
             'qcomp': '0.65',
-            # Balanciert Kontrast und Bewegungsszenen gut
-            # - 0.5-1.0 ist der übliche Bereich
-            # - Default ist 0.6
+            # Balances contrast and motion scenes well
+            # - 0.5-1.0 is the typical range
+            # - Default is 0.6
             'rc-lookahead': '50',
-            # Bessere Vorausschau für komplexe Szenen
-            # - default ist 10 für veryfast, 40 für medium, 50 für slow
-            # - 40-50 = optimaler Allround-Wert
-            # - RAM-intensiv bei sehr hochauflösenden Videos (4K+)
+            # Better lookahead for complex scenes
+            # - default is 10 for veryfast, 40 for medium, 50 for slow
+            # - 40-50 = optimal all-round value
+            # - RAM-intensive for very high-resolution videos (4K+)
             'me': None,
-            # Motion Estimation Methode
-            # - dia (diamond) = schnellste
-            # - hex (hexagon) = guter Kompromiss (default bei fast/faster)
-            # - umh (uneven multi-hexagon) = default bei slow/slower
-            # - esa (exhaustive) = sehr langsam, kaum Mehrwert
+            # Motion Estimation method
+            # - dia (diamond) = fastest
+            # - hex (hexagon) = good compromise (default for fast/faster)
+            # - umh (uneven multi-hexagon) = default for slow/slower
+            # - esa (exhaustive) = very slow, hardly any added value
             'subme': None,
-            # Subpixel Motion Estimation Qualität
-            # - 1-11 (1 = schnell, 11 = beste Qualität)
-            # - default ist 6 für medium, 7 für slow, 9 für slower
-            # - 7-9 = guter Bereich für Qualität
+            # Subpixel Motion Estimation quality
+            # - 1-11 (1 = fast, 11 = best quality)
+            # - default is 6 for medium, 7 for slow, 9 for slower
+            # - 7-9 = good range for quality
             'merange': None,
-            # Motion Estimation Suchbereich
-            # - default ist 16 für medium/slow
-            # - 16-24 = guter Bereich
+            # Motion Estimation search range
+            # - default is 16 for medium/slow
+            # - 16-24 = good range
         }
 
         new_params= self._preset.ffmpeg_params.get('x264-params', {}) or {}
@@ -126,11 +126,11 @@ class Libx264Codec(VideoCodecBase):
                 'aq-mode': '2',
                 'aq-strength': '1.1',
                 'psy-rd': '0.9:0.0',  # x264 format: psy-rd:psy-trellis
-                'ref': '8',  # Anime profitiert von mehr Referenzbildern
-                'bframes': '10',  # für Animation können mehr B-Frames helfen
+                'ref': '8',  # Anime benefits from more reference frames
+                'bframes': '10',  # for animation, more B-frames can help
                 'b-adapt': '2',
                 'trellis': '2',
-                'deblock': None,  # default bei animation tune ist 1:1
+                'deblock': None,  # default for animation tune is 1:1
             })
         elif (
             hdr_forge_preset in [
@@ -141,7 +141,7 @@ class Libx264Codec(VideoCodecBase):
             # optimize psy settings for more optical quality
             params.update({
                 'aq-mode': '2',
-                'psy-rd': '1.0:0.15',  # leichte psy-trellis Erhöhung für bessere Texturerhaltung
+                'psy-rd': '1.0:0.15',  # slight psy-trellis increase for better texture preservation
             })
         elif hdr_forge_preset == HdrForgeEncodingTuningPresets.BANDING:
             # reduce banding artifacts
@@ -164,8 +164,17 @@ class Libx264Codec(VideoCodecBase):
         """
         params: list[str] = self._build_default_x264_params()
 
-        if self._video.get_color_primaries() == 'bt709':
-            params.extend(BT_709_FLAGS.copy())
+        color_primaries_flag: Optional[ColorPrimaries] = self._encoder_settings.override_color_primaries_flag
+        if color_primaries_flag is None:
+            try:
+                color_primaries_flag = ColorPrimaries(self._video.get_color_primaries())
+            except ValueError:
+                color_primaries_flag = None
+                # unknown color primaries
+
+        if color_primaries_flag is not None:
+            flags: list[str] = COLOR_PRIMARIES_FLAG_MAP[color_primaries_flag].copy()
+            params.extend(flags)
 
         x264_params_str: str = ':'.join(params)
         return x264_params_str

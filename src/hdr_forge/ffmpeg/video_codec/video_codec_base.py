@@ -10,7 +10,8 @@ from hdr_forge.analyze.grain_score import GrainAnalyzer
 from hdr_forge.cli.cli_output import print_err, print_warn
 from hdr_forge.ffmpeg.video_codec.service.presets import calc_hw_prest_params
 from hdr_forge.typedefs.codec_typing import HDR_FORGE_SPEED_PRESET, CodecPreset, VideoEncoderLibrary
-from hdr_forge.typedefs.encoder_typing import EncoderSettings, HdrForgeSpeedPreset, HdrSdrFormat, ScaleMode, UniversalEncoderParams
+from hdr_forge.typedefs.dolby_vision_typing import DolbyVisionProfile
+from hdr_forge.typedefs.encoder_typing import EncoderSettings, HdrForgeEncodingTuningPresets, HdrForgeSpeedPreset, HdrSdrFormat, ScaleMode, UniversalEncoderParams
 from hdr_forge.typedefs.video_typing import HdrMetadata
 from hdr_forge.video import Video
 
@@ -150,7 +151,16 @@ class VideoCodecBase(ABC):
 
         if encoding_hdr_sdr_format in [HdrSdrFormat.HDR, HdrSdrFormat.HDR10, HdrSdrFormat.DOLBY_VISION]:
             return 10
-        elif encoding_hdr_sdr_format == HdrSdrFormat.SDR:
+
+        override_bit_depth: int | None = self._encoder_settings.override_bit_depth
+        if override_bit_depth is not None:
+            return override_bit_depth
+
+        hdr_forge_preset: HdrForgeEncodingTuningPresets = self._encoder_settings.hdr_forge_encoding_preset.preset
+        if hdr_forge_preset == HdrForgeEncodingTuningPresets.BANDING:
+            return 10
+
+        if encoding_hdr_sdr_format == HdrSdrFormat.SDR:
             if self._video.is_hdr_video():
                 return 8
 
@@ -196,13 +206,13 @@ class VideoCodecBase(ABC):
             Video filter string
         """
         filters: list[str] = []
+        if self._video.is_video_interlaced():
+            filters.append('bwdif=mode=send_frame:parity=auto:deint=all')
+
         vf: str | None = self._encoder_settings.vfilter
         if vf is not None:
             _filter: list[str] = vf.split(',')
             filters.extend(_filter)
-
-        if self._video.is_video_interlaced():
-            filters.append('bwdif=mode=send_frame:parity=auto:deint=all')
 
         delogo_filter: str | None = self._logo_remover.get_ffmpeg_delogo_filter()
         if delogo_filter:
@@ -220,15 +230,34 @@ class VideoCodecBase(ABC):
             if scale_filter:
                 filters.append(scale_filter)
 
-        if encoding_hdr_sdr_format == HdrSdrFormat.SDR:
+        if self._video.get_dolby_vision_profile() == DolbyVisionProfile._5:
+            # Upscale to HDR10 color space for SDR to HDR10/DV conversion
+            if encoding_hdr_sdr_format == HdrSdrFormat.SDR:
+                if self.get_bit_depth_for_encoding() == 10:
+                    format= "yuv420p10le"
+                else:
+                    format= "yuv420p"
+
+                filters.extend([
+                    f'libplacebo=colorspace=bt709:color_primaries=bt709:color_trc=bt709:format={format}'
+                ])
+            else:
+                filters.extend([
+                    'libplacebo=colorspace=bt2020nc:color_primaries=bt2020:color_trc=smpte2084:format=yuv420p10le'
+                ])
+        elif encoding_hdr_sdr_format == HdrSdrFormat.SDR:
             if self._video.is_hdr_video():
                 # Tone mapping for HDR to SDR conversion
+                if self.get_bit_depth_for_encoding() == 10:
+                    format= "yuv420p10le"
+                else:
+                    format= "yuv420p"
                 filters.extend([
                     'zscale=t=linear:npl=100',
                     'format=gbrpf32le',
                     'tonemap=tonemap=hable:desat=0',
                     'zscale=t=bt709:m=bt709:p=bt709:r=tv',
-                    'format=yuv420p'
+                    f'format={format}'
                 ])
         if len(filters) == 0:
             return None
@@ -425,29 +454,29 @@ class VideoCodecBase(ABC):
         max_crf: float = 30.0
     ) -> float:
         """
-        Berechnet einen Gewichtungsfaktor für die CRF-Anpassung nach unten.
+        Calculates a weighting factor for downward CRF adjustment.
 
         Args:
-            current_crf: Basis-CRF des Videos
-            crf_delta: gewünschte Anpassung nach unten (z.B. 2 für -2 CRF)
-            min_weight: minimale Gewichtung
-            max_weight: maximale Gewichtung
-            min_crf: kleinster Basis-CRF für Skalierung
-            max_crf: größter Basis-CRF für Skalierung
+            current_crf: Base CRF of the video
+            crf_delta: Desired downward adjustment (e.g. 2 for -2 CRF)
+            min_weight: Minimum weighting
+            max_weight: Maximum weighting
+            min_crf: Smallest base CRF for scaling
+            max_crf: Largest base CRF for scaling
 
-        Rückgabe:
-            float zwischen min_weight und max_weight
+        Returns:
+            float between min_weight and max_weight
         """
         if crf_delta == 0.0:
             return 0.0
 
-        # Skaliere Basis-CRF auf 0..1
+        # Scale base CRF to 0..1
         crf_norm = (current_crf - min_crf) / (max_crf - min_crf)
         crf_norm = max(0.0, min(crf_norm, 1.0))
 
-        # Gewicht proportional zum CRF-Delta und Basis-CRF
-        weight = crf_norm * (crf_delta / crf_delta)  # hier nur skalierende Logik
-        # Clamp auf min/max
+        # Weight proportional to CRF delta and base CRF
+        weight = crf_norm * (crf_delta / crf_delta)  # here only scaling logic
+        # Clamp to min/max
         weight = max(min_weight, min(weight, max_weight))
 
         return weight

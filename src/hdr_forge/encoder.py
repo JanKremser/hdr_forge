@@ -6,9 +6,8 @@ import sys
 import time
 from typing import Dict, Optional, Tuple
 
-from hdr_forge.cli.cli_output import create_ffmpeg_progress_handler, print_debug, print_err
+from hdr_forge.cli.cli_output import create_ffmpeg_progress_handler, print_err, print_warn
 from hdr_forge.core.config import get_global_temp_directory
-from hdr_forge.core.service import build_ffmpeg_cmd_dict_to_str
 from hdr_forge.tools import mkvmerge
 from hdr_forge.ffmpeg.ffmpeg_wrapper import run_ffmpeg
 from hdr_forge.ffmpeg.video_codec.h264_nvenc import H264NvencCodec
@@ -19,8 +18,9 @@ from hdr_forge.ffmpeg.video_codec.libx265 import Libx265Codec
 from hdr_forge.ffmpeg.video_codec.libsvtav1 import LibSvtAV1Codec
 from hdr_forge.tools import dovi_tool
 from hdr_forge.typedefs.codec_typing import VideoEncoderLibrary
-from hdr_forge.typedefs.encoder_typing import EncoderOverride, HdrSdrFormat, EncoderSettings, SampleSettings, VideoCodec
-from hdr_forge.typedefs.dolby_vision_typing import DolbyVisionEnhancementLayer, DolbyVisionProfile, DolbyVisionProfileEncodingMode
+from hdr_forge.typedefs.encoder_typing import AudioCodec, AudioCodecItem, EncoderOverride, HdrSdrFormat, EncoderSettings, SampleSettings, SubtitleMode, SubtitleModeItem, VideoCodec
+from hdr_forge.typedefs.dolby_vision_typing import DolbyVisionInfo, DolbyVisionProfile, DolbyVisionProfileEncodingMode
+from hdr_forge.typedefs.mkv_typing import MkvTrack
 from hdr_forge.video import Video
 
 
@@ -56,7 +56,7 @@ class Encoder:
         self._target_dv_profile: Optional[DolbyVisionProfile] = self._determine_dv_profile(
             dv_profile=settings.target_dv_profile
         )
-        self._target_dv_el: DolbyVisionEnhancementLayer | None = self._determine_dv_enhancement_layer(
+        self._dv_el_present: bool | None = self._determine_dv_el_present(
             target_dv_profile=self._target_dv_profile,
         )
 
@@ -67,11 +67,11 @@ class Encoder:
 
     def get_available_hw_encoders(self) -> list[VideoEncoderLibrary]:
         """
-        Gibt eine Liste von Enum-Mitgliedern zurück, deren Encoder
-        auf dem System über FFmpeg verfügbar sind UND Hardware-beschleunigt sind.
+        Returns a list of enum members whose encoders are available on the
+        system via FFmpeg AND are hardware-accelerated.
 
-        :param enum_class: Enum-Klasse, z. B. VideoEncoderLibrary
-        :return: Liste der Enum-Mitglieder, die verfügbar und HW-Encoder sind
+        :param enum_class: Enum class, e.g. VideoEncoderLibrary
+        :return: List of enum members that are available and are HW encoders
         """
         try:
             result = subprocess.run(
@@ -89,7 +89,7 @@ class Encoder:
                     parts = line.split()
                     if len(parts) > 1:
                         encoder_name = parts[1]
-                        # typische HW-Kennzeichen
+                        # typical HW indicators
                         if any(hw in encoder_name for hw in ["nvenc", "qsv", "vaapi", "amf", "v4l2"]):
                             available_hw_encoders.add(encoder_name)
 
@@ -102,7 +102,7 @@ class Encoder:
             return result_members
 
         except subprocess.CalledProcessError as e:
-            print("Fehler beim Abfragen der Encoder:", e)
+            print("Error querying encoders:", e)
             return []
 
 
@@ -149,7 +149,11 @@ class Encoder:
                     sys.exit(1)
             else:
                 return Libx264Codec(encoder_settings=encoder_settings, video=video, scale=scale_tuple)
-
+        elif encoder_settings.video_codec == VideoCodec.AV1:
+            if encoder_settings.enable_gpu_acceleration:
+                print_err("Hardware acceleration is not supported for AV1 encoding.")
+                sys.exit(1)
+            return LibSvtAV1Codec(encoder_settings=encoder_settings, video=video, scale=scale_tuple)
         return None
 
     def _get_codec_from_override(
@@ -248,10 +252,10 @@ class Encoder:
         return (int(start_time), int(end_time))
 
 
-    def _determine_dv_enhancement_layer(
+    def _determine_dv_el_present(
         self,
         target_dv_profile: Optional[DolbyVisionProfile],
-    ) -> Optional[DolbyVisionEnhancementLayer]:
+    ) -> Optional[bool]:
         """Determine the Dolby Vision Enhancement Layer for encoding.
 
         Args:
@@ -261,13 +265,13 @@ class Encoder:
         if not self.is_dolby_vision_encoding():
             return None
 
-        if target_dv_profile == DolbyVisionProfile._7:
-            source_el: DolbyVisionEnhancementLayer | None = self._video.get_dolby_vision_enhancement_layer()
-            source_profile: DolbyVisionProfile | None = self._video.get_dolby_vision_profile()
-            if source_el is not None and source_profile == DolbyVisionProfile._7:
-                return source_el
+        source_dv_profile: DolbyVisionProfile | None = self._video.get_dolby_vision_profile()
+        if target_dv_profile == source_dv_profile:
+            dv_info: DolbyVisionInfo | None = self._video.get_dolby_vision_info()
+            if dv_info is not None and dv_info.dv_profile == DolbyVisionProfile._7.value:
+                return dv_info.el_preset
 
-        return None
+        return False
 
     def _determine_dv_profile(self, dv_profile: DolbyVisionProfileEncodingMode) -> Optional[DolbyVisionProfile]:
         """Determine the Dolby Vision profile for encoding.
@@ -285,7 +289,7 @@ class Encoder:
         if source_dv_profile is None:
             return None
 
-        if dv_profile == DolbyVisionProfileEncodingMode.AUTO:
+        if dv_profile == DolbyVisionProfileEncodingMode.AUTO and self.get_encoding_video_codec() == VideoCodec.COPY:
             return source_dv_profile
 
         return DolbyVisionProfile._8
@@ -298,13 +302,13 @@ class Encoder:
         """
         return self._target_dv_profile
 
-    def get_encoding_dolby_vision_enhancement_layer(self) -> Optional[DolbyVisionEnhancementLayer]:
+    def get_encoding_dolby_vision_el_present(self) -> Optional[bool]:
         """Get the Dolby Vision Enhancement Layer for encoding.
 
         Returns:
             DolbyVisionEnhancementLayer or None if not applicable
         """
-        return self._target_dv_el
+        return self._dv_el_present
 
     def get_encoding_video_codec(self) -> VideoCodec:
         """Get the video codec to be used for encoding.
@@ -313,6 +317,14 @@ class Encoder:
             VideoCodec enum value
         """
         return self._target_video_codec
+
+    def get_audio_codec_items(self) -> Dict[str, AudioCodecItem]:
+        """Get the audio codec items for encoding.
+
+        Returns:
+            Dictionary of audio codec items
+        """
+        return self._encoder_settings.audio_codecs
 
     def get_encoding_hdr_sdr_format(self) -> list[HdrSdrFormat]:
         """Get the effective color format for encoding.
@@ -338,6 +350,14 @@ class Encoder:
         """Check if encoding to SDR format."""
         return HdrSdrFormat.SDR in self.get_encoding_hdr_sdr_format()
 
+    def is_audio_copy_encoding(self) -> bool:
+        audio: dict[str, AudioCodecItem] = self._encoder_settings.audio_codecs
+
+        if audio.get('default') and audio['default'].to_codec == AudioCodec.COPY:
+            return True
+
+        return False
+
     def get_target_file(self) -> Path:
         """Get the target output file path.
 
@@ -346,6 +366,166 @@ class Encoder:
         """
         return self._target_file
 
+    def _build_ffmpeg_audio_options(self, options: dict) -> dict:
+        audio_codecs: dict[str, AudioCodecItem] = self._encoder_settings.audio_codecs
+        audio_tracks: list[MkvTrack] = self._video.get_container_audio_tracks()
+
+        audio_default_track: str | None = self._encoder_settings.audio_default_track
+
+        for track in audio_tracks:
+            track_id_str = str(track.id)
+            audio_codec_item: AudioCodecItem | None = None
+            if track_id_str in audio_codecs:
+                audio_codec_item = audio_codecs[track_id_str]
+            elif track.properties.language in audio_codecs:
+                audio_codec_item = audio_codecs[track.properties.language]
+            elif 'default' in audio_codecs:
+                audio_codec_item = audio_codecs['default']
+
+            if audio_codec_item and audio_codec_item.to_codec == AudioCodec.REMOVE:
+                continue
+            elif audio_codec_item and audio_codec_item.to_codec != AudioCodec.COPY:
+                track_codec = track.codec.lower().replace('-', '')
+                if audio_codec_item.from_codec == track_codec or audio_codec_item.from_codec is None:
+                    options['map'].append(f'0:a:{track.ffmpeg_index}')
+                    options[f'c:a:{track.ffmpeg_index}'] = audio_codec_item.to_codec.value
+                    count_ch = 2
+                    if track.properties.audio_channels:
+                        count_ch: int = track.properties.audio_channels
+
+                    if audio_codec_item.to_codec == AudioCodec.FLAC and count_ch > 8:
+                        print_err(f"FLAC codec supports a maximum of 8 (7.1) channels. Track ID {track.id} has {count_ch} channels.")
+                        sys.exit(1)
+                    elif audio_codec_item.to_codec == AudioCodec.FLAC and count_ch > 6:
+                        print_warn(f"FLAC codec with more than 6 channels may not be widely supported. Track ID {track.id} has {count_ch} channels.")
+                    if audio_codec_item.to_codec == AudioCodec.FLAC:
+                        options['compression_level'] = '12' # 0-12 / 12 is a best kompression but slowest
+                        continue # no bitrate setting for FLAC
+
+                    if audio_codec_item.to_codec == AudioCodec.AC3 and count_ch > 6:
+                        print_err(f"AC3 codec supports a maximum of 6 (5.1) channels. Track ID {track.id} has {count_ch} channels.")
+                        sys.exit(1)
+
+                    if audio_codec_item.to_codec == AudioCodec.AAC and count_ch > 6:
+                        print_warn(f"AAC codec with more than 6 channels may not be widely supported. Track ID {track.id} has {count_ch} channels.")
+
+                    bitrate: int
+                    if count_ch == 1: # Mono
+                        if audio_codec_item.to_codec == AudioCodec.AC3 or audio_codec_item.to_codec == AudioCodec.EAC3:
+                            bitrate = 128 # 96-128 = AC3
+                        else:
+                            bitrate = 128
+                    elif count_ch == 2: # Stereo
+                        if audio_codec_item.to_codec == AudioCodec.AC3:
+                            bitrate = 384 # 192-384 = AC3
+                        elif audio_codec_item.to_codec == AudioCodec.EAC3:
+                            bitrate = 256 # 128-256 = EAC3
+                        else:
+                            bitrate = 256 # 128-256 = AAC / default 192
+                    elif count_ch == 6: # 5.1
+                        if audio_codec_item.to_codec == AudioCodec.AC3:
+                            bitrate = 640 # 640 = AC3
+                        elif audio_codec_item.to_codec == AudioCodec.EAC3:
+                            bitrate = 1024 # 1024 = EAC3
+                        else:
+                            bitrate = 640 # 384-640 = AAC / default 512
+                    elif count_ch == 8: # 7.1
+                        if audio_codec_item.to_codec == AudioCodec.EAC3:
+                            bitrate = 1536 # 768-1536 = EAC3
+                        else:
+                            bitrate = 1024 # 512-1024 = AAC / default 768
+                    elif count_ch == 10: # 7.1.2
+                        if audio_codec_item.to_codec == AudioCodec.EAC3:
+                            bitrate = 2048 # 1024-2048 = EAC3
+                        else:
+                            bitrate = 1536 # 768–1536 for 7.1.2 / default 1024
+                    else:
+                        bitrate = 64 * count_ch
+
+                    if track.properties.tag_bps is not None:
+                        try:
+                            source_bitrate: float = int(track.properties.tag_bps) / 1000
+                            if source_bitrate < bitrate:
+                                bitrate = int(source_bitrate)
+                        except ValueError:
+                            pass
+
+                    options[f'b:a:{track.ffmpeg_index}'] = f"{bitrate}k"
+                    options[f'ac:a:{track.ffmpeg_index}'] = str(count_ch)
+            else:
+                options['map'].append(f'0:a:{track.ffmpeg_index}')
+                options[f'c:a:{track.ffmpeg_index}'] = 'copy'
+
+            # Set default audio track
+            if audio_default_track == "copy":
+                continue
+            if audio_default_track == track_id_str or track.properties.language == audio_default_track:
+                options[f'disposition:a:{track.ffmpeg_index}'] = 'default'
+            else:
+                options[f'disposition:a:{track.ffmpeg_index}'] = '0'
+
+        return options
+
+    def _build_ffmpeg_subtitle_options(self, options: dict) -> dict:
+        subtitle_flags: SubtitleModeItem = self._encoder_settings.subtitle_flags
+        if subtitle_flags.mode == SubtitleMode.REMOVE:
+            return options
+        elif subtitle_flags.mode == SubtitleMode.COPY:
+            options['map'].append(f'0:s?')
+            options.update({
+                'c:s': 'copy',
+            })
+            return options
+
+        default_lang: str | None = subtitle_flags.default_lang
+
+        subtitle_tracks: list[MkvTrack] = self._video.get_container_subtitles_tracks()
+
+        has_default_track = False
+        for track in subtitle_tracks:
+            options['map'].append(f'0:s:{track.ffmpeg_index}')
+            options[f'c:s:{track.ffmpeg_index}'] = 'copy'
+
+            title: str = ""
+            disposition: str = "none"
+            if (
+                track.properties.forced_track
+                or (
+                    track.properties.track_name and "forced" in track.properties.track_name.lower()
+                )
+            ):
+                title = "forced"
+                if default_lang and track.properties.language == default_lang and not has_default_track:
+                    disposition = "default" # forced+default
+                    has_default_track = True
+
+            track_name = track.properties.track_name or ""
+            if title == "":
+                if "commentary" in track_name.lower():
+                    title = "commentary"
+                else:
+                    title = "full"
+
+            if "sdh" in track_name.lower():
+                title += " SDH"
+
+            if track.codec:
+                codec: list[str] = track.codec.upper().split('/')
+                codec_2: list[str] = track.codec.upper().split(' ')
+
+                sub_codec: str = track.codec
+                if len(codec) > 1:
+                    sub_codec: str = codec[1]
+                elif len(codec_2) > 1:
+                    sub_codec: str = codec_2[1]
+
+                title += f" ({sub_codec})"
+
+            options[f'metadata:s:s:{track.ffmpeg_index}'] = f'title={title}'
+            options[f'disposition:s:{track.ffmpeg_index}'] = disposition
+
+        return options
+
     def _build_ffmpeg_output_options(self) -> Dict[str, str]:
         """Build FFmpeg output options dictionary for encoding.
 
@@ -353,7 +533,7 @@ class Encoder:
             Dictionary of FFmpeg output options
         """
         output_options: dict = {
-            "map": "0",
+            "map": ["0:v"],
         }
 
         if self._video_sample_in_sec is not None:
@@ -370,17 +550,19 @@ class Encoder:
 
         metadata: list[str] = [
             'hdr_forge_version=' + str(getattr(sys.modules['hdr_forge'], '__version__', 'unknown')),
+            #'title="Mein Film – Extended Cut"',
         ]
-
         if 'metadata' in output_options:
             output_options['metadata'].extend(metadata)
         else:
             output_options['metadata'] = metadata
 
-        output_options.update({
-            'c:a': 'copy',
-            'c:s': 'copy',
-        })
+        output_options = self._build_ffmpeg_audio_options(options=output_options)
+
+        output_options = self._build_ffmpeg_subtitle_options(options=output_options)
+
+        if self._encoder_settings.threads:
+            output_options['threads'] = str(self._encoder_settings.threads)
 
         return output_options
 
@@ -402,23 +584,25 @@ class Encoder:
                 total_frames=total_frames,
                 process_start_time=process_start_time,
                 video_fps=self._video.get_fps(),
-                process_name=f"Encoding Video: {target_file.name}",
+                process_name=f"Encoding: {target_file.name}",
             )
 
         try:
             # Build output options
             output_options: dict = self._build_ffmpeg_output_options()
 
-            # Debug output
-            debug_ffmpeg: str = build_ffmpeg_cmd_dict_to_str(output_options)
-            print_debug(f'Run command: ffmpeg -y -i "{input_file}" {debug_ffmpeg} "{target_file}"')
+            init_hw_device_vulkan: bool = False
+            if (self._video.get_dolby_vision_profile() == DolbyVisionProfile._5):
+                init_hw_device_vulkan = True
 
             # Execute FFmpeg with progress tracking
             success: bool = run_ffmpeg(
                 input_file=input_file,
                 output_file=target_file,
                 output_options=output_options,
-                progress_callback=progress_callback
+                progress_callback=progress_callback,
+                try_fix=self._encoder_settings.try_fix,
+                init_hw_device_vulkan=init_hw_device_vulkan,
             )
             print()
 
@@ -428,7 +612,7 @@ class Encoder:
             print_err(f"Error during encoding: {e}")
             return False
 
-    def convert_sdr_hdr10(
+    def convert_sdr_hdr10_or_video_copy(
         self,
     ) -> bool:
         """Execute FFmpeg conversion with configured parameters.
@@ -496,7 +680,7 @@ class Encoder:
 
         hevc: Path = hevc_bl
         # Setup 2: If AUTO profile and source is profile 7, demux EL profile 7 RPU
-        if self._target_dv_el is not None:
+        if self._dv_el_present:
             # start demux EL profile 7 for profile 7 encoding
             el_path: Path = dovi_tool.extract_enhancement_layer(
                 input_path=input_file,
@@ -514,7 +698,7 @@ class Encoder:
         encoded_hevc_with_rpu_path: Path = dovi_tool.inject_rpu(
             input_path=hevc,
             input_rpu=rpu_file_path,
-            output_hevc=temp_dir / f"video_encoded_BL_{'EL_' if self._target_dv_el else ''}RPU.hevc"
+            output_hevc=temp_dir / f"video_encoded_BL_{'EL_' if self._dv_el_present else ''}RPU.hevc"
         )
 
         return encoded_hevc_with_rpu_path
@@ -555,6 +739,7 @@ class Encoder:
 
     def convert_dolby_vision(
         self,
+        extract_base_layer: bool = True,
     ) -> bool:
         """Convert Dolby Vision video by re-encoding base layer and optionally re-injecting RPU or EL+RPU.
 
@@ -586,23 +771,24 @@ class Encoder:
         # Create temporary directory for all intermediate files
         temp_dir: Path = get_global_temp_directory()
 
-        # Step 1: Extract base layer (HEVC without RPU) from original video
-        base_layer_hevc_path: Path = dovi_tool.extract_base_layer(
-            input_path=input_file,
-            output_hevc=temp_dir / f"video_BL.hevc",
-            total_frames=total_frames,
-        )
+        if extract_base_layer:
+            # Step 1: Extract base layer (HEVC without RPU) from original video
+            base_layer_hevc_path: Path = dovi_tool.extract_base_layer(
+                input_path=input_file,
+                output_hevc=temp_dir / f"video_BL.hevc",
+                total_frames=total_frames,
+            )
 
-        # Step 2: Mux base layer HEVC with original audio/subtitles into temporary MKV
-        # This creates a playable MKV file with base layer video + original audio/subs
-        base_layer_mkv_path: Path = mkvmerge.mux_hevc_to_mkv(
-            input_hevc_path=base_layer_hevc_path,
-            input_mkv=input_file,
-            output_mkv=temp_dir / f"video_BL.mkv",
-        )
+            # Step 2: Mux base layer HEVC with original audio/subtitles into temporary MKV
+            # This creates a playable MKV file with base layer video + original audio/subs
+            base_layer_mkv_path: Path = mkvmerge.mux_hevc_to_mkv(
+                input_hevc_path=base_layer_hevc_path,
+                input_mkv=input_file,
+                output_mkv=temp_dir / f"video_BL.mkv",
+            )
 
-        # Cleanup: Delete base layer HEVC (no longer needed after muxing)
-        base_layer_hevc_path.unlink(missing_ok=True)
+            # Cleanup: Delete base layer HEVC (no longer needed after muxing)
+            base_layer_hevc_path.unlink(missing_ok=True)
 
         # Step 3: Re-encode the base layer MKV with FFmpeg (apply CRF, filters, etc.)
         encoded_base_layer_mkv: Path = temp_dir / f"video_BL_Encoded.mkv"
@@ -611,12 +797,15 @@ class Encoder:
         if only_hdr10_or_sdr_encoding:
             encoded_base_layer_mkv = self._target_file
 
+        ffmpeg_encoding_input_file: Path = base_layer_mkv_path if extract_base_layer else input_file
+
         encoding_success: bool = self._run_ffmpeg_encoding_process(
-            input_file=Path(base_layer_mkv_path),
+            input_file=ffmpeg_encoding_input_file,
             target_file=encoded_base_layer_mkv,
         )
-        # Cleanup: Delete base layer MKV (no longer needed after encoding)
-        base_layer_mkv_path.unlink(missing_ok=True)
+        if extract_base_layer:
+            # Cleanup: Delete base layer MKV (no longer needed after encoding)
+            base_layer_mkv_path.unlink(missing_ok=True)
 
         if not encoding_success:
             return False
@@ -659,14 +848,24 @@ class Encoder:
     ) -> bool:
         if self._video.is_dolby_vision_video():
 
+            if (self.get_encoding_video_codec() == VideoCodec.COPY and self._encoder_settings.target_dv_profile == DolbyVisionProfileEncodingMode.AUTO):
+                # Dolby Vision Profile copy without re-encoding
+                return self.convert_sdr_hdr10_or_video_copy()
+
+            if (self._video.get_dolby_vision_profile() == DolbyVisionProfile._5):
+                # Dolby Vision Profile 5 cannot be converted to other profiles without re-encoding
+                return self.convert_dolby_vision(
+                    extract_base_layer=False,
+                )
+
             # Convert Dolby Vision to HDR10, without re-encoding
-            if (self.get_encoding_video_codec() == VideoCodec.COPY):
-                if (self.is_hdr10_encoding()):
-                    return self.convert_dolby_vision_to_hdr10_without_re_encoding()
-                elif (self.is_dolby_vision_encoding()):
+            if (self.get_encoding_video_codec() == VideoCodec.COPY and self.is_audio_copy_encoding()):
+                if (self.is_dolby_vision_encoding()):
                     return self.convert_dolby_vision_to_other_profile_without_re_encoding()
+                elif (self.is_hdr10_encoding()):
+                    return self.convert_dolby_vision_to_hdr10_without_re_encoding()
 
             # Dolby Vision encoding workflow
             return self.convert_dolby_vision()
 
-        return self.convert_sdr_hdr10()
+        return self.convert_sdr_hdr10_or_video_copy()

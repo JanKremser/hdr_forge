@@ -1,4 +1,3 @@
-from concurrent.futures import ProcessPoolExecutor
 import os
 from dataclasses import dataclass
 from pathlib import Path
@@ -8,8 +7,6 @@ from typing import List, Optional, Tuple
 import numpy as np
 from collections import Counter
 
-from PIL import Image
-import tempfile
 
 from hdr_forge.core.config import get_global_temp_directory
 from hdr_forge.ffmpeg import ffmpeg_wrapper
@@ -124,11 +121,11 @@ class LogoDetector:
         filtered: List[LogoDetectResult] = []
 
         for result in results:
-            # Größen-Filter (zu groß)
+            # Size filter (too large)
             if result.width > max_width or result.height > max_height:
                 continue
 
-            # Größen-Filter (zu klein)
+            # Size filter (too small)
             if result.width < min_width or result.height < min_height:
                 continue
 
@@ -437,7 +434,7 @@ class LogoDetector:
         max_dimension = max(self._video.width, self._video.height)
         merge_threshold = max_dimension * 0.08
 
-        # Erstelle Index-Liste sortiert nach Cluster-Größe (größte zuerst)
+        # Create index list sorted by cluster size (largest first)
         sorted_indices = sorted(range(len(clusters)), key=lambda i: len(clusters[i]), reverse=True)
 
         merged_results: List[ClusterInfo] = []
@@ -451,7 +448,7 @@ class LogoDetector:
                 orig_idx, clusters, merge_threshold
             )
 
-            # Markiere verwendete Cluster
+            # Mark used clusters
             used_clusters.add(orig_idx)
             for idx in merged_indices:
                 used_clusters.add(idx)
@@ -464,8 +461,8 @@ class LogoDetector:
                 merged_count=merged_count
             ))
 
-        # Ergebnisse sind bereits nach ursprünglicher Cluster-Größe geordnet
-        # (größter initialer Cluster zuerst)
+        # Results are already sorted by original cluster size
+        # (largest initial cluster first)
         return merged_results
 
     def _find_largest_reasonable_box(
@@ -636,6 +633,9 @@ Total candidates: {len(results)}"""
             )
 
         output_options: dict = {
+            'map': '0:v:0',
+            'crf': '0',
+            'preset': 'ultrafast',
             'vf': f"crop=x={mask_result.x}:y={mask_result.y}:w={mask_result.width}:h={mask_result.height}"
         }
         output_path: Path = temp_dir / "crop_video.mp4"
@@ -675,7 +675,10 @@ Total candidates: {len(results)}"""
 
         delogo_str: str = f"delogo=x={mask_info['x']}:y={mask_info['y']}:w={mask_info['width']}:h={mask_info['height']}"
 
-        output_options: dict[str, str] = {
+        output_options: dict[str, list[str] | str] = {
+            'map': '0:v:0',
+            'crf': '0',
+            'preset': 'ultrafast',
             'vf': f"crop=x={mask_result.x}:y={mask_result.y}:w={mask_result.width}:h={mask_result.height},{delogo_str}"
         }
         output_path: Path = temp_dir / "crop_delogo_video.mp4"
@@ -715,7 +718,9 @@ Total candidates: {len(results)}"""
                 str(delogo_path),
                 str(mask_path),
             ],
-            "filter_complex": "[2:v]format=yuva420p,scale=iw:ih[mask_alpha];[1:v][mask_alpha]alphamerge[replacement_masked];[0:v][replacement_masked]overlay"
+            'crf': '0',
+            'preset': 'ultrafast',
+            "filter_complex": "[2:v]format=gray,gblur=sigma=2.5,format=yuva420p[mask_alpha];[1:v][mask_alpha]alphamerge[replacement_masked];[0:v][replacement_masked]overlay"
         }
         output_path: Path = temp_dir / "final_crop_video_delogo_mask.mp4"
         success: bool = ffmpeg_wrapper.run_ffmpeg(
@@ -734,6 +739,7 @@ Total candidates: {len(results)}"""
         """
         Erzeugt direkt aus einem Video eine finale Schnittmengen-Maske im Speicher.
         Nur Pixel, die in allen gültigen Frames weiß sind, bleiben weiß.
+        Analysiert maximal 2 Minuten des Videos (oder die gesamte Länge, falls kürzer).
 
         Args:
             video_path (str): Pfad zum Video.
@@ -748,14 +754,23 @@ Total candidates: {len(results)}"""
 
         cap = cv2.VideoCapture(video_path)
         if not cap.isOpened():
-            raise FileNotFoundError(f"Video {video_path} konnte nicht geöffnet werden!")
+            raise FileNotFoundError(f"Video {video_path} could not be opened!")
+
+        # Calculate maximum number of frames to analyze (maximum 2 minutes)
+        fps = self._video.get_fps()
+        duration_seconds = self._video.get_duration_seconds()
+        max_duration_seconds = min(120, duration_seconds)  # Maximal 2 Minuten (120 Sekunden)
+        max_frames = int(max_duration_seconds * fps)
+        total_frames = self._video.get_total_frames()
+        frames_to_process = min(max_frames, total_frames)
 
         progressbar = ProgressBarSpinner(description="Creating logo mask")
         progressbar.start()
 
         valid_masks: list = []
+        frame_count = 0
 
-        while True:
+        while frame_count < frames_to_process:
             ret, frame = cap.read()
             if not ret:
                 break
@@ -763,7 +778,7 @@ Total candidates: {len(results)}"""
             # Crop
             cropped = frame[y:y+h, x:x+w]
 
-            # Graustufen
+            # Grayscale
             gray = cv2.cvtColor(cropped, cv2.COLOR_BGR2GRAY)
 
             # Threshold → Binärmaske
@@ -772,18 +787,19 @@ Total candidates: {len(results)}"""
             if np.any(mask > 0):
                 valid_masks.append(mask)
 
-            progressbar.update(percent=(cap.get(cv2.CAP_PROP_POS_FRAMES) / cap.get(cv2.CAP_PROP_FRAME_COUNT)) * 100)
+            frame_count += 1
+            progressbar.update(percent=(frame_count / frames_to_process) * 100)
 
         progressbar.stop("Mask creation completed.")
 
         cap.release()
         if not valid_masks:
-            raise ValueError("Keine gültigen Masken mit weißen Pixeln gefunden!")
+            raise ValueError("No valid masks with white pixels found!")
 
-        # Stack zu einem 3D-Array
+        # Stack to a 3D array
         stack = np.stack(valid_masks, axis=0)
 
-        # Schnittmenge: Pixel nur weiß, wenn in allen Frames weiß
+        # Intersection: pixels only white if white in all frames
         final_mask = np.min(stack, axis=0)
         final_mask[final_mask > 0] = 255
 
@@ -815,7 +831,7 @@ Total candidates: {len(results)}"""
         if not contours:
             return None
 
-        # Größte Kontur oder alle kombinieren
+        # Largest contour or combine all
         all_points = np.vstack(contours)
         x, y, w, h = cv2.boundingRect(all_points)
 
@@ -834,51 +850,51 @@ Total candidates: {len(results)}"""
 
     def _center_mask_in_canvas(self, mask: np.ndarray, crop_rect: Tuple[int, int, int, int], padding: int = 10) -> MaskResult:
         """
-        Verschiebt die Maskierung in der Maske in die Mitte einer neuen Maske mit Padding.
-        Berechnet die neue Position und Größe im Originalvideo.
+        Shifts the masking in the mask to the center of a new mask with padding.
+        Calculates the new position and size in the original video.
 
         Args:
-            mask (np.ndarray): Binärmaske (0/255).
-            crop_rect (tuple): (x, y, w, h) Bereich im Originalvideo, aus dem die Maske stammt.
-            padding (int): Abstand um die Maskierung herum.
+            mask (np.ndarray): Binary mask (0/255).
+            crop_rect (tuple): (x, y, w, h) area in the original video from which the mask originates.
+            padding (int): Distance around the masking.
 
         Returns:
-            centered_mask (np.ndarray): Neue Maske mit zentrierter Maskierung.
-            new_video_pos (tuple): (x, y, w, h) im Originalvideo.
+            centered_mask (np.ndarray): New mask with centered masking.
+            new_video_pos (tuple): (x, y, w, h) in the original video.
         """
         info = self._get_mask_info(mask)
         if info is None:
-            raise ValueError("Keine Kontur in der Maske gefunden!")
+            raise ValueError("No contour found in the mask!")
 
-        # Alte Position und Größe in der Maske
+        # Old position and size in the mask
         mask_x, mask_y, mask_w, mask_h = info['x'], info['y'], info['width'], info['height']
 
-        # Neue Größe inkl. Padding
+        # New size including padding
         new_w = mask_w + 2 * padding
         new_h = mask_h + 2 * padding
 
-        # Seitenverhältnis auf gerade Zahl bringen
+        # Make aspect ratio even number
         if new_w % 2 != 0:
             new_w += 1
         if new_h % 2 != 0:
             new_h += 1
 
-        # Erstelle neue leere Maske
+        # Create new empty mask
         centered_mask = np.zeros((new_h, new_w), dtype=np.uint8)
 
-        # Kopiere die Maskierung in die Mitte
+        # Copy the masking to the center
         centered_mask[padding:padding+mask_h, padding:padding+mask_w] = mask[mask_y:mask_y+mask_h, mask_x:mask_x+mask_w]
 
-        # Berechne neue Position im Originalvideo
+        # Calculate new position in the original video
         crop_x, crop_y, crop_w, crop_h = crop_rect
         new_x = crop_x + mask_x - padding
         new_y = crop_y + mask_y - padding
 
-        # Stelle sicher, dass die neue Position nicht negativ ist
+        # Ensure that the new position is not negative
         new_x = max(0, new_x)
         new_y = max(0, new_y)
 
-        # Optional: Begrenzung auf Videogröße kann hier ergänzt werden
+        # Optional: limitation to video size can be added here
         return MaskResult(mask=centered_mask, x=new_x, y=new_y, width=new_w, height=new_h, region=None)
 
     def _create_mask_delogo(self, mask_result: MaskResult) -> None | Path:
@@ -941,9 +957,9 @@ Total candidates: {len(results)}"""
                 crop_rect=(detect_logo.x, detect_logo.y, detect_logo.width, detect_logo.height),
                 threshold=40,
                 padding=10,
-                blur_radius=20
+                blur_radius=0
             )
-            default_padding = 10
+            default_padding = 20
             if self._logo_removal_settings.mode == LogoRemovalMode.DELOGO:
                 default_padding = 5
 
@@ -967,7 +983,7 @@ Total candidates: {len(results)}"""
             return None
         detect_logos = self._filter_logo_results(
             results=detect_logos,
-            max_size_ratio=0.15,
+            max_size_ratio=0.30,
             min_size_ratio=0.01,
             video_height=self._video.height,
             video_width=self._video.width,
@@ -986,6 +1002,8 @@ Total candidates: {len(results)}"""
 
         mask: MaskResult | None = self.create_mask()
         if mask is None:
+            print_err(msg="No valid logo mask could be created.")
+            sys.exit(status=1)
             return None
 
         if self._logo_removal_settings.mode == LogoRemovalMode.MASK:

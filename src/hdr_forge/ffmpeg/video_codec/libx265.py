@@ -3,7 +3,7 @@ from hdr_forge.ffmpeg.video_codec.service.presets import Hdr_Forge_X265_X264_Pre
 from hdr_forge.ffmpeg.video_codec.video_codec_base import VideoCodecBase
 from hdr_forge.typedefs.encoder_typing import EncoderSettings, HdrForgeEncodingTuningPresets, HdrForgeSpeedPreset, HdrSdrFormat, Libx265Params, X265Tune
 from hdr_forge.typedefs.video_typing import ContentLightLevelMetadata, HdrMetadata, MasterDisplayMetadata, build_master_display_string, build_max_cll_string
-from hdr_forge.typedefs.codec_typing import BT_2020_FLAGS, BT_709_FLAGS, PIXEL_FORMAT_YUV420_10_BIT, PIXEL_FORMAT_YUV420_8_BIT, CodecPreset, VideoEncoderLibrary
+from hdr_forge.typedefs.codec_typing import BT_2020_FLAGS, COLOR_PRIMARIES_FLAG_MAP, PIXEL_FORMAT_YUV420_10_BIT, PIXEL_FORMAT_YUV420_8_BIT, CodecPreset, ColorPrimaries, VideoEncoderLibrary
 from hdr_forge.video import Video
 
 class Libx265Codec(VideoCodecBase):
@@ -17,7 +17,7 @@ class Libx265Codec(VideoCodecBase):
 
     # HDR x265 parameters for HDR10 encoding
     HDR10_X265_PARAMS: list[str] = [
-        'profile=main10',
+        #'profile=main10',
         'hdr-opt=1',
         'hdr10=1',
         'repeat-headers=1',
@@ -44,12 +44,12 @@ class Libx265Codec(VideoCodecBase):
     ]
 
     HDR_X265_PARAMS: list[str] = [
-        'profile=main10',
+        #'profile=main10',
     ]
 
     # SDR x265 parameters
     SDR_X265_PARAMS: list[str] = [
-        'profile=main',
+        #'profile=main',
     ]
 
     REMOVE_HDR_FLAGS: list[str] = [
@@ -91,11 +91,7 @@ class Libx265Codec(VideoCodecBase):
         return output_options
 
     def get_pix_format_for_encoding(self) -> str | None:
-        bit_depth = self.get_bit_depth_for_encoding()
-
-        hdr_forge_preset: HdrForgeEncodingTuningPresets = self._encoder_settings.hdr_forge_encoding_preset.preset
-        if hdr_forge_preset == HdrForgeEncodingTuningPresets.BANDING:
-            return PIXEL_FORMAT_YUV420_10_BIT  # always use 10bit for banding reduction
+        bit_depth: int = self.get_bit_depth_for_encoding()
 
         if bit_depth == 10:
             return PIXEL_FORMAT_YUV420_10_BIT
@@ -104,13 +100,7 @@ class Libx265Codec(VideoCodecBase):
         return super().get_pix_format_for_encoding()
 
     def get_bit_depth_for_encoding(self) -> int:
-        bit: int =  super().get_bit_depth_for_encoding()
-
-        hdr_forge_preset: HdrForgeEncodingTuningPresets = self._encoder_settings.hdr_forge_encoding_preset.preset
-        if hdr_forge_preset == HdrForgeEncodingTuningPresets.BANDING:
-            return 10
-
-        return bit
+        return super().get_bit_depth_for_encoding()
 
     def get_custom_lib_parameters(self) -> dict:
         masterdisplay: MasterDisplayMetadata | None = self._get_master_display_for_encoding()
@@ -266,7 +256,36 @@ class Libx265Codec(VideoCodecBase):
                 'psy-rd': '1.2',
                 'psy-rdoq': '1.0',
             })
-            pass
+        elif hdr_forge_preset == HdrForgeEncodingTuningPresets.FILM4K:
+            params.update({
+                'aq-mode': '3',
+                'aq-strength': '1.0',
+                'qcomp': '0.66',
+                'psy-rd': '2.0',
+                'psy-rdoq': '1.5',
+                'cutree': '1',
+                'sao': '0',
+                'deblock': '-1,-1',
+                'tu-intra-depth': '3',
+                'tu-inter-depth': '3',
+                'subme': '5',
+                'strong-intra-smoothing': '0',
+            })
+        elif hdr_forge_preset == HdrForgeEncodingTuningPresets.FILM4K_FAST:
+            params.update({
+                'aq-mode': '2',
+                'aq-strength': '0.9',
+                'qcomp': '0.65',
+                'psy-rd': '1.2',
+                'psy-rdoq': '1.0',
+                'cutree': '1',
+                'sao': '0',
+                'deblock': '0,-1',
+                'tu-intra-depth': '2',
+                'tu-inter-depth': '2',
+                'subme': '4',
+                'strong-intra-smoothing': '0',
+            })
         elif hdr_forge_preset == HdrForgeEncodingTuningPresets.BANDING:
             # reduce banding artifacts by enabling stronger deblocking and using 10bit encoding for SDR
             params.update({
@@ -278,7 +297,18 @@ class Libx265Codec(VideoCodecBase):
                 'rdoq-level': '2',
                 'qcomp': '0.65',
             })
-            pass
+        elif hdr_forge_preset == HdrForgeEncodingTuningPresets.GRAIN:
+            params.update({
+                'aq-mode': '3',# better to preserve grain
+                'aq-strength': '0.7', # 0.8 is great, 0.7 is better for compression
+                'psy-rd': '1.8',
+                'psy-rdoq': '1.0',
+                'cutree': '1',# 0 is better. 1 is a good compromise
+                'qcomp': '0.80',# 0.80 is great
+                #'qg-size': '16',# 16 negatively affects compression behavior
+                'sao': '0',
+                'rc-grain': '1',
+            })
 
         return list(f"{key}={value}" for key, value in params.items() if value is not None)
 
@@ -329,13 +359,21 @@ class Libx265Codec(VideoCodecBase):
             params.append('master-display=G(0,0)B(0,0)R(0,0)WP(0,0)L(0,0)')
             params.append('max-cll=0,0')
 
-        if self._video.get_color_primaries() == 'bt2020':
-            params.extend(BT_2020_FLAGS.copy())
-        elif self._video.get_color_primaries() == 'bt709':
-            params.extend(BT_709_FLAGS.copy())
-        else:
-            # unknown color primaries, do not set any
-            pass
+        encoding_hdr_sdr_format: HdrSdrFormat = self.get_encoding_hdr_sdr_format()
+
+        color_primaries_flag: Optional[ColorPrimaries] = self._encoder_settings.override_color_primaries_flag
+        if self._video.is_hdr_video() and encoding_hdr_sdr_format == HdrSdrFormat.SDR:
+            color_primaries_flag = ColorPrimaries.BT709
+        elif color_primaries_flag is None:
+            try:
+                color_primaries_flag = ColorPrimaries(self._video.get_color_primaries())
+            except ValueError:
+                color_primaries_flag = None
+                # unknown color primaries
+
+        if color_primaries_flag is not None:
+            flags: list[str] = COLOR_PRIMARIES_FLAG_MAP[color_primaries_flag].copy()
+            params.extend(flags)
         return params
 
     def _get_auto_tune(self) -> Optional[X265Tune]:
@@ -357,6 +395,9 @@ class Libx265Codec(VideoCodecBase):
         hdr_forge_preset: HdrForgeEncodingTuningPresets = self._encoder_settings.hdr_forge_encoding_preset.preset
         if hdr_forge_preset == HdrForgeEncodingTuningPresets.ANIMATION:
             return X265Tune.ANIMATION
+
+        if hdr_forge_preset == HdrForgeEncodingTuningPresets.GRAIN_FFMPEG:
+            return X265Tune.GRAIN
 
         if self._grain.get_category() >= 2:
             return X265Tune.GRAIN

@@ -14,6 +14,7 @@ from hdr_forge.core import config
 from hdr_forge.core.service import shutdown_system
 from hdr_forge.metadata_injector import MetadataInjector
 from hdr_forge.tools import dovi_tool, hdr10plus_tool, hevc_hdr_editor
+from hdr_forge.typedefs.dolby_vision_typing import DolbyVisionProfile
 from hdr_forge.typedefs.encoder_typing import EncoderSettings, LogoRemovalAutoDetectMode, LogoRemovalMode, LogoRemovelSettings
 from hdr_forge.encoder import Encoder
 from hdr_forge.video import Video
@@ -103,7 +104,7 @@ def convert_video(
         True if conversion succeeded, False otherwise
     """
     try:
-        video = Video(filepath=video_file)
+        video = Video(filepath=video_file, with_out_rpu_extraction=True)
         print_video_infos(video=video)
 
         # Create encoder with settings
@@ -152,7 +153,7 @@ def process_convert_command(args) -> int:
         sys.exit(1)
 
     # Get list of video files to process
-    video_files = get_video_files(input_path, SUPPORTED_FORMATS)
+    video_files: list[Path] = get_video_files(path=input_path, supported_formats=SUPPORTED_FORMATS)
 
     if not video_files:
         print(f"Error: No supported video files found in: {input_path}")
@@ -160,7 +161,7 @@ def process_convert_command(args) -> int:
         sys.exit(1)
 
     # Determine if batch processing
-    is_batch = len(video_files) > 1
+    is_batch: bool = len(video_files) > 1
 
     if is_batch:
         # Ensure output is a directory for batch processing
@@ -217,19 +218,21 @@ def process_info_command(args) -> int:
 
     # Determine if it's a file or directory
     if input_path.is_file():
-        show_video_info(input_path)
-    else:
-        # Get list of video files to process
-        video_files = get_video_files(input_path, SUPPORTED_FORMATS)
+        show_video_info(input_file=input_path)
+        return 0
 
-        if not video_files:
-            print(f"Error: No supported video files found in: {input_path}")
-            print(f"Supported formats: {', '.join(SUPPORTED_FORMATS)}")
-            return 1
+    # Get list of video files to process
+    video_files: list[Path] = get_video_files(path=input_path, supported_formats=SUPPORTED_FORMATS)
 
-        # Show info for each video file
-        for video_file in video_files:
-            show_video_info(video_file)
+    if not video_files:
+        print(f"Error: No supported video files found in: {input_path}")
+        print(f"Supported formats: {', '.join(SUPPORTED_FORMATS)}")
+        return 1
+
+    # Show info for each video file
+    for video_file in video_files:
+        show_video_info(input_file=video_file)
+
     return 0
 
 def process_extract_metadata_command(args) -> int:
@@ -262,10 +265,13 @@ def process_extract_metadata_command(args) -> int:
 
         if video.is_dolby_vision_video():
             rpu_file_path: Path = output_path / f"{input_path.stem}.rpu"
+            to_dv_profile_8: bool = getattr(args, 'to_dv_8', False)
             dovi_tool.extract_rpu(
                 input_path=video.get_filepath(),
                 output_rpu=rpu_file_path,
                 total_frames=video.get_total_frames(),
+                dv_profile_source=video.get_dolby_vision_profile(),
+                dv_profile_encoding=DolbyVisionProfile._8 if to_dv_profile_8 else None,
             )
             dv_info: dovi_tool.DolbyVisionRpuInfo = dovi_tool.get_rpu_info(
                 rpu_path=rpu_file_path,

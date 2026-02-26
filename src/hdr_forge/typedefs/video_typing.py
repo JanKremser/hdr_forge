@@ -58,8 +58,8 @@ BT_709_MASTER_DISPLAY: MasterDisplayMetadata = MasterDisplayMetadata(
 )
 
 class MasterDisplayColorPrimaries(Enum):
-    BT709 = "BT.709"
-    BT2020 = "BT.2020"
+    BT709 = "bt.709"
+    BT2020 = "bt.2020"
     DISPLAY_P3 = "DisplayP3"
 
 MASTER_DISPLAY_PRESETS: dict[MasterDisplayColorPrimaries, MasterDisplayMetadata] = {
