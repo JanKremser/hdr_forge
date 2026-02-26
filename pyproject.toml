@@ -34,6 +34,9 @@ Homepage = "https://github.com/jankremser/hdr_forge"
 Repository = "https://github.com/jankremser/hdr_forge"
 Issues = "https://github.com/jankremser/hdr_forge/issues"
 
+[project.optional-dependencies]
+gui = ["Pillow>=9.0.0"]
+
 [project.scripts]
 hdr_forge = "hdr_forge.main:main"
 hdr_forge_ui = "hdr_forge.main_ui:main_ui"

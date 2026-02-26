@@ -5,9 +5,335 @@ import sys
 import threading
 from argparse import Namespace
 from pathlib import Path
-from tkinter import Tk, messagebox, filedialog, StringVar
+from tkinter import Tk, messagebox, filedialog, StringVar, Button, Frame
 from tkinter import ttk
 from tkinter.scrolledtext import ScrolledText
+
+# Optional PIL support for rounded corners
+try:
+    from PIL import Image, ImageDraw, ImageTk
+    HAS_PIL = True
+except ImportError:
+    HAS_PIL = False
+
+
+# GTK4 Adwaita-inspired color palettes
+_LIGHT: dict[str, str] = {
+    'win_bg':       '#f6f5f4',
+    'widget_bg':    '#ffffff',
+    'border':       '#deddda',
+    'fg':           '#2e2e2e',
+    'label_title':  '#777777',
+    'btn_bg':       '#e0dfe6',
+    'btn_hover':    '#ccccd1',
+    'btn_pressed':  '#b5b5ba',
+    'accent':       '#3584e4',
+    'accent_hover': '#4a96f5',
+    'accent_press': '#2469be',
+    'accent_fg':    '#ffffff',
+    'status_bg':    '#eeeeec',
+    'disabled_fg':  '#999999',
+    'disabled_bg':  '#e8e8e5',
+    'select_bg':    '#3584e4',
+    'select_fg':    '#ffffff',
+    'insert':       '#2e2e2e',
+    'trough':       '#e0dfe6',
+    'scroll_thumb': '#b0afb5',
+    'scroll_hover': '#909095',
+}
+
+_DARK: dict[str, str] = {
+    'win_bg':       '#1d1d1d',
+    'widget_bg':    '#2e2e2e',
+    'border':       '#484848',
+    'fg':           '#deddda',
+    'label_title':  '#aaaaaa',
+    'btn_bg':       '#383838',
+    'btn_hover':    '#484848',
+    'btn_pressed':  '#585858',
+    'accent':       '#3584e4',
+    'accent_hover': '#4a96f5',
+    'accent_press': '#2469be',
+    'accent_fg':    '#ffffff',
+    'status_bg':    '#242424',
+    'disabled_fg':  '#777777',
+    'disabled_bg':  '#2a2a2a',
+    'select_bg':    '#3584e4',
+    'select_fg':    '#ffffff',
+    'insert':       '#deddda',
+    'trough':       '#252525',
+    'scroll_thumb': '#555555',
+    'scroll_hover': '#707070',
+}
+
+
+class RoundedButton(Button):
+    """A tk.Button with rounded corners (requires PIL)."""
+
+    def __init__(self, parent, text="", bg_color="#ffffff", fg_color="#000000",
+                 width=100, height=36, radius=8, command=None, font_size=9, bold=False, **kwargs):
+        """Initialize rounded button.
+
+        Args:
+            parent: Parent widget
+            text: Button text
+            bg_color: Background color (hex)
+            fg_color: Foreground/text color (hex)
+            width: Button width
+            height: Button height
+            radius: Corner radius
+            command: Click callback
+            font_size: Font size
+            bold: Bold text
+        """
+        self.text = text
+        self.bg_color = bg_color
+        self.fg_color = fg_color
+        self.width = width
+        self.height = height
+        self.radius = radius
+        self.font_size = font_size
+        self.bold = bold
+        self.photo_image = None
+
+        super().__init__(
+            parent, text="", command=command, bg=bg_color, fg=fg_color,
+            relief='flat', bd=0, highlightthickness=0, padx=0, pady=0,
+            **kwargs
+        )
+
+        # Set rounded background if PIL available
+        if HAS_PIL:
+            self._update_appearance()
+        else:
+            # Fallback: show text on button without rounded corners
+            self.config(text=text, font=('TkDefaultFont', font_size, 'bold' if bold else 'normal'))
+
+    def _update_appearance(self):
+        """Update button appearance with rounded background."""
+        if not HAS_PIL:
+            return
+
+        img = _create_rounded_button_image(
+            self.width, self.height, self.bg_color,
+            text=self.text, text_color=self.fg_color,
+            radius=self.radius, font_size=self.font_size, bold=self.bold)
+        if img:
+            self.photo_image = ImageTk.PhotoImage(img)
+            self.config(image=self.photo_image, width=self.width, height=self.height)
+
+    def set_colors(self, bg_color, fg_color):
+        """Update button colors and regenerate appearance."""
+        self.bg_color = bg_color
+        self.fg_color = fg_color
+        self.config(bg=bg_color, fg=fg_color)
+        if HAS_PIL:
+            self._update_appearance()
+
+
+def _create_rounded_button_image(width, height, color, text="", text_color="#000000", radius=8, font_size=9, bold=False):
+    """Create a rounded rectangle image with text using PIL.
+
+    Args:
+        width: Image width
+        height: Image height
+        color: Background hex color string (e.g., '#3584e4')
+        text: Button text
+        text_color: Text hex color string
+        radius: Corner radius
+        font_size: Font size in points
+        bold: Bold text
+
+    Returns:
+        PIL.Image or None if PIL not available
+    """
+    if not HAS_PIL:
+        return None
+
+    # Convert hex colors to RGB
+    color_rgb = tuple(int(color.lstrip('#')[i:i+2], 16) for i in (0, 2, 4))
+    text_rgb = tuple(int(text_color.lstrip('#')[i:i+2], 16) for i in (0, 2, 4))
+
+    # Create image with rounded corners
+    img = Image.new('RGBA', (width, height), (255, 255, 255, 0))
+    draw = ImageDraw.Draw(img)
+
+    # Draw rounded rectangle (x0, y0, x1, y1)
+    draw.rounded_rectangle(
+        [(0, 0), (width - 1, height - 1)],
+        radius=radius,
+        fill=color_rgb,
+        outline=None
+    )
+
+    # Draw text on the image
+    if text:
+        font = None
+        try:
+            from PIL import ImageFont
+            # Try to find a system font
+            font_paths = [
+                # Linux
+                '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf' if bold else '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
+                '/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf' if bold else '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf',
+                # macOS
+                '/Library/Fonts/Arial.ttf',
+                # Windows
+                'C:\\Windows\\Fonts\\arialbd.ttf' if bold else 'C:\\Windows\\Fonts\\arial.ttf',
+            ]
+            for font_path in font_paths:
+                try:
+                    font = ImageFont.truetype(font_path, font_size)
+                    break
+                except (FileNotFoundError, OSError):
+                    pass
+        except ImportError:
+            pass
+
+        # Calculate text position (center)
+        try:
+            bbox = draw.textbbox((0, 0), text, font=font)
+            text_width = bbox[2] - bbox[0]
+            text_height = bbox[3] - bbox[1]
+        except:
+            # Fallback: estimate text size
+            text_width = len(text) * (font_size // 2)
+            text_height = font_size
+
+        x = (width - text_width) // 2
+        y = (height - text_height) // 2
+
+        # Draw text
+        draw.text((x, y), text, fill=text_rgb, font=font)
+
+    return img
+
+
+def _apply_theme(root, style, c, output_text):
+    """Apply a color theme to all GUI widgets.
+
+    Args:
+        root: tkinter root window
+        style: ttk.Style instance
+        c: Color dictionary (either _LIGHT or _DARK)
+        output_text: ScrolledText widget to style
+    """
+    # Root background
+    root.configure(bg=c['win_bg'])
+
+    # Combobox dropdown popup (plain tk.Listbox — only reachable via option_add)
+    root.option_add('*TCombobox*Listbox.background',       c['widget_bg'], 80)
+    root.option_add('*TCombobox*Listbox.foreground',       c['fg'],        80)
+    root.option_add('*TCombobox*Listbox.selectBackground', c['select_bg'], 80)
+    root.option_add('*TCombobox*Listbox.selectForeground', c['select_fg'], 80)
+    root.option_add('*TCombobox*Listbox.relief',           'flat',         80)
+    root.option_add('*TCombobox*Listbox.borderWidth',      '0',            80)
+
+    # TFrame / TLabelframe
+    style.configure('TFrame', background=c['win_bg'])
+    style.configure('TLabelframe',
+        background=c['win_bg'], bordercolor=c['border'],
+        lightcolor=c['win_bg'], darkcolor=c['border'],
+        relief='groove', borderwidth=1, padding=8)
+    style.configure('TLabelframe.Label',
+        background=c['win_bg'], foreground=c['label_title'],
+        font=('TkDefaultFont', 9))
+
+    # TLabel / Status.TLabel
+    style.configure('TLabel',
+        background=c['win_bg'], foreground=c['fg'], font=('TkDefaultFont', 9))
+    style.configure('Status.TLabel',
+        background=c['status_bg'], foreground=c['fg'],
+        relief='flat', padding=(6, 3), font=('TkDefaultFont', 9))
+
+    # TEntry
+    style.configure('TEntry',
+        fieldbackground=c['widget_bg'], foreground=c['fg'],
+        bordercolor=c['border'], lightcolor=c['widget_bg'], darkcolor=c['border'],
+        insertcolor=c['insert'], selectbackground=c['select_bg'],
+        selectforeground=c['select_fg'], relief='flat', borderwidth=1, padding=(5, 4))
+    style.map('TEntry',
+        bordercolor=[('focus', c['accent']), ('!focus', c['border'])],
+        lightcolor=[('focus', c['accent']), ('!focus', c['widget_bg'])],
+        fieldbackground=[('readonly', c['win_bg']), ('disabled', c['disabled_bg'])],
+        foreground=[('disabled', c['disabled_fg'])])
+
+    # TCombobox
+    style.configure('TCombobox',
+        fieldbackground=c['widget_bg'], background=c['btn_bg'], foreground=c['fg'],
+        bordercolor=c['border'], lightcolor=c['widget_bg'], darkcolor=c['border'],
+        arrowcolor=c['fg'], selectbackground=c['select_bg'], selectforeground=c['select_fg'],
+        relief='flat', borderwidth=1, padding=(5, 4))
+    style.map('TCombobox',
+        fieldbackground=[('readonly', 'focus', c['widget_bg']),
+                         ('readonly', c['widget_bg']), ('disabled', c['disabled_bg'])],
+        foreground=[('readonly', 'focus', c['fg']), ('readonly', c['fg']),
+                    ('disabled', c['disabled_fg'])],
+        background=[('active', c['btn_hover']), ('pressed', c['btn_pressed'])],
+        bordercolor=[('focus', c['accent']), ('!focus', c['border'])],
+        arrowcolor=[('disabled', c['disabled_fg']), ('!disabled', c['fg'])])
+
+    # TButton (Browse buttons)
+    style.configure('TButton',
+        background=c['btn_bg'], foreground=c['fg'], bordercolor=c['border'],
+        lightcolor=c['btn_bg'], darkcolor=c['btn_bg'],
+        relief='flat', borderwidth=1, padding=(8, 5), font=('TkDefaultFont', 9))
+    style.map('TButton',
+        background=[('active', c['btn_hover']), ('pressed', c['btn_pressed']),
+                    ('disabled', c['disabled_bg'])],
+        foreground=[('disabled', c['disabled_fg'])],
+        bordercolor=[('focus', c['accent']), ('!focus', c['border'])],
+        lightcolor=[('active', c['btn_hover']), ('!active', c['btn_bg'])],
+        darkcolor=[('active', c['btn_hover']), ('!active', c['btn_bg'])])
+
+    # Accent.TButton (Convert button)
+    style.configure('Accent.TButton',
+        background=c['accent'], foreground=c['accent_fg'],
+        bordercolor=c['accent_press'], lightcolor=c['accent'], darkcolor=c['accent'],
+        relief='flat', borderwidth=0, padding=(12, 6), font=('TkDefaultFont', 9, 'bold'))
+    style.map('Accent.TButton',
+        background=[('active', c['accent_hover']), ('pressed', c['accent_press']),
+                    ('disabled', c['disabled_bg'])],
+        foreground=[('disabled', c['disabled_fg'])],
+        lightcolor=[('active', c['accent_hover']), ('!active', c['accent'])],
+        darkcolor=[('active', c['accent_hover']), ('!active', c['accent'])])
+
+    # ThemeToggle.TButton (moon/sun icon)
+    style.configure('ThemeToggle.TButton',
+        background=c['win_bg'], foreground=c['fg'], bordercolor=c['border'],
+        lightcolor=c['win_bg'], darkcolor=c['win_bg'],
+        relief='flat', borderwidth=1, padding=(4, 3), font=('TkDefaultFont', 10))
+    style.map('ThemeToggle.TButton',
+        background=[('active', c['btn_bg']), ('pressed', c['btn_hover'])],
+        bordercolor=[('focus', c['accent']), ('!focus', c['border'])],
+        lightcolor=[('active', c['btn_bg']), ('!active', c['win_bg'])],
+        darkcolor=[('active', c['btn_bg']), ('!active', c['win_bg'])])
+
+    # Horizontal.TProgressbar
+    style.configure('Horizontal.TProgressbar',
+        background=c['accent'], troughcolor=c['trough'],
+        bordercolor=c['border'], lightcolor=c['accent'], darkcolor=c['accent'],
+        relief='flat', thickness=6)
+
+    # TScrollbar
+    style.configure('TScrollbar',
+        background=c['scroll_thumb'], troughcolor=c['trough'],
+        bordercolor=c['border'], arrowcolor=c['fg'],
+        lightcolor=c['scroll_thumb'], darkcolor=c['scroll_thumb'], relief='flat')
+    style.map('TScrollbar',
+        background=[('active', c['scroll_hover']), ('pressed', c['scroll_hover'])])
+
+    # Non-ttk: ScrolledText (tk.Text + internal tk.Frame + tk.Scrollbar)
+    output_text.configure(
+        background=c['widget_bg'], foreground=c['fg'], insertbackground=c['insert'],
+        selectbackground=c['select_bg'], selectforeground=c['select_fg'],
+        highlightbackground=c['border'], highlightcolor=c['accent'],
+        highlightthickness=1, font=('Courier', 9))
+    output_text.frame.configure(background=c['widget_bg'], bd=0, highlightthickness=0)
+    output_text.vbar.configure(
+        background=c['scroll_thumb'], troughcolor=c['trough'],
+        activebackground=c['scroll_hover'],
+        relief='flat', borderwidth=0, highlightthickness=0, width=10)
 
 
 class GuiStdoutRedirect:
@@ -84,8 +410,13 @@ class HdrForgeGui:
         self.root.minsize(700, 580)
 
         # Configure style
-        style = ttk.Style()
-        style.theme_use('clam')
+        self.style = ttk.Style()
+        self.style.theme_use('clam')
+
+        # Theme state
+        self.current_theme = 'light'
+        self.theme_toggle_btn = None
+        self.rounded_buttons = []  # Track rounded buttons for theme updates
 
         # State flags
         self.encoding_in_progress = False
@@ -95,8 +426,25 @@ class HdrForgeGui:
         # Build UI
         self._build_ui()
 
+        # Apply initial theme
+        _apply_theme(self.root, self.style, _LIGHT, self.output_text)
+        self._update_rounded_buttons(_LIGHT)
+
     def _build_ui(self):
         """Build the user interface."""
+        # Header with title and theme toggle
+        header = ttk.Frame(self.root)
+        header.pack(fill='x', padx=10, pady=(8, 0))
+
+        ttk.Label(header, text="HDR Forge", font=('TkDefaultFont', 11, 'bold')).pack(side='left')
+
+        self.theme_toggle_btn = RoundedButton(
+            header, text='\U0001f319', command=self._toggle_theme,
+            bg_color=_LIGHT['win_bg'], fg_color=_LIGHT['fg'],
+            width=40, height=32, radius=6, font_size=11)
+        self.theme_toggle_btn.pack(side='right')
+        self.rounded_buttons.append((self.theme_toggle_btn, 'toggle'))
+
         # Files section
         files_frame = ttk.LabelFrame(self.root, text="Files", padding=10)
         files_frame.pack(fill='x', padx=10, pady=5)
@@ -105,13 +453,23 @@ class HdrForgeGui:
         self.input_var = StringVar()
         self.input_entry = ttk.Entry(files_frame, textvariable=self.input_var)
         self.input_entry.grid(row=0, column=1, sticky='ew', padx=5)
-        ttk.Button(files_frame, text="Browse", command=self._browse_input).grid(row=0, column=2)
+        browse_input_btn = RoundedButton(
+            files_frame, text="Browse", command=self._browse_input,
+            bg_color=_LIGHT['btn_bg'], fg_color=_LIGHT['fg'],
+            width=90, height=32, font_size=9)
+        browse_input_btn.grid(row=0, column=2)
+        self.rounded_buttons.append((browse_input_btn, 'secondary'))
 
         ttk.Label(files_frame, text="Output:").grid(row=1, column=0, sticky='w', pady=5)
         self.output_var = StringVar()
         self.output_entry = ttk.Entry(files_frame, textvariable=self.output_var)
         self.output_entry.grid(row=1, column=1, sticky='ew', padx=5)
-        ttk.Button(files_frame, text="Browse", command=self._browse_output).grid(row=1, column=2)
+        browse_output_btn = RoundedButton(
+            files_frame, text="Browse", command=self._browse_output,
+            bg_color=_LIGHT['btn_bg'], fg_color=_LIGHT['fg'],
+            width=90, height=32, font_size=9)
+        browse_output_btn.grid(row=1, column=2)
+        self.rounded_buttons.append((browse_output_btn, 'secondary'))
 
         files_frame.columnconfigure(1, weight=1)
 
@@ -158,8 +516,12 @@ class HdrForgeGui:
         control_frame = ttk.Frame(self.root)
         control_frame.pack(fill='x', padx=10, pady=5)
 
-        self.convert_button = ttk.Button(control_frame, text="Convert", command=self._on_convert_click)
+        self.convert_button = RoundedButton(
+            control_frame, text="Convert", command=self._on_convert_click,
+            bg_color=_LIGHT['accent'], fg_color=_LIGHT['accent_fg'],
+            width=100, height=36, radius=8, font_size=9, bold=True)
         self.convert_button.pack(side='left', padx=5)
+        self.rounded_buttons.append((self.convert_button, 'primary'))
 
         self.progress_bar = ttk.Progressbar(control_frame, mode='indeterminate')
         self.progress_bar.pack(side='left', fill='x', expand=True, padx=5)
@@ -173,13 +535,18 @@ class HdrForgeGui:
             state='disabled',
             font=('Courier', 9),
             wrap='word',
-            height=15
+            height=15,
+            relief='flat',
+            borderwidth=0,
+            highlightthickness=1
         )
         self.output_text.pack(fill='both', expand=True, padx=10, pady=5)
 
         # Status bar
         self.status_var = StringVar(value="Ready")
-        self.status_bar = ttk.Label(self.root, textvariable=self.status_var, relief='sunken')
+        self.status_bar = ttk.Label(
+            self.root, textvariable=self.status_var,
+            style='Status.TLabel')
         self.status_bar.pack(fill='x', side='bottom')
 
     def _browse_input(self):
@@ -249,6 +616,34 @@ class HdrForgeGui:
             daemon=True
         )
         thread.start()
+
+    def _update_rounded_buttons(self, colors):
+        """Update colors for all rounded buttons.
+
+        Args:
+            colors: Color dictionary (_LIGHT or _DARK)
+        """
+        for btn_ref in self.rounded_buttons:
+            btn, btn_type = btn_ref
+            if btn_type == 'primary':  # Convert button
+                btn.set_colors(colors['accent'], colors['accent_fg'])
+            elif btn_type == 'secondary':  # Browse buttons
+                btn.set_colors(colors['btn_bg'], colors['fg'])
+            elif btn_type == 'toggle':  # Theme toggle button
+                btn.set_colors(colors['win_bg'], colors['fg'])
+
+    def _toggle_theme(self):
+        """Toggle between light and dark theme."""
+        if self.current_theme == 'light':
+            self.current_theme = 'dark'
+            self.theme_toggle_btn.configure(text='\u2600')  # ☀ (sun)
+            c = _DARK
+        else:
+            self.current_theme = 'light'
+            self.theme_toggle_btn.configure(text='\U0001f319')  # 🌙 (moon)
+            c = _LIGHT
+        _apply_theme(self.root, self.style, c, self.output_text)
+        self._update_rounded_buttons(c)
 
     def _encoding_worker(self, input_path: str, output_path: str):
         """Worker thread that runs the encoding job.
