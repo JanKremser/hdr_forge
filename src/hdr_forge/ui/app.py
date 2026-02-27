@@ -204,7 +204,7 @@ class HdrForgeGui:
             state='disabled',
             font=('Courier', 9),
             wrap='word',
-            height=15,
+            height=14,
             relief='flat',
             borderwidth=0,
             highlightthickness=1
