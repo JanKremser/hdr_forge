@@ -189,14 +189,14 @@ def run_ffmpeg(
     print_debug(f'Run command: ffmpeg -y {debug_ffmpeg}')
 
     # Add progress reporting to stderr
-    cmd_prefix = ['ffmpeg', '-y']
+    cmd_prefix: list[str] = ['ffmpeg', '-y']
     if progress_callback:
         cmd_prefix.extend(['-progress', 'pipe:2'])
     # Final
     cmd: list[str] = cmd_prefix + cmd
 
     # Buffer to store stderr for error reporting
-    stderr_buffer = []
+    stderr_buffer: list = []
 
     try:
         # Start FFmpeg process - always capture stderr
