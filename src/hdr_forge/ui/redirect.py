@@ -147,10 +147,9 @@ class GuiStdoutRedirect:
         self.text_widget.config(state='normal')
         if lines_to_delete > 0:
             # Delete previous progress block (N lines from end).
-            # To delete N lines before the final empty line, use:
-            # "end - (N+1)l linestart" to "end - 1l"
+            # "end - {N}l linestart" to "end" removes exactly N complete lines
             delete_start = f"end - {lines_to_delete + 1}l linestart"
-            delete_end = "end - 1l"
+            delete_end = "end"
             self.text_widget.delete(delete_start, delete_end)
         # Insert new progress lines
         for line in lines:
