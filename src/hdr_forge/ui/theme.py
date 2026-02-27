@@ -231,6 +231,18 @@ def _apply_theme(root, style: ttk.Style, c: dict[str, str], output_text) -> None
                     ('disabled', c['disabled_bg'])],
         foreground=[('disabled', c['disabled_fg'])])
 
+    # CancelRounded.TButton (Red cancel button - destructive action)
+    cancel_red = '#e01b24'
+    cancel_red_hover = '#c01520'
+    style.configure('CancelRounded.TButton',
+        background=cancel_red, foreground='white',
+        bordercolor=cancel_red_hover, lightcolor=cancel_red, darkcolor=cancel_red,
+        relief='flat', borderwidth=0, padding=(14, 8), font=('TkDefaultFont', 9, 'bold'))
+    style.map('CancelRounded.TButton',
+        background=[('active', cancel_red_hover), ('pressed', '#a00f18'),
+                    ('disabled', c['disabled_bg'])],
+        foreground=[('disabled', c['disabled_fg'])])
+
     # ThemeToggle.TButton (moon/sun icon)
     style.configure('ThemeToggle.TButton',
         background=c['win_bg'], foreground=c['fg'], bordercolor=c['border'],

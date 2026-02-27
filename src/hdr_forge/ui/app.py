@@ -41,9 +41,11 @@ class HdrForgeGui:
 
         # State flags
         self.encoding_in_progress = False
+        self.cancel_requested = False
         self.stdout_redirect = None
         self.original_stdout = None
         self.output_text: ScrolledText
+        self.encoding_thread: threading.Thread | None = None
 
         # Build UI
         self._build_ui()
@@ -267,9 +269,11 @@ class HdrForgeGui:
             messagebox.showerror("Error", f"Input file does not exist: {input_path}")
             return
 
-        # Disable Convert button and start progress
+        # Transform button to Cancel
+        self.cancel_requested = False
         self.encoding_in_progress = True
-        self.convert_button.config(state='disabled')
+        self.convert_button.config(text="Cancel", command=self._on_cancel_click)
+        self.convert_button.button.config(style='CancelRounded.TButton')
         self.progress_bar.start(10)
         self.status_var.set("Encoding...")
 
@@ -279,12 +283,22 @@ class HdrForgeGui:
         self.output_text.config(state='disabled')
 
         # Start encoding in background thread
-        thread = threading.Thread(
+        self.encoding_thread = threading.Thread(
             target=self._encoding_worker,
             args=(input_path, output_path),
             daemon=True
         )
-        thread.start()
+        self.encoding_thread.start()
+
+    def _on_cancel_click(self) -> None:
+        """Handle Cancel button click."""
+        if not self.encoding_in_progress:
+            return
+        self.cancel_requested = True
+        self.status_var.set("Cancelling...")
+        self.convert_button.config(state='disabled')
+        from hdr_forge.core import config as _config
+        _config.terminate_running_process()
 
     def _update_rounded_buttons(self, colors):
         """Update colors for all rounded buttons.
@@ -453,9 +467,22 @@ class HdrForgeGui:
         """
         self.progress_bar.stop()
         self.encoding_in_progress = False
+
+        # Restore Convert button
+        self.convert_button.config(text="Convert", command=self._on_convert_click)
+        self.convert_button.button.config(style='AccentRounded.TButton')
+
+        # Determine which colors to use for the button
+        colors = _DARK if self.current_theme == 'dark' else _LIGHT
+        self.convert_button.set_colors(colors['accent'], colors['accent_fg'])
+
         self._update_convert_state()
 
-        if error_msg:
+        # Handle result
+        if self.cancel_requested:
+            self.status_var.set("Cancelled")
+            self.cancel_requested = False
+        elif error_msg:
             self.status_var.set(error_msg)
             messagebox.showerror("Encoding Error", error_msg)
         elif success:

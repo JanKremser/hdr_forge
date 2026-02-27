@@ -218,8 +218,19 @@ def run_ffmpeg(
             )
             reader_thread.start()
 
-        # Wait for process to complete
-        returncode = process.wait(timeout=timeout)
+        # Register process globally for cancellation support
+        from hdr_forge.core import config as _config
+        _config.set_running_process(process)
+
+        try:
+            # Wait for process to complete
+            returncode = process.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            raise RuntimeError(f"FFmpeg execution timed out after {timeout} seconds")
+        finally:
+            # Unregister process
+            _config.set_running_process(None)
 
         # Wait for reader thread to finish
         if reader_thread:
@@ -237,8 +248,5 @@ def run_ffmpeg(
 
         return True
 
-    except subprocess.TimeoutExpired:
-        process.kill()
-        raise RuntimeError(f"FFmpeg execution timed out after {timeout} seconds")
     except Exception as e:
         raise RuntimeError(f"FFmpeg execution failed: {e}")
