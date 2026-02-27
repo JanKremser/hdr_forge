@@ -62,7 +62,7 @@ class GuiStdoutRedirect:
         for line in complete_lines:
             stripped = line.strip()
             # Skip lines that are only progress bar characters
-            if stripped and not all(c in '█░─│ ' for c in stripped):
+            if not stripped or not all(c in '█░─│ ' for c in stripped):
                 filtered_lines.append(line)
 
         # Handle progress block replacement or normal append
@@ -117,7 +117,7 @@ class GuiStdoutRedirect:
         # Then handle any remaining buffer content
         if self.buffer.strip():
             stripped = self.buffer.strip()
-            if stripped and not all(c in '█░─│ ' for c in stripped):
+            if not stripped or not all(c in '█░─│ ' for c in stripped):
                 if self._overwrite_next:
                     # Overwrite previous progress block if cursor-up was received
                     self.root.after(0, self._update_progress, [self.buffer], self._progress_line_count)
