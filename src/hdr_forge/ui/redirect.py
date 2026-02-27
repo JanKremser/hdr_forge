@@ -20,8 +20,10 @@ class GuiStdoutRedirect:
         self.text_widget = text_widget
         self.root = root
         self.buffer = ""
-        self._progress_line_count = 0  # lines in the current overwritable block
+        self._progress_line_count = 0  # lines in current progress/append block
         self._overwrite_next = False  # cursor-up received, content arrives in next write
+        self._pending_cursor_ups = 0  # cursor-ups to apply when content arrives
+        self._pending_progress_lines = []  # accumulated lines when in replace mode
 
     def write(self, text):
         """Write text to the widget after stripping ANSI codes.
@@ -36,7 +38,8 @@ class GuiStdoutRedirect:
             return len(text) if isinstance(text, str) else 0
 
         # Count cursor-up sequences before stripping (indicates progress block overwrite)
-        has_cursor_up = text.count('\x1b[1A') > 0
+        cursor_up_count = text.count('\x1b[1A')
+        has_cursor_up = cursor_up_count > 0
 
         # Strip ANSI escape codes
         # Pattern: \033 (ESC) followed by [ and any number of digits/semicolons, then a letter
@@ -65,23 +68,53 @@ class GuiStdoutRedirect:
         # Handle progress block replacement or normal append
         if filtered_lines:
             if has_cursor_up or self._overwrite_next:
-                # Schedule in-place replacement of previous progress block
-                self.root.after(0, self._update_progress, filtered_lines, self._progress_line_count)
+                # In replace mode: accumulate all lines until we exit replace mode
+                self._pending_progress_lines.extend(filtered_lines)
                 self._overwrite_next = False
+                # Accumulate cursor-ups (add them up)
+                if cursor_up_count > 0:
+                    self._pending_cursor_ups += cursor_up_count
             else:
+                # Exiting replace mode: flush any pending progress lines first
+                if self._pending_progress_lines:
+                    # Use the accumulated progress line count to determine deletion
+                    lines_to_delete = self._progress_line_count
+                    new_lines_count = len(self._pending_progress_lines)
+                    self.root.after(0, self._update_progress, self._pending_progress_lines, lines_to_delete)
+                    self._pending_progress_lines = []
+                    self._pending_cursor_ups = 0
+                    # Update progress count with newly inserted lines
+                    self._progress_line_count = new_lines_count
+                else:
+                    # Normal append: reset progress count when entering normal append
+                    self._progress_line_count = 0
+
                 # Normal append: add each line individually
                 for line in filtered_lines:
                     self.root.after(0, self._append_line, line)
-            # Update progress line count for next potential overwrite
-            self._progress_line_count = len(filtered_lines)
+                # Accumulate lines when appending normally
+                self._progress_line_count += len(filtered_lines)
         elif has_cursor_up:
             # Cursor-up received but no content yet; content will arrive in next write()
             self._overwrite_next = True
+            self._pending_cursor_ups += cursor_up_count
 
         return len(text) if isinstance(text, str) else 0
 
     def flush(self):
         """Flush any remaining buffer content."""
+        # First, flush any pending progress lines
+        if self._pending_progress_lines:
+            # Delete the previous progress block lines
+            lines_to_delete = self._progress_line_count
+            new_lines_count = len(self._pending_progress_lines)
+            self.root.after(0, self._update_progress, self._pending_progress_lines, lines_to_delete)
+            self._pending_progress_lines = []
+            self._pending_cursor_ups = 0
+            # Update progress count with newly inserted lines
+            self._progress_line_count = new_lines_count
+
+        # Then handle any remaining buffer content
         if self.buffer.strip():
             stripped = self.buffer.strip()
             if stripped and not all(c in '█░─│ ' for c in stripped):
@@ -114,14 +147,11 @@ class GuiStdoutRedirect:
         self.text_widget.config(state='normal')
         if lines_to_delete > 0:
             # Delete previous progress block (N lines from end).
-            # Tkinter adds empty lines after newlines, so we need to adjust: use
-            # "end - (N+1)l linestart" to properly delete N content lines.
+            # To delete N lines before the final empty line, use:
+            # "end - (N+1)l linestart" to "end - 1l"
             delete_start = f"end - {lines_to_delete + 1}l linestart"
-            self.text_widget.delete(delete_start, "end")
-            # After deletion, ensure content ends with a newline for proper line separation
-            remaining = self.text_widget.get("1.0", "end")
-            if remaining and not remaining.endswith('\n'):
-                self.text_widget.insert('end', '\n')
+            delete_end = "end - 1l"
+            self.text_widget.delete(delete_start, delete_end)
         # Insert new progress lines
         for line in lines:
             self.text_widget.insert('end', line + '\n')
