@@ -8,7 +8,7 @@ from typing import Dict, Optional, Tuple
 
 from hdr_forge.cli.cli_output import create_ffmpeg_progress_handler, print_err, print_warn
 from hdr_forge.core.config import get_global_temp_directory
-from hdr_forge.tools import mkvmerge
+from hdr_forge.tools import mkvmerge, mkvpropedit
 from hdr_forge.ffmpeg.ffmpeg_wrapper import run_ffmpeg
 from hdr_forge.ffmpeg.video_codec.h264_nvenc import H264NvencCodec
 from hdr_forge.ffmpeg.video_codec.hevc_nvenc import HevcNvencCodec
@@ -470,71 +470,156 @@ class Encoder:
         subtitle_flags: SubtitleModeItem = self._encoder_settings.subtitle_flags
         if subtitle_flags.mode == SubtitleMode.REMOVE:
             return options
-        elif subtitle_flags.mode == SubtitleMode.COPY:
-            # Get subtitle tracks to preserve original disposition flags
-            subtitle_tracks: list[MkvTrack] = self._video.get_container_subtitles_tracks()
-            if not subtitle_tracks:
-                # Fallback for files where track list is unavailable (e.g., some TS files)
-                options['map'].append('0:s?')
-                options.update({'c:s': 'copy'})
-                return options
-            # Map each track individually and preserve original default flag
-            for track in subtitle_tracks:
-                options['map'].append(f'0:s:{track.ffmpeg_index}')
-                options[f'c:s:{track.ffmpeg_index}'] = 'copy'
-                # Preserve original default flag from source file
-                is_default = track.properties.default_track or False
-                options[f'disposition:s:{track.ffmpeg_index}'] = 'default' if is_default else 'none'
-            return options
 
-        default_lang: str | None = subtitle_flags.default_lang
-
+        # COPY and AUTO modes: map all subtitle tracks, disposition will be set via mkvpropedit
         subtitle_tracks: list[MkvTrack] = self._video.get_container_subtitles_tracks()
 
-        has_default_track = False
+        if not subtitle_tracks:
+            # Fallback for files where track list is unavailable (e.g., some TS files)
+            options['map'].append('0:s?')
+            options.update({'c:s': 'copy'})
+            return options
+
+        # Map each subtitle track individually
         for track in subtitle_tracks:
             options['map'].append(f'0:s:{track.ffmpeg_index}')
             options[f'c:s:{track.ffmpeg_index}'] = 'copy'
 
-            title: str = ""
-            disposition: str = "none"
-            if (
-                track.properties.forced_track
-                or (
-                    track.properties.track_name and "forced" in track.properties.track_name.lower()
-                )
-            ):
-                title = "forced"
-                if default_lang and track.properties.language == default_lang and not has_default_track:
-                    disposition = "default" # forced+default
-                    has_default_track = True
-
-            track_name = track.properties.track_name or ""
-            if title == "":
-                if "commentary" in track_name.lower():
-                    title = "commentary"
-                else:
-                    title = "full"
-
-            if "sdh" in track_name.lower():
-                title += " SDH"
-
-            if track.codec:
-                codec: list[str] = track.codec.upper().split('/')
-                codec_2: list[str] = track.codec.upper().split(' ')
-
-                sub_codec: str = track.codec
-                if len(codec) > 1:
-                    sub_codec: str = codec[1]
-                elif len(codec_2) > 1:
-                    sub_codec: str = codec_2[1]
-
-                title += f" ({sub_codec})"
-
-            options[f'metadata:s:s:{track.ffmpeg_index}'] = f'title={title}'
-            options[f'disposition:s:{track.ffmpeg_index}'] = disposition
-
         return options
+
+    def _apply_subtitle_properties(self, output_file: Path) -> bool:
+        """Apply subtitle track properties to output file via mkvpropedit.
+
+        This sets track names, default flags, and forced flags based on subtitle_flags mode.
+        Supports COPY (preserve source), REMOVE (skip), and AUTO (intelligent selection).
+
+        Args:
+            output_file: Path to output MKV file to edit
+
+        Returns:
+            True if successful, False otherwise
+        """
+        subtitle_flags: SubtitleModeItem = self._encoder_settings.subtitle_flags
+
+        if subtitle_flags.mode == SubtitleMode.REMOVE:
+            # No subtitle edits needed for REMOVE mode
+            return True
+
+        try:
+            # Extract output file track information
+            from hdr_forge.tools.mkvmerge import extract_container_info_json
+            output_info = extract_container_info_json(output_file)
+            output_subtitle_tracks = [
+                track for track in output_info.tracks if track.type.value.lower() == 'subtitles'
+            ]
+
+            if not output_subtitle_tracks:
+                # No subtitles in output, nothing to do
+                return True
+
+            # Get source subtitle tracks
+            source_subtitle_tracks = self._video.get_container_subtitles_tracks()
+            if not source_subtitle_tracks:
+                # No source subtitles, nothing to do
+                return True
+
+            # Build list of track edits
+            edits: list[mkvpropedit.SubtitleTrackEdit] = []
+
+            if subtitle_flags.mode == SubtitleMode.COPY:
+                # COPY: Preserve source properties exactly
+                for output_track in output_subtitle_tracks:
+                    # Map by index: output_track index should correspond to source_track index
+                    # since FFmpeg preserves track order
+                    source_track_idx = output_subtitle_tracks.index(output_track)
+                    if source_track_idx >= len(source_subtitle_tracks):
+                        continue
+
+                    source_track = source_subtitle_tracks[source_track_idx]
+                    track_selector = f"track:@{output_track.id + 1}"
+
+                    edits.append(
+                        mkvpropedit.SubtitleTrackEdit(
+                            track_selector=track_selector,
+                            name=source_track.properties.track_name,
+                            flag_default=source_track.properties.default_track or False,
+                            flag_forced=source_track.properties.forced_track or False,
+                        )
+                    )
+
+            elif subtitle_flags.mode == SubtitleMode.AUTO:
+                # AUTO: Intelligent selection with language matching
+                default_lang: str | None = subtitle_flags.default_lang
+                has_default_track = False
+
+                for output_track in output_subtitle_tracks:
+                    source_track_idx = output_subtitle_tracks.index(output_track)
+                    if source_track_idx >= len(source_subtitle_tracks):
+                        continue
+
+                    source_track = source_subtitle_tracks[source_track_idx]
+                    track_selector = f"track:@{output_track.id + 1}"
+
+                    # Determine title and flags
+                    title: str = ""
+                    is_default = False
+                    is_forced = False
+
+                    # Check if this is a forced track
+                    if (
+                        source_track.properties.forced_track
+                        or (
+                            source_track.properties.track_name
+                            and "forced" in source_track.properties.track_name.lower()
+                        )
+                    ):
+                        title = "forced"
+                        is_forced = True
+                        # Only set as default if language matches and no other default yet
+                        if default_lang and source_track.properties.language == default_lang and not has_default_track:
+                            is_default = True
+                            has_default_track = True
+
+                    # Determine title if not forced
+                    track_name = source_track.properties.track_name or ""
+                    if title == "":
+                        if "commentary" in track_name.lower():
+                            title = "commentary"
+                        else:
+                            title = "full"
+
+                    # Append SDH if in track name
+                    if "sdh" in track_name.lower():
+                        title += " SDH"
+
+                    # Append codec info
+                    if source_track.codec:
+                        codec_parts = source_track.codec.upper().split('/')
+                        if len(codec_parts) > 1:
+                            codec_name = codec_parts[1]
+                        else:
+                            codec_parts2 = source_track.codec.upper().split(' ')
+                            codec_name = codec_parts2[1] if len(codec_parts2) > 1 else source_track.codec.upper()
+                        title += f" ({codec_name})"
+
+                    edits.append(
+                        mkvpropedit.SubtitleTrackEdit(
+                            track_selector=track_selector,
+                            name=title,
+                            flag_default=is_default,
+                            flag_forced=is_forced,
+                        )
+                    )
+
+            # Apply edits via mkvpropedit
+            if edits:
+                return mkvpropedit.set_subtitle_track_properties(output_file, edits)
+
+            return True
+
+        except Exception as e:
+            print_err(f"Failed to apply subtitle properties: {e}")
+            return False
 
     def _build_ffmpeg_output_options(self) -> Dict[str, str]:
         """Build FFmpeg output options dictionary for encoding.
@@ -637,10 +722,16 @@ class Encoder:
         """
         input_file: Path = self._video.get_filepath()
 
-        return self._run_ffmpeg_encoding_process(
+        success = self._run_ffmpeg_encoding_process(
             input_file=input_file,
             target_file=self._target_file,
         )
+
+        if success:
+            # Apply subtitle properties via mkvpropedit
+            success = self._apply_subtitle_properties(self._target_file)
+
+        return success
 
     def convert_dolby_vision_to_hdr10_without_re_encoding(
         self,
@@ -665,7 +756,8 @@ class Encoder:
             output_mkv=self._target_file,
         )
 
-        return True
+        # Apply subtitle properties via mkvpropedit
+        return self._apply_subtitle_properties(self._target_file)
 
     def _convert_dolby_profile(
         self,
@@ -745,7 +837,8 @@ class Encoder:
             output_mkv=self._target_file,
         )
 
-        return True
+        # Apply subtitle properties via mkvpropedit
+        return self._apply_subtitle_properties(self._target_file)
 
     def convert_dolby_vision(
         self,
@@ -820,9 +913,9 @@ class Encoder:
         if not encoding_success:
             return False
 
-        # For HDR10 or SDR encoding, we are done here
+        # For HDR10 or SDR encoding, apply subtitle properties and we are done here
         if only_hdr10_or_sdr_encoding:
-            return True
+            return self._apply_subtitle_properties(self._target_file)
 
         print()
 
@@ -851,7 +944,8 @@ class Encoder:
             output_mkv=self._target_file,
         )
 
-        return True
+        # Apply subtitle properties via mkvpropedit
+        return self._apply_subtitle_properties(self._target_file)
 
     def convert(
         self,
