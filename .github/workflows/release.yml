@@ -1,0 +1,41 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.14'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Build with PyInstaller
+        run: |
+          pyinstaller --clean --onefile ./src/hdr_forge/main.py --name hdr_forge
+
+      - name: Rename binary
+        run: |
+          mv dist/hdr_forge dist/hdr_forge-linux-x64
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/hdr_forge-linux-x64
+          draft: false
+          prerelease: false
