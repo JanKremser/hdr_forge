@@ -211,12 +211,26 @@ Examples:
         default="copy",
         help=f"""{sdr_dot} {hdr_dot} {dolby_vision_dot}
 Subtitle flags. Default is 'copy'.
-    [copy]                 : Copy all subtitle tracks
-    [remove]               : Remove all subtitle tracks
-    [auto]                 : Automatically select subtitle tracks (forced and default tracks), by name
-    [auto>ger]             : Automatically select subtitle tracks (forced and default tracks), for German language
 
-Info: VLC has problems displaying a title name when the ffmpeg set it. Kodi and MKVtoolnix has no problems with it.
+  Global modes:
+    [copy]                 : Copy all subtitle tracks (default)
+    [remove]               : Remove all subtitle tracks
+    [auto]                 : Automatically select forced/default tracks by system language
+    [auto>ger]             : Auto-select for a specific language
+
+  Per-track overrides (use track IDs from 'hdr_forge info'):
+    [ID:remove]            : Remove a specific track  (e.g. 3:remove)
+    [ID:default]           : Set a specific track as default  (e.g. 3:default)
+    [ID:forced]            : Set a specific track as forced  (e.g. 3:forced)
+    [ID:none]              : Remove default and forced flags from a track  (e.g. 3:none)
+    [LANG:default]         : Set tracks of a language as default  (e.g. ger:default)
+
+  Combine with semicolons:
+    [copy;3:remove]        : Copy all, but remove track 3
+    [auto;3:default]       : Auto-select logic, but override track 3 as default
+    [3:default;4:forced;5:remove]
+
+Track IDs are mkvmerge absolute track IDs, shown by 'hdr_forge info'.
 """
     )
 

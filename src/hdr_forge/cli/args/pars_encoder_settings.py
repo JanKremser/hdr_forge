@@ -9,7 +9,7 @@ from typing import Tuple
 from hdr_forge import __version__
 from hdr_forge.cli.cli_output import print_err, print_warn
 from hdr_forge.typedefs.codec_typing import ColorPrimaries, HEVC_NVENC_Preset, VideoEncoderLibrary, x265_x264_Preset
-from hdr_forge.typedefs.encoder_typing import AudioCodec, AudioCodecItem, CropMode, CropSettings, EncoderOverride, GrainMode, HdrForgeEncodingHardwarePresets, HdrForgeEncodingPresetSettings, HdrForgeEncodingTuningPresets, HdrForgeSpeedPreset, HdrSdrFormat, EncoderSettings, LogoRemovalAutoDetectMode, LogoRemovalMode, LogoRemovelSettings, NvencParams, NvencRcMode, SampleSettings, ScaleMode, SubtitleMode, SubtitleModeItem, UniversalEncoderParams, VideoCodec, Libx264Params, X264Tune, Libx265Params, X265Tune
+from hdr_forge.typedefs.encoder_typing import AudioCodec, AudioCodecItem, CropMode, CropSettings, EncoderOverride, GrainMode, HdrForgeEncodingHardwarePresets, HdrForgeEncodingPresetSettings, HdrForgeEncodingTuningPresets, HdrForgeSpeedPreset, HdrSdrFormat, EncoderSettings, LogoRemovalAutoDetectMode, LogoRemovalMode, LogoRemovelSettings, NvencParams, NvencRcMode, SampleSettings, ScaleMode, SubtitleMode, SubtitleModeItem, SubtitleTrackAction, SubtitleTrackOverride, UniversalEncoderParams, VideoCodec, Libx264Params, X264Tune, Libx265Params, X265Tune
 from hdr_forge.typedefs.dolby_vision_typing import DolbyVisionProfileEncodingMode
 from hdr_forge.typedefs.video_typing import BT_2020_MASTER_DISPLAY, BT_709_MASTER_DISPLAY, DISPLAY_P3_MASTER_DISPLAY, ContentLightLevelMetadata, HdrMetadata, MasterDisplayMetadata
 
@@ -183,14 +183,14 @@ def _get_audio_codec_from_string(codec_str: str | None) -> dict[str, AudioCodecI
 
     return codec_map
 
-def _get_subtitle_flags_from_string(flag_str: str | None) -> SubtitleModeItem:
-    """Convert string to SubtitleEncoder enum.
+def _get_subtitle_flags_from_string(flag_str: str | None) -> tuple[SubtitleModeItem, dict[str, SubtitleTrackOverride]]:
+    """Convert string to SubtitleModeItem and parse per-track overrides.
 
     Args:
-        codec_str: Subtitle codec string
+        flag_str: Subtitle flags string (e.g., "copy", "auto;3:remove", "ger:default")
 
     Returns:
-        Corresponding SubtitleEncoder enum value
+        Tuple of (SubtitleModeItem, dict[str, SubtitleTrackOverride])
     """
     def get_default_lang() -> str | None:
         ISO_639_1_TO_2: dict = {
@@ -214,25 +214,64 @@ def _get_subtitle_flags_from_string(flag_str: str | None) -> SubtitleModeItem:
             _default_lang: str | None = ISO_639_1_TO_2.get(iso1, None)  # und = undefined
         return _default_lang
 
-    supported_modi: list[str] = ['copy', 'remove', 'auto']
+    supported_global_modi: list[str] = ['copy', 'remove', 'auto']
+    supported_track_actions: list[str] = ['remove', 'default', 'forced', 'none']
+
     if flag_str is None:
-        return SubtitleModeItem(mode=SubtitleMode.COPY, default_lang=None)
+        return SubtitleModeItem(mode=SubtitleMode.COPY, default_lang=None), {}
 
-    codec_str_norm = flag_str.lower().replace('-', '')
-    if codec_str_norm in supported_modi:
-        if 'auto' in codec_str_norm:
-            default_lang: str | None = get_default_lang()
-            return SubtitleModeItem(mode=SubtitleMode.AUTO, default_lang=default_lang)
+    # Split on semicolons to separate global mode from per-track specs
+    tokens = [t.strip() for t in flag_str.split(';')]
+    global_mode_item: SubtitleModeItem | None = None
+    overrides: dict[str, SubtitleTrackOverride] = {}
 
-        return SubtitleModeItem(mode=SubtitleMode(codec_str_norm), default_lang=None)
-    elif "auto>" in codec_str_norm:
-        auto_lang: list[str] = codec_str_norm.split(">")
-        if len(auto_lang) != 2:
-            print_err(f"Invalid subtitle codec value '{flag_str}', using default")
-            sys.exit(1)
-        return SubtitleModeItem(mode=SubtitleMode(auto_lang[0]), default_lang=auto_lang[1])
+    for token in tokens:
+        token_norm = token.lower().replace('-', '')
 
-    return SubtitleModeItem(mode=SubtitleMode.COPY, default_lang=None)
+        # Check if this is a per-track spec (contains ':' with action keyword)
+        if ':' in token_norm:
+            parts = token_norm.split(':', 1)
+            track_key = parts[0].strip()
+            action_str = parts[1].strip()
+
+            if action_str not in supported_track_actions:
+                print_err(f"Invalid subtitle track action '{action_str}' in '{token}'. Must be one of: {', '.join(supported_track_actions)}")
+                sys.exit(1)
+
+            if not track_key:
+                print_err(f"Invalid subtitle track spec '{token}': track ID/language cannot be empty")
+                sys.exit(1)
+
+            overrides[track_key] = SubtitleTrackOverride(action=SubtitleTrackAction(action_str))
+            continue
+
+        # Check if this is a global mode
+        if token_norm in supported_global_modi:
+            if 'auto' in token_norm:
+                default_lang: str | None = get_default_lang()
+                global_mode_item = SubtitleModeItem(mode=SubtitleMode.AUTO, default_lang=default_lang)
+            else:
+                global_mode_item = SubtitleModeItem(mode=SubtitleMode(token_norm), default_lang=None)
+            continue
+
+        # Check for auto>LANG pattern
+        if "auto>" in token_norm:
+            auto_lang: list[str] = token_norm.split(">")
+            if len(auto_lang) != 2:
+                print_err(f"Invalid subtitle codec value '{token}', using default")
+                sys.exit(1)
+            global_mode_item = SubtitleModeItem(mode=SubtitleMode(auto_lang[0]), default_lang=auto_lang[1])
+            continue
+
+        # Invalid token
+        print_err(f"Invalid subtitle-flags token '{token}'. Expected global mode (copy/remove/auto/auto>LANG) or per-track spec (ID:action or LANG:action)")
+        sys.exit(1)
+
+    # Default global mode when only per-track specs are given
+    if global_mode_item is None:
+        global_mode_item = SubtitleModeItem(mode=SubtitleMode.COPY, default_lang=None)
+
+    return global_mode_item, overrides
 
 
 def _get_crop_settings_from_string(crop_str: str | None) -> CropSettings:
@@ -843,11 +882,14 @@ def create_encoder_settings_from_args(args) -> EncoderSettings:
             print_err(f"Invalid color primaries flag value '{color_primaries_flag}', must be one of {[cp.value for cp in ColorPrimaries]}.")
             sys.exit(1)
 
+    subtitle_flags, subtitle_track_overrides = _get_subtitle_flags_from_string(flag_str=getattr(args, 'subtitle_flags', None))
+
     return EncoderSettings(
         video_codec=_get_video_codec_from_string(codec_str=args.video_codec),
         audio_codecs=_get_audio_codec_from_string(codec_str=getattr(args, 'audio_codec', None)),
         audio_default_track=getattr(args, 'audio_default', None),
-        subtitle_flags=_get_subtitle_flags_from_string(flag_str=getattr(args, 'subtitle_flags', None)),
+        subtitle_flags=subtitle_flags,
+        subtitle_track_overrides=subtitle_track_overrides,
         vfilter=getattr(args, 'vfilter', None),
         dar_ratio=_get_dar_ratio_settings_from_string(getattr(args, 'dar_ratio', None)),
         try_fix=getattr(args, 'try_fix', False) or False,
