@@ -471,10 +471,20 @@ class Encoder:
         if subtitle_flags.mode == SubtitleMode.REMOVE:
             return options
         elif subtitle_flags.mode == SubtitleMode.COPY:
-            options['map'].append(f'0:s?')
-            options.update({
-                'c:s': 'copy',
-            })
+            # Get subtitle tracks to preserve original disposition flags
+            subtitle_tracks: list[MkvTrack] = self._video.get_container_subtitles_tracks()
+            if not subtitle_tracks:
+                # Fallback for files where track list is unavailable (e.g., some TS files)
+                options['map'].append('0:s?')
+                options.update({'c:s': 'copy'})
+                return options
+            # Map each track individually and preserve original default flag
+            for track in subtitle_tracks:
+                options['map'].append(f'0:s:{track.ffmpeg_index}')
+                options[f'c:s:{track.ffmpeg_index}'] = 'copy'
+                # Preserve original default flag from source file
+                is_default = track.properties.default_track or False
+                options[f'disposition:s:{track.ffmpeg_index}'] = 'default' if is_default else 'none'
             return options
 
         default_lang: str | None = subtitle_flags.default_lang
