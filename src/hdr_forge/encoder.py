@@ -522,7 +522,7 @@ class Encoder:
 
         try:
             from hdr_forge.tools.mkvmerge import extract_container_info_json
-            from hdr_forge.tools.subtitle_editor import build_subtitle_track_edits
+            from hdr_forge.edit_files.subtitle_editor import build_subtitle_track_edits
 
             # Extract output file track information
             output_info = extract_container_info_json(output_file)

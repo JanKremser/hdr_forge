@@ -778,7 +778,7 @@ def _add_edit_subcommand(parser: argparse._SubParsersAction) -> None:
     edit_parser.add_argument(
         '-s', '--subtitle-flags',
         default=None,
-        help="""{sdr_dot} {hdr_dot} {dolby_vision_dot}
+        help="""
 Subtitle flags. Same syntax as the convert subcommand.
 If omitted, subtitle properties are left untouched.
 
@@ -799,7 +799,7 @@ If omitted, subtitle properties are left untouched.
 
 Note: In-place editing does not support :remove (track removal requires remux).
 Track IDs are mkvmerge absolute track IDs, shown by 'hdr_forge info'.
-""".format(sdr_dot=sdr_dot, hdr_dot=hdr_dot, dolby_vision_dot=dolby_vision_dot),
+"""
     )
 
     edit_parser.add_argument(
