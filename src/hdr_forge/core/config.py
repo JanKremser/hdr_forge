@@ -1,8 +1,9 @@
 import os
 from pathlib import Path
 import sys
+import threading
+import subprocess
 
-from hdr_forge.cli.cli_output import print_warn
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -76,3 +77,35 @@ def clear_global_temp_directory() -> None:
             print(f"Cleaned up temporary files: {temp_dir}")
         except Exception as e:
             print(f"Warning: Failed to clean up temporary directory {temp_dir}: {e}")
+
+
+# Global process reference for cancellation support
+_process_lock = threading.Lock()
+_running_process: subprocess.Popen | None = None
+
+
+def set_running_process(proc: subprocess.Popen | None) -> None:
+    """Store a reference to the currently running FFmpeg process.
+
+    Args:
+        proc: subprocess.Popen instance or None to clear
+    """
+    global _running_process
+    with _process_lock:
+        _running_process = proc
+
+
+def terminate_running_process() -> bool:
+    """Terminate the currently running FFmpeg process.
+
+    Returns:
+        True if a process was terminated, False if no process was running
+    """
+    with _process_lock:
+        if _running_process is not None:
+            try:
+                _running_process.terminate()
+                return True
+            except Exception:
+                return False
+        return False

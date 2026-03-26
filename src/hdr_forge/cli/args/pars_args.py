@@ -7,13 +7,10 @@ from hdr_forge.cli.cli_output import ANSI_BLUE, ANSI_GREEN, ANSI_ORANGE, ANSI_RE
 
 
 HDR_FORGE_LOGO = rainbow_text("""
-▒█▒   ▒█▒ ▒██████▒  ▒██████▒      ▒██████▒  ▒█████▒   ▒██████▒    ▒█████▒  ▒██████▒
-▒█▒   ▒█▒ ▒█▒   ▒█▒ ▒█▒   ▒█▒     ▒█▒      ▒█▒   ▒█▒  ▒█▒   ▒█▒  ▒█▒       ▒█▒
-▒███████▒ ▒█▒   ▒█▒ ▒██████▒      ▒█████▒  ▒█▒   ▒█▒  ▒██████▒   ▒█▒ ▒██▒  ▒████▒
-▒█▒   ▒█▒ ▒█▒   ▒█▒ ▒█▒   ▒█▒     ▒█▒      ▒█▒   ▒█▒  ▒█▒   ▒█▒  ▒█▒   ▒█▒ ▒█▒
-▒█▒   ▒█▒ ▒██████▒  ▒█▒   ▒█▒     ▒█▒       ▒█████▒   ▒█▒   ▒█▒   ▒█████▒  ▒██████▒
-
-▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒""")
+    █▒   ▒█ █▀▀▀▀▄  █▀▀▀█       █▀▀▀▀▀ █▀▀▀▀█ █▀▀▀█▄ █▀▀▀▀ █▀▀▀▀▀
+    ███████ █     █ ██▀▀▀       █▀▀▀   █    █ ██▀▀▀  █ ▄▄▄ █▀▀▀
+    █▒   ▒█ █▄▄▄▄▀  █ ▀▄▄       █      █▄▄▄▄█ █ ▀▄▄  █▄▄▄█ █▄▄▄▄▄
+▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄""")
 
 def _add_version_arg(parser: argparse.ArgumentParser) -> None:
     """Add version argument to the parser.
@@ -214,12 +211,26 @@ Examples:
         default="copy",
         help=f"""{sdr_dot} {hdr_dot} {dolby_vision_dot}
 Subtitle flags. Default is 'copy'.
-    [copy]                 : Copy all subtitle tracks
-    [remove]               : Remove all subtitle tracks
-    [auto]                 : Automatically select subtitle tracks (forced and default tracks), by name
-    [auto>ger]             : Automatically select subtitle tracks (forced and default tracks), for German language
 
-Info: VLC has problems displaying a title name when the ffmpeg set it. Kodi and MKVtoolnix has no problems with it.
+  Global modes:
+    [copy]                 : Copy all subtitle tracks (default)
+    [remove]               : Remove all subtitle tracks
+    [auto]                 : Automatically select forced/default tracks by system language
+    [auto>ger]             : Auto-select for a specific language
+
+  Per-track overrides (use track IDs from 'hdr_forge info'):
+    [ID:remove]            : Remove a specific track  (e.g. 3:remove)
+    [ID:default]           : Set a specific track as default  (e.g. 3:default)
+    [ID:forced]            : Set a specific track as forced  (e.g. 3:forced)
+    [ID:none]              : Remove default and forced flags from a track  (e.g. 3:none)
+    [LANG:default]         : Set tracks of a language as default  (e.g. ger:default)
+
+  Combine with semicolons:
+    [copy;3:remove]        : Copy all, but remove track 3
+    [auto;3:default]       : Auto-select logic, but override track 3 as default
+    [3:default;4:forced;5:remove]
+
+Track IDs are mkvmerge absolute track IDs, shown by 'hdr_forge info'.
 """
     )
 
@@ -749,6 +760,53 @@ Example:
         action='store_true',
     )
 
+def _add_edit_subcommand(parser: argparse._SubParsersAction) -> None:
+    """Add arguments for the 'edit' subcommand."""
+    edit_parser: argparse.ArgumentParser = parser.add_parser(
+        'edit',
+        description='Edit MKV files in-place (no re-encoding)',
+        formatter_class=argparse.RawTextHelpFormatter,
+        help='Edit MKV file properties in-place',
+    )
+
+    edit_parser.add_argument(
+        '-i', '--input',
+        required=True,
+        help='Input MKV file or directory containing MKV files',
+    )
+
+    edit_parser.add_argument(
+        '-s', '--subtitle-flags',
+        default=None,
+        help="""
+Subtitle flags. Same syntax as the convert subcommand.
+If omitted, subtitle properties are left untouched.
+
+  Global modes:
+    [copy]                 : Preserve source subtitle flags exactly
+    [auto]                 : Intelligently set forced/default tracks by system language
+    [auto>ger]             : Auto-select for a specific language
+
+  Per-track overrides (use track IDs from 'hdr_forge info'):
+    [ID:default]           : Set a track as default  (e.g. 3:default)
+    [ID:forced]            : Set a track as forced  (e.g. 3:forced)
+    [ID:none]              : Remove default and forced flags from a track  (e.g. 3:none)
+    [LANG:default]         : Set tracks of a language as default  (e.g. ger:default)
+
+  Combine with semicolons:
+    [copy;3:default]       : Copy flags, override track 3 as default
+    [auto>eng;4:forced]    : Auto-select English as default language, force track 4
+
+Note: In-place editing does not support :remove (track removal requires remux).
+Track IDs are mkvmerge absolute track IDs, shown by 'hdr_forge info'.
+"""
+    )
+
+    edit_parser.add_argument(
+        '-d', '--debug',
+        action='store_true',
+    )
+
 def parse_args():
     """Parse command-line arguments with subcommands.
 
@@ -778,5 +836,7 @@ def parse_args():
     _add_inject_dolby_vision_hdr_metadata_subcommand(parser=subparsers)
 
     _add_detect_logo_subcommand(parser=subparsers)
+
+    _add_edit_subcommand(parser=subparsers)
 
     return parser.parse_args()

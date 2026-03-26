@@ -12,6 +12,7 @@ from hdr_forge.cli.encoder import print_encoding_params
 from hdr_forge.cli.video import print_video_infos
 from hdr_forge.core import config
 from hdr_forge.core.service import shutdown_system
+from hdr_forge.edit_files import process_edit_command
 from hdr_forge.metadata_injector import MetadataInjector
 from hdr_forge.tools import dovi_tool, hdr10plus_tool, hevc_hdr_editor
 from hdr_forge.typedefs.dolby_vision_typing import DolbyVisionProfile
@@ -375,6 +376,8 @@ def main() -> None:
         code = process_inject_metadata_command(args)
     elif args.command == 'detect-logo':
         code = process_detect_logo_command(args)
+    elif args.command == 'edit':
+        code = process_edit_command(args)
     elif args.command == 'calc_maxcll':
         input_path = Path(args.input)
         if not input_path.exists():

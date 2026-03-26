@@ -106,36 +106,6 @@ hdr_forge inject-metadata -i video.mkv -o output.mkv \
 -   Video sampling for testing
 -   Enhanced CLI with comprehensive parameter support
 
-## What's New in v0.7.11
-
-### AV1 Support (Beta)
-
-HDR Forge now supports AV1 encoding via libsvtav1 (SVT-AV1 encoder). AV1 is a next-generation video codec that offers:
-
--   **Superior Compression:** 20-40% smaller file sizes compared to HEVC at similar quality
--   **Royalty-Free:** Open-source codec with no licensing fees
--   **Future-Proof:** Growing platform support (YouTube, Netflix, modern browsers)
-
-**Beta Status and Current Capabilities:**
--   **HDR10 Support:** Full HDR10 encoding support via stream metadata flags (Site Data)
--   **HDR10 Limitations:** Stream metadata only (no OBU-based HDR), Dolby Vision encoding not supported
--   **Stable and Production-Ready:** Mature encoder with excellent SDR and HDR10 results
-
-```bash
-# Basic AV1 encoding
-hdr_forge convert -i input.mkv -o output.mkv --encoder libsvtav1
-
-# AV1 with quality control
-hdr_forge convert -i input.mkv -o output.mkv --encoder libsvtav1 --quality 23
-
-# Convert HDR to SDR with AV1 (HDR input, SDR output)
-hdr_forge convert -i hdr_video.mkv -o output.mkv \
-  --encoder libsvtav1 \
-  --hdr-sdr-format sdr
-```
-
-**See [Encoder Guide - AV1](documentation/encoders.md#libsvtav1-av1) for detailed information.**
-
 ## Installation
 
 ### Requirements

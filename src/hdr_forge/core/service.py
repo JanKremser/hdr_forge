@@ -1,5 +1,6 @@
 import platform
 import subprocess
+import time
 
 from hdr_forge.cli.cli_output import print_warn
 
@@ -40,13 +41,17 @@ def build_ffmpeg_cmd_dict_to_str(cmd: dict[str, list[str] | str]) -> str:
     return ' '.join(parts)
 
 def shutdown_system() -> None:
-    """Shutdown the system after a delay."""
+    """Shutdown the system after conversion."""
     system: str = platform.system()
 
     try:
         if system == "Linux":
             print_warn("Shutting down the linux-system in 1 minute...")
-            subprocess.run(["shutdown", "-h", "+1"])
+            time.sleep(60)
+            result = subprocess.run(["systemctl", "poweroff"], capture_output=True)
+            if result.returncode != 0:
+                # Fallback für Nicht-systemd-Systeme
+                subprocess.run(["poweroff"])
         elif system == "Windows":
             print_warn("Shutting down the windows-system in 1 minute...")
             subprocess.run(["shutdown", "/s", "/t", "60"])

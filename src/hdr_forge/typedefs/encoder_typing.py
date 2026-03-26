@@ -81,6 +81,18 @@ class SubtitleModeItem():
     mode: SubtitleMode = SubtitleMode.AUTO
     default_lang: Optional[str] = None
 
+class SubtitleTrackAction(Enum):
+    """Per-track subtitle action."""
+    REMOVE = "remove"
+    DEFAULT = "default"
+    FORCED = "forced"
+    NONE = "none"
+
+@dataclass
+class SubtitleTrackOverride():
+    """Per-track override for a single subtitle track."""
+    action: SubtitleTrackAction
+
 class ScaleMode(Enum):
     """Scaling mode for video resizing after cropping."""
     ADAPTIVE = "adaptive"
@@ -226,6 +238,7 @@ class EncoderSettings:
     subtitle_flags: SubtitleModeItem = field(default_factory=lambda: SubtitleModeItem(
         mode=SubtitleMode.COPY, default_lang=None
     ))
+    subtitle_track_overrides: dict[str, SubtitleTrackOverride] = field(default_factory=dict)  # { lang or track id: SubtitleTrackOverride }
 
     # Video filter settings
     vfilter: Optional[str] = None
