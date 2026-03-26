@@ -628,7 +628,7 @@ class Encoder:
             Dictionary of FFmpeg output options
         """
         output_options: dict = {
-            "map": ["0:v"],
+            "map": ["0:V"],
         }
 
         if self._video_sample_in_sec is not None:
