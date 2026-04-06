@@ -149,11 +149,13 @@ def inject_rpu(input_path: Path, input_rpu: Path, output_hevc: Optional[Path] = 
 
         # Wait for the reader thread to finish
         reader_thread.join(timeout=1.0)
+        print()  # Newline after progress output
 
         if not output_hevc.exists():
             raise RuntimeError("HEVC file with RPU was not created")
 
         print_debug(f"RPU injected successfully: {str(output_hevc)}")
+        print()
         return output_hevc
 
     except FileNotFoundError as e:
