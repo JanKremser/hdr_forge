@@ -447,6 +447,73 @@ def create_ffmpeg_minimal_progress_handler(total_frames: int, process_start_time
     return on_progress
 
 
+def print_progress_info_percent(process_name: str, first_update: bool, percent: float, process_time_seconds: float) -> None:
+    """Display progress for dovi_tool operations with percentage-based tracking.
+
+    Args:
+        process_name: Description of the process
+        first_update: Whether this is the first progress update
+        percent: Progress percentage (0-100)
+        process_time_seconds: Time elapsed since process start
+    """
+    # Clamp percentage to 0-100
+    if percent > 100:
+        percent = 100
+    elif percent < 0:
+        percent = 0
+
+    # Create progress bar with percentage
+    progress_bar: str = create_progress_bar_with_percent(percent=percent)
+
+    process_time_str: str = format_time(seconds=process_time_seconds)
+
+    bar_len = 70
+    bar_len: int = bar_len - (len(process_name) + 4)
+    # Format for multi-line output
+    info_line: str = f"""
+{color_str(f"-- {process_name} " + ("-" * bar_len), ANSI_GREEN)}
+Progress      : {color_str(f"{percent:.1f}%", ANSI_GREEN)}
+Process Time  : {color_str(process_time_str, ANSI_GREEN)}
+{progress_bar}
+{color_str("-" * 70, ANSI_GREEN)}"""
+
+    # For the first output, we only need to print both lines
+    print(clear_lines(6) if first_update is False else "", end="")
+    print(info_line, end="", flush=True)
+
+
+def create_dovi_tool_progress_handler(process_name: str, process_start_time: float) -> Callable[[float], None]:
+    """Create a progress handler for dovi_tool operations with percentage-based progress.
+
+    Args:
+        process_name: Description of the dovi_tool operation
+        process_start_time: Start time of the process
+
+    Returns:
+        Progress handler function that accepts a percentage float (0-100)
+    """
+    first_update = True
+
+    def on_progress(percent: float) -> None:
+        """Handle progress updates from dovi_tool with percentage."""
+        nonlocal first_update
+
+        process_time_seconds: float = _calc_process_time_seconds(
+            process_start_time=process_start_time
+        )
+
+        print_progress_info_percent(
+            process_name=process_name,
+            first_update=first_update,
+            percent=percent,
+            process_time_seconds=process_time_seconds,
+        )
+        if first_update:
+            first_update = False
+
+    return on_progress
+
+
 def print_conversion_summary(success_count: int, fail_count: int) -> None:
     """Print conversion summary.
 

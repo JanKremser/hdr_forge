@@ -3,13 +3,14 @@
 import re
 import subprocess
 import threading
+import time
 from pathlib import Path
 from typing import Optional
 
-from hdr_forge.cli.cli_output import monitor_process_progress, print_debug
+from hdr_forge.cli.cli_output import print_debug, create_dovi_tool_progress_handler
 from hdr_forge.core.config import PROJECT_ROOT
 from hdr_forge.core.service import build_cmd_array_to_str
-from hdr_forge.tools.helper import run_ffmpeg_tool_pipeline
+from hdr_forge.tools.helper import run_ffmpeg_tool_pipeline, dovi_tool_progress_reader_thread
 from hdr_forge.typedefs.dolby_vision_typing import DolbyVisionProfile, DolbyVisionRpuInfo
 
 
@@ -125,22 +126,29 @@ def inject_rpu(input_path: Path, input_rpu: Path, output_hevc: Optional[Path] = 
         dovi_process = subprocess.Popen(
             dovi_cmd,
             stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL
+            stderr=subprocess.STDOUT,
+            text=True
         )
 
-        # Start a thread to monitor and show progress
-        monitor_thread = threading.Thread(
-            target=monitor_process_progress,
-            args=(dovi_process, "Injecting RPU metadata:"),
+        # Start progress tracking thread for dovi_tool's percentage output
+        process_start_time = time.time()
+        progress_callback = create_dovi_tool_progress_handler(
+            process_name="Injecting RPU metadata:",
+            process_start_time=process_start_time
+        )
+
+        reader_thread = threading.Thread(
+            target=dovi_tool_progress_reader_thread,
+            args=(dovi_process.stdout, progress_callback),
             daemon=True
         )
-        monitor_thread.start()
+        reader_thread.start()
 
         # Wait for dovi_tool to complete
         dovi_process.wait()
 
-        # Wait for the monitor thread to finish
-        monitor_thread.join(timeout=1.0)
+        # Wait for the reader thread to finish
+        reader_thread.join(timeout=1.0)
 
         if not output_hevc.exists():
             raise RuntimeError("HEVC file with RPU was not created")
@@ -281,26 +289,32 @@ def inject_dolby_vision_layers(bl_path: Path, el_path: Path, output_bl_el: Optio
         dovi_process = subprocess.Popen(
             dovi_cmd,
             stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
+            stderr=subprocess.STDOUT,
+            text=True
         )
 
-        # Start a thread to monitor and show progress
-        monitor_thread = threading.Thread(
-            target=monitor_process_progress,
-            args=(dovi_process, "Multiplexing Dolby Vision layers:"),
+        # Start progress tracking thread for dovi_tool's percentage output
+        process_start_time = time.time()
+        progress_callback = create_dovi_tool_progress_handler(
+            process_name="Multiplexing Dolby Vision layers:",
+            process_start_time=process_start_time
+        )
+
+        reader_thread = threading.Thread(
+            target=dovi_tool_progress_reader_thread,
+            args=(dovi_process.stdout, progress_callback, 1),
             daemon=True
         )
-        monitor_thread.start()
+        reader_thread.start()
 
         # Wait for dovi_tool to complete
-        _stdout, stderr = dovi_process.communicate()
+        dovi_process.wait()
 
-        # Wait for the monitor thread to finish
-        monitor_thread.join(timeout=1.0)
+        # Wait for the reader thread to finish
+        reader_thread.join(timeout=1.0)
 
         if dovi_process.returncode != 0:
-            error_msg = stderr.decode('utf-8', errors='ignore')
-            raise RuntimeError(f"dovi_tool muxing failed: {error_msg}")
+            raise RuntimeError("dovi_tool muxing failed")
 
         if not output_bl_el.exists():
             raise RuntimeError("Multiplexed file was not created")
