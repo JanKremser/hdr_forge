@@ -660,6 +660,13 @@ Extract Dolby Vision/HDR10 and/or HDR10Plus metadata from a encoded video file.
     )
 
     inject_parser.add_argument(
+        '--crop',
+        action='store_true',
+        required=False,
+        help='Crop RPU active area offsets (passes --crop to dovi_tool)'
+    )
+
+    inject_parser.add_argument(
         '-d', '--debug',
         action='store_true',
     )

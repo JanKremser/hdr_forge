@@ -267,12 +267,14 @@ def process_extract_metadata_command(args) -> int:
         if video.is_dolby_vision_video():
             rpu_file_path: Path = output_path / f"{input_path.stem}.rpu"
             to_dv_profile_8: bool = getattr(args, 'to_dv_8', False)
+            crop: bool = getattr(args, 'crop', False)
             dovi_tool.extract_rpu(
                 input_path=video.get_filepath(),
                 output_rpu=rpu_file_path,
                 total_frames=video.get_total_frames(),
                 dv_profile_source=video.get_dolby_vision_profile(),
                 dv_profile_encoding=DolbyVisionProfile._8 if to_dv_profile_8 else None,
+                crop=crop,
             )
             dv_info: dovi_tool.DolbyVisionRpuInfo = dovi_tool.get_rpu_info(
                 rpu_path=rpu_file_path,

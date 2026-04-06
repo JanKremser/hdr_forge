@@ -164,6 +164,7 @@ def extract_rpu(
     dv_profile_encoding: Optional[DolbyVisionProfile] = None,
     total_frames: Optional[int] = None,
     use_cache: bool = False,
+    crop: bool = False,
 ) -> Path:
     """Extract Dolby Vision RPU (Reference Processing Unit) metadata.
 
@@ -174,6 +175,7 @@ def extract_rpu(
         dv_profile_source: Source Dolby Vision profile
         dv_profile_encoding: Target Dolby Vision profile for encoding
         total_frames: Total number of frames in the video (for progress tracking)
+        crop: If True, adds --crop flag to dovi_tool command
 
     Returns:
         Path to the extracted RPU file
@@ -208,6 +210,9 @@ def extract_rpu(
             if dv_profile_encoding == DolbyVisionProfile._8:
                 if dv_profile_source.value in map_dv_profile8_mode:
                     dovi_cmd.extend(['-m', map_dv_profile8_mode[dv_profile_source.value]])
+
+        if crop:
+            dovi_cmd.append('--crop')
 
         dovi_cmd.extend([
             'extract-rpu',
