@@ -57,3 +57,4 @@ yolov8n.pt
 yolo11n.pt
 frame.png
 maske.png
+*.spec

@@ -907,6 +907,8 @@ class Encoder:
                     return self.convert_dolby_vision_to_hdr10_without_re_encoding()
 
             # Dolby Vision encoding workflow
-            return self.convert_dolby_vision()
+            return self.convert_dolby_vision(
+                extract_base_layer=False,
+            )
 
         return self.convert_sdr_hdr10_or_video_copy()
