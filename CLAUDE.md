@@ -40,7 +40,7 @@ HDR Forge is a Python CLI tool for video conversion with HDR metadata preservati
 
 ```
 src/hdr_forge/
-├── main.py                        # CLI entry point (info, convert, calc_maxcll, extract-metadata, inject-metadata, edit, detect-logo)
+├── main.py                        # CLI entry point (info, convert, extract-metadata, inject-metadata, edit, detect-logo)
 ├── main_ui.py                     # GUI entry point (shim, calls ui.main_ui)
 ├── video.py                       # Video metadata extraction (Video class)
 ├── encoder.py                     # Encoder orchestration (Encoder class)
@@ -75,7 +75,6 @@ src/hdr_forge/
 │   ├── mkvpropedit.py             # In-place MKV property editing
 │   └── helper.py                  # Utility functions
 ├── analyze/                       # Content analysis
-│   ├── maxcll.py                  # MaxCLL/MaxFALL calculation
 │   ├── grain_score.py             # Grain detection
 │   ├── motion_score.py            # Motion detection
 │   ├── crop_video.py              # Crop detection
@@ -283,7 +282,6 @@ hdr_forge convert -i input.mkv -o output.mkv --encoder libx265 --encoder-params 
 
 # Other commands
 hdr_forge info -i input.mkv
-hdr_forge calc_maxcll -i input.mkv
 hdr_forge detect-logo -i input.mkv --export logo_mask.png
 hdr_forge extract-metadata -i input.mkv -o ./metadata
 hdr_forge inject-metadata -i input.mkv -o output.mkv --hdr10 metadata.json

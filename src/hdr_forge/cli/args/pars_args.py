@@ -49,29 +49,6 @@ def _add_info_subcommand(parser: argparse._SubParsersAction) -> None:
     )
 
 
-def _add_maxcll_subcommand(parser: argparse._SubParsersAction) -> None:
-    """Add arguments for the 'calc_maxcll' subcommand.
-
-    Args:
-        parser: Argument parser to add arguments to
-    """
-    # "maccll" subcommand
-    maxcll_parser: argparse.ArgumentParser = parser.add_parser('calc_maxcll',
-        description='BETA function. Calculate MaxCLL and MaxFALL values for HDR videos',
-        help='Calculate MaxCLL and MaxFALL'
-    )
-
-    maxcll_parser.add_argument(
-        '-i', '--input',
-        required=True,
-        help='Video file for MaxCLL and MaxFALL calculation'
-    )
-
-    maxcll_parser.add_argument(
-        '-d', '--debug',
-        action='store_true',
-    )
-
 def _add_detect_logo_subcommand(parser: argparse._SubParsersAction) -> None:
     """Add arguments for the 'detect_logo' subcommand.
 
@@ -834,8 +811,6 @@ def parse_args():
     subparsers.required = True
 
     _add_info_subcommand(parser=subparsers)
-
-    _add_maxcll_subcommand(parser=subparsers)
 
     _add_convert_subcommand(parser=subparsers)
 

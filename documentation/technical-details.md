@@ -842,16 +842,6 @@ Debug:
 
 **For detailed parameter explanations, see earlier sections of this document.**
 
-### calc_maxcll Subcommand
-
-```
-hdr_forge calc_maxcll -i INPUT   Calculate MaxCLL and MaxFALL (BETA)
-
-Options:
-  -i, --input INPUT         Input video file
-  -d, --debug               Enable debug output
-```
-
 ## See Also
 
 -   [Encoder Guide](encoders.md) - Detailed encoder information
