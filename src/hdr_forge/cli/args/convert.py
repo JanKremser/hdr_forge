@@ -313,7 +313,7 @@ Example:
     )
 
     convert_parser.add_argument(
-        '--hdr-sdr-format',
+        '--hdr',
         choices=['auto', 'hdr10', 'hdr', 'sdr'],
         default='auto',
         help=f"""{sdr_dot} {hdr_dot} {dolby_vision_dot}
@@ -357,7 +357,7 @@ Process only a short sample of the video for testing purposes. Not supported for
 Expert Option:
 Add custom FFmpeg video filters.
 If you want to overwrite settings, avoid using these arguments.
-    --crop, --scale, --scale-mode, --hdr-sdr-format
+    --crop, --scale, --scale-mode, --hdr
 Otherwise, your filter will be placed at the beginning of the filter chain.
 
 Format:

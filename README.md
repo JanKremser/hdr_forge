@@ -51,7 +51,7 @@ hdr_forge edit -i video.mkv --subtitle-flags auto
 hdr_forge_ui
 
 # Convert Dolby Vision to HDR10
-hdr_forge convert -i dv.mkv -o output.mkv --hdr-sdr-format hdr10
+hdr_forge convert -i dv.mkv -o output.mkv --hdr hdr10
 
 # Inject metadata without re-encoding
 hdr_forge inject-metadata -i video.mkv -o output.mkv \
@@ -198,7 +198,7 @@ hdr_forge info -i dolby_vision.mkv  # shows "RPU Crop" if detected
 hdr_forge convert -i profile5_dv.mkv -o output.mkv --dv-profile 8
 
 # Profile 5 → HDR10 (fast format conversion)
-hdr_forge convert -i profile5_dv.mkv -o output.mkv --hdr-sdr-format hdr10
+hdr_forge convert -i profile5_dv.mkv -o output.mkv --hdr hdr10
 ```
 
 ## Usage
@@ -365,15 +365,15 @@ hdr_forge convert -i dolby_vision.mkv -o output.mkv --crop off
 hdr_forge convert -i dolby_vision.mkv -o output.mkv --dv-profile 8 --crop off
 
 # Convert to HDR10 (extract base layer)
-hdr_forge convert -i dolby_vision.mkv -o output.mkv --hdr-sdr-format hdr10
+hdr_forge convert -i dolby_vision.mkv -o output.mkv --hdr hdr10
 
 # Fast conversion without re-encoding
 hdr_forge convert -i dolby_vision.mkv -o output.mkv \
   --video-codec copy \
-  --hdr-sdr-format hdr10
+  --hdr hdr10
 
 # Convert to SDR with tone mapping
-hdr_forge convert -i dolby_vision.mkv -o output.mkv --hdr-sdr-format sdr
+hdr_forge convert -i dolby_vision.mkv -o output.mkv --hdr sdr
 ```
 
 **Crop:** Auto crop (with `--crop auto`) reads RPU L5 offsets. Manual and ratio crop modes are blocked. Scale not supported.
@@ -383,13 +383,13 @@ hdr_forge convert -i dolby_vision.mkv -o output.mkv --hdr-sdr-format sdr
 
 ```bash
 # Convert HDR10 to SDR with tone mapping
-hdr_forge convert -i hdr10_video.mkv -o output.mkv --hdr-sdr-format sdr
+hdr_forge convert -i hdr10_video.mkv -o output.mkv --hdr sdr
 
 # Preserve HDR without metadata (metadata flags only)
-hdr_forge convert -i hdr10_video.mkv -o output.mkv --hdr-sdr-format hdr
+hdr_forge convert -i hdr10_video.mkv -o output.mkv --hdr hdr
 
 # Keep source format (default)
-hdr_forge convert -i input.mkv -o output.mkv --hdr-sdr-format auto
+hdr_forge convert -i input.mkv -o output.mkv --hdr auto
 ```
 
 **Format hierarchy:** Dolby Vision → HDR10 → HDR (metadata only) → SDR (only downgrades supported)

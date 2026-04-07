@@ -105,7 +105,7 @@ hdr_forge convert -i input.mkv -o output.mkv --hw-preset cpu:quality
 
 **Convert Dolby Vision to HDR10:**
 ```bash
-hdr_forge convert -i dv.mkv -o hdr10.mkv --hdr-sdr-format hdr10
+hdr_forge convert -i dv.mkv -o hdr10.mkv --hdr hdr10
 ```
 
 **Batch conversion:**

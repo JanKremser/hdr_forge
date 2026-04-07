@@ -404,7 +404,7 @@ hdr_forge convert -i dv.mkv -o output.mkv --scale FHD             ← ERROR
 
 ```bash
 # Step 1: Extract HDR10 base layer (removes DV RPU)
-hdr_forge convert -i dolby_vision.mkv -o hdr10.mkv --hdr-sdr-format hdr10
+hdr_forge convert -i dolby_vision.mkv -o hdr10.mkv --hdr hdr10
 
 # Step 2: Apply manual crop or scale to HDR10 video
 hdr_forge convert -i hdr10.mkv -o final.mkv --crop 1920:800:0:140 --scale FHD
@@ -431,7 +431,7 @@ Dolby Vision workflow involves multiple steps (base layer extraction, RPU extrac
    ```bash
    # If Dolby Vision not needed, convert to HDR10
    hdr_forge convert -i dolby_vision.mkv -o output.mkv \
-     --hdr-sdr-format hdr10
+     --hdr hdr10
    ```
 
 3. **Use GPU Encoding:**
@@ -490,13 +490,13 @@ Profile 5 (IPTPQc2) uses a non-standard color space which cannot be stream-copie
 2. **Convert to HDR10 (faster alternative):**
    ```bash
    # Extracts HDR10 base layer without RPU
-   hdr_forge convert -i profile5_dv.mkv -o output_hdr10.mkv --hdr-sdr-format hdr10
+   hdr_forge convert -i profile5_dv.mkv -o output_hdr10.mkv --hdr hdr10
    ```
 
 3. **Convert to SDR:**
    ```bash
    # Profile 5 → SDR with tone mapping
-   hdr_forge convert -i profile5_dv.mkv -o output_sdr.mkv --hdr-sdr-format sdr
+   hdr_forge convert -i profile5_dv.mkv -o output_sdr.mkv --hdr sdr
    ```
 
 **Requirements for Profile 5 → 8.1:**
@@ -750,8 +750,8 @@ HDR Forge only supports format downgrades (DV → HDR10 → SDR), not upgrades.
 # Can only do: DV → HDR10, HDR10 → SDR, DV → SDR
 
 # Keep original format or downgrade
-hdr_forge convert -i hdr10.mkv -o output.mkv --hdr-sdr-format auto
-hdr_forge convert -i hdr10.mkv -o output.mkv --hdr-sdr-format sdr
+hdr_forge convert -i hdr10.mkv -o output.mkv --hdr auto
+hdr_forge convert -i hdr10.mkv -o output.mkv --hdr sdr
 ```
 
 ### "Speed preset not compatible with NVENC"
@@ -782,7 +782,7 @@ Dolby Vision RPU metadata requires the complete video stream.
 # Cannot sample when preserving Dolby Vision
 # Either remove --sample or convert to HDR10
 hdr_forge convert -i dolby_vision.mkv -o output.mkv \
-  --hdr-sdr-format hdr10 \
+  --hdr hdr10 \
   --sample auto
 ```
 

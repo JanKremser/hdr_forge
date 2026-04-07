@@ -113,18 +113,18 @@ hdr_forge convert -i hdr10_video.mkv -o hdr10_av1.mkv \
 # Convert HDR10 to SDR with AV1 (tone mapping)
 hdr_forge convert -i hdr10_video.mkv -o sdr_av1.mkv \
   --encoder libsvtav1 \
-  --hdr-sdr-format sdr \
+  --hdr sdr \
   --quality 23
 
 # Dolby Vision to HDR10 with AV1
 hdr_forge convert -i dolby_vision.mkv -o hdr10_av1.mkv \
   --encoder libsvtav1 \
-  --hdr-sdr-format hdr10
+  --hdr hdr10
 
 # Dolby Vision to SDR with AV1
 hdr_forge convert -i dolby_vision.mkv -o sdr_av1.mkv \
   --encoder libsvtav1 \
-  --hdr-sdr-format sdr
+  --hdr sdr
 ```
 
 **Note:** AV1 HDR10 is pass-through only — HDR10 metadata from the source is carried as SiteData and not modified. Dolby Vision encoding not supported.
@@ -701,18 +701,18 @@ hdr_forge convert -i dolby_vision.mkv -o output.mkv \
 ```bash
 # Extract HDR10 base layer with re-encoding
 hdr_forge convert -i dolby_vision.mkv -o hdr10.mkv \
-  --hdr-sdr-format hdr10
+  --hdr hdr10
 
 # With crop and scale (supported when converting to HDR10)
 hdr_forge convert -i dolby_vision.mkv -o hdr10_1080p.mkv \
-  --hdr-sdr-format hdr10 \
+  --hdr hdr10 \
   --crop auto \
   --scale FHD
 
 # Fast extraction without re-encoding
 hdr_forge convert -i dolby_vision.mkv -o hdr10.mkv \
   --video-codec copy \
-  --hdr-sdr-format hdr10
+  --hdr hdr10
 ```
 
 ### DV to SDR
@@ -720,17 +720,17 @@ hdr_forge convert -i dolby_vision.mkv -o hdr10.mkv \
 ```bash
 # Convert to SDR with tone mapping
 hdr_forge convert -i dolby_vision.mkv -o sdr.mkv \
-  --hdr-sdr-format sdr
+  --hdr sdr
 
 # With crop and scale
 hdr_forge convert -i dolby_vision.mkv -o sdr_720p.mkv \
-  --hdr-sdr-format sdr \
+  --hdr sdr \
   --crop auto \
   --scale HD
 
 # Fast GPU conversion
 hdr_forge convert -i dolby_vision.mkv -o sdr.mkv \
-  --hdr-sdr-format sdr \
+  --hdr sdr \
   --encoder hevc_nvenc
 ```
 
@@ -758,7 +758,7 @@ hdr_forge convert -i dolby_vision.mkv -o output.mkv \
 
 **Workaround for manual crop with DV:** Convert to HDR10 first:
 ```bash
-hdr_forge convert -i dolby_vision.mkv -o hdr10_temp.mkv --hdr-sdr-format hdr10
+hdr_forge convert -i dolby_vision.mkv -o hdr10_temp.mkv --hdr hdr10
 hdr_forge convert -i hdr10_temp.mkv -o final.mkv --crop 1920:800:0:140
 ```
 
@@ -771,10 +771,10 @@ Profile 5 (IPTPQc2) uses a non-standard color space and requires full re-encodin
 hdr_forge convert -i profile5_dv.mkv -o output_p81.mkv --dv-profile 8
 
 # Profile 5 → HDR10 (extract base layer with re-encode)
-hdr_forge convert -i profile5_dv.mkv -o output_hdr10.mkv --hdr-sdr-format hdr10
+hdr_forge convert -i profile5_dv.mkv -o output_hdr10.mkv --hdr hdr10
 
 # Profile 5 → SDR (full tone mapping)
-hdr_forge convert -i profile5_dv.mkv -o output_sdr.mkv --hdr-sdr-format sdr
+hdr_forge convert -i profile5_dv.mkv -o output_sdr.mkv --hdr sdr
 
 # With quality settings
 hdr_forge convert -i profile5_dv.mkv -o output_p81_1080p.mkv \
@@ -790,12 +790,12 @@ hdr_forge convert -i profile5_dv.mkv -o output_p81_1080p.mkv \
 ```bash
 # Convert entire DV library to HDR10
 hdr_forge convert -i ./dv_collection -o ./hdr10_collection \
-  --hdr-sdr-format hdr10 \
+  --hdr hdr10 \
   --scale FHD
 
 # Convert DV library to SDR
 hdr_forge convert -i ./dv_collection -o ./sdr_collection \
-  --hdr-sdr-format sdr \
+  --hdr sdr \
   --crop auto
 ```
 
@@ -908,14 +908,14 @@ hdr_forge convert -i source.mkv -o 1080p_hdr.mkv \
 
 # 1080p SDR for compatibility
 hdr_forge convert -i source.mkv -o 1080p_sdr.mkv \
-  --hdr-sdr-format sdr \
+  --hdr sdr \
   --scale FHD \
   --crop auto \
   --encoder hevc_nvenc
 
 # 720p H.264 for maximum compatibility
 hdr_forge convert -i source.mkv -o 720p_h264.mkv \
-  --hdr-sdr-format sdr \
+  --hdr sdr \
   --scale HD \
   --encoder h264_nvenc \
   --crop auto
@@ -946,7 +946,7 @@ hdr_forge convert -i ./4k_videos -o ./1080p_videos \
 
 # Batch HDR to SDR
 hdr_forge convert -i ./hdr_videos -o ./sdr_videos \
-  --hdr-sdr-format sdr \
+  --hdr sdr \
   --crop auto
 ```
 

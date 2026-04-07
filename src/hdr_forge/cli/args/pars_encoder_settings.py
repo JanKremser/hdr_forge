@@ -863,7 +863,7 @@ def create_encoder_settings_from_args(args) -> EncoderSettings:
         dar_ratio=_get_dar_ratio_settings_from_string(getattr(args, 'dar_ratio', None)),
         try_fix=getattr(args, 'try_fix', False) or False,
         hdr_forge_encoding_preset=hdr_forge_preset_settings,
-        hdr_sdr_format=_get_hdr_sdr_format_from_string(format_str=args.hdr_sdr_format),
+        hdr_sdr_format=_get_hdr_sdr_format_from_string(format_str=args.hdr),
         enable_gpu_acceleration=hdr_forge_preset_settings.hardware_preset.value.startswith('gpu:'),
         target_dv_profile=_get_dolby_vision_profile_from_string(profile_str=args.dv_profile),
         libx265_params=libx265_params,

@@ -188,7 +188,7 @@ Key functions:
 ### Dolby Vision Conversion
 
 **Workflow 1: DV → HDR10/SDR (Copy Mode)**
-- Command: `--video-codec copy --hdr-sdr-format hdr10`
+- Command: `--video-codec copy --hdr hdr10`
 - Extract base layer (dovi_tool remove)
 - Mux with audio/subs
 
@@ -266,7 +266,7 @@ hdr_forge convert -i input.mkv -o output.mkv --scale FHD|UHD --scale-mode height
 hdr_forge convert -i input.mkv -o output.mkv --grain auto
 
 # Format conversion
-hdr_forge convert -i dv.mkv -o output.mkv --hdr-sdr-format hdr10|sdr
+hdr_forge convert -i dv.mkv -o output.mkv --hdr hdr10|sdr
 
 # DV profile conversion (copy mode)
 hdr_forge convert -i dv.mkv -o output.mkv --video-codec copy --dv-profile 8
