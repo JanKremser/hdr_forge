@@ -286,10 +286,10 @@ hdr_forge convert -i action.mkv -o output.mkv --preset action
 hdr_forge convert -i anime.mkv -o output.mkv --preset animation
 
 # Grain preservation with x265 parameters
-hdr_forge convert -i grainy_film.mkv -o output.mkv --preset grain
+hdr_forge convert -i grainy_film.mkv -o output.mkv --preset grain:low
 
 # Grain preservation with FFmpeg tune=grain
-hdr_forge convert -i grainy_film.mkv -o output.mkv --preset grain:ffmpeg
+hdr_forge convert -i grainy_film.mkv -o output.mkv --preset grain
 
 # Banding reduction (and 8-bit to 10-bit for SDR)
 hdr_forge convert -i input.mkv -o output.mkv --preset banding

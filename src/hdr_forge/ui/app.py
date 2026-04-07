@@ -147,7 +147,7 @@ class HdrForgeGui:
             settings_frame,
             textvariable=self.preset_var,
             values=['auto', 'film', 'film4k', 'film4k:fast', 'banding', 'video',
-                    'action', 'animation', 'grain', 'grain:ffmpeg'],
+                    'action', 'animation', 'grain:low', 'grain'],
             state='readonly',
             width=20
         )

@@ -730,7 +730,7 @@ Subtitle Options:
 
 Encoding Presets:
   -p, --preset PRESET       Content preset: auto, film, film4k, film4k:fast,
-                            grain, grain:ffmpeg, banding, video, action,
+                            grain:low, grain, banding, video, action,
                             animation (default: auto)
   --hw-preset PRESET        Hardware preset: cpu, cpu:balanced, cpu:quality,
                             gpu, gpu:balanced, gpu:quality, balanced, quality

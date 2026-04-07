@@ -141,7 +141,7 @@ Track IDs are mkvmerge absolute track IDs, shown by 'hdr_forge info'.
 
     convert_parser.add_argument(
         '-p', '--preset',
-        choices=["auto", "film", "film4k", "film4k:fast", "banding", "video", "action", "animation", "grain", "grain:ffmpeg"],
+        choices=["auto", "film", "film4k", "film4k:fast", "banding", "video", "action", "animation", "grain:low", "grain"],
         default="auto",
         help=f"""{sdr_dot} {hdr_dot} {dolby_vision_dot}
 HDR Forge encoding preset for simplified settings. Default is the automation mode. Not libx265/libx264 presets.
@@ -161,8 +161,8 @@ Presets:
                      This settings switch 8bit encoding for SDR to 10bit, reducing banding artifacts in challenging scenes.
     [action]       : Optimized for action-packed content with fast motion
     [animation]    : Optimized for animated content with vibrant colors
-    [grain]        : Optimize encoding settings for grainy content
-    [grain:ffmpeg] : Using ffmpeg's tune=grain option\n
+    [grain]        : Using ffmpeg's tune=grain option
+    [grain:low]    : Optimize encoding settings for grainy content\n
 """
     )
 

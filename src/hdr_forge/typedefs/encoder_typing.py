@@ -178,8 +178,8 @@ class HdrForgeEncodingTuningPresets(Enum):
     BANDING = "banding"
     ACTION = "action"
     ANIMATION = "animation"
+    GRAIN_LOW = "grain:low"
     GRAIN = "grain"
-    GRAIN_FFMPEG = "grain:ffmpeg"
     FILM4K = "film4k"
     FILM4K_FAST = "film4k:fast"
 
