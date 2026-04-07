@@ -331,8 +331,7 @@ hdr_forge convert -i input.mkv -o output.mkv \
 ```bash
 hdr_forge convert -i input.mkv -o output.mkv \
   --encoder libx265 \
-  --hw-preset cpu:quality \
-  --grain auto
+  --hw-preset cpu:quality
 ```
 
 ### For Fast Batch Processing

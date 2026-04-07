@@ -257,9 +257,6 @@ iotop  # Check if disk is bottleneck
    ```bash
    # Disable crop detection
    hdr_forge convert -i input.mkv -o output.mkv --crop off
-
-   # Disable grain analysis
-   hdr_forge convert -i input.mkv -o output.mkv --grain off
    ```
 
 4. **Use Lower Resolution:**
@@ -532,13 +529,7 @@ Profile 5 (IPTPQc2) uses a non-standard color space which cannot be stream-copie
    hdr_forge convert -i input.mkv -o output.mkv --speed slow
    ```
 
-4. **Enable Grain Tuning:**
-   ```bash
-   # For content with grain
-   hdr_forge convert -i input.mkv -o output.mkv --grain cat2
-   ```
-
-5. **Switch to CPU Encoding:**
+4. **Switch to CPU Encoding:**
    ```bash
    # CPU encoding has better quality than GPU
    hdr_forge convert -i input.mkv -o output.mkv \
@@ -582,31 +573,24 @@ Profile 5 (IPTPQc2) uses a non-standard color space which cannot be stream-copie
 
 **Solutions:**
 
-1. **Enable Grain Analysis:**
-   ```bash
-   hdr_forge convert -i film.mkv -o output.mkv --grain cat2
-   ```
-
-2. **Lower CRF:**
+1. **Lower CRF:**
    ```bash
    hdr_forge convert -i film.mkv -o output.mkv \
-     --quality 14 \
-     --grain cat2
+     --quality 14
    ```
 
-3. **Use Grain Tune:**
+2. **Use Grain Tune:**
    ```bash
    hdr_forge convert -i film.mkv -o output.mkv \
      --encoder libx265 \
      --encoder-params "preset=slow:crf=14:tune=grain"
    ```
 
-4. **Use CPU Encoding:**
+3. **Use CPU Encoding:**
    ```bash
    # CPU encoding better at preserving grain
    hdr_forge convert -i film.mkv -o output.mkv \
-     --hw-preset cpu:quality \
-     --grain cat3
+     --hw-preset cpu:quality
    ```
 
 ## Performance Issues
@@ -680,8 +664,7 @@ Automatic crop detection analyzes 10 video positions, requiring 10 FFmpeg invoca
 4. **Disable Heavy Features:**
    ```bash
    hdr_forge convert -i ./videos -o ./encoded \
-     --crop off \
-     --grain off
+     --crop off
    ```
 
 ## Crop/Scale Issues

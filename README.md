@@ -69,7 +69,7 @@ hdr_forge inject-metadata -i video.mkv -o output.mkv \
 
 | Version | Highlights |
 |---------|-----------|
-| **1.1.0** | DV auto crop via L5 offsets, Profile 5→8.1 re-encoding with libplacebo, `edit` subcommand for in-place MKV editing, GUI (experimental) |
+| **1.1.0** | DV auto crop via L5 offsets, Profile 5→8.1 re-encoding with libplacebo, `edit` subcommand for in-place MKV editing, GUI (experimental). Removed: `calc_maxcll` subcommand, `--grain` auto-detection, mask-based logo removal |
 | **1.0.0** | AV1 encoding (libsvtav1), audio/subtitle management, logo removal, batch processing |
 | **0.7.x** | HDR metadata injection, DV profile support, audio/subtitle management, logo detection |
 | **0.4.0** | Python rewrite with NVENC, multiple encoders, advanced cropping/scaling, grain analysis |

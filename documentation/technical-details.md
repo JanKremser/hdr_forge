@@ -752,9 +752,8 @@ Cropping & Scaling:
   --scale-mode MODE         Scale mode: height, adaptive (default: height)
 
 Content Analysis & Filtering:
-  --grain MODE              Grain analysis: off, auto, cat1, cat2, cat3 (default: off)
   --remove-logo MODE        Logo removal: off, auto, delogo:auto, delogo:top-left,
-                            mask:auto, mask:top-left (default: off)
+                            delogo:bot-left, delogo:bot-right (default: off)
   --sample TIME             Process sample: auto or start:end in seconds
   --dar-ratio RATIO         Custom display aspect ratio (e.g., 16:9, cinema)
   --vfilter FILTERS         Custom FFmpeg video filters
