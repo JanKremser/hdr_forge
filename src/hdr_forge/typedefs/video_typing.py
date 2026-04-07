@@ -4,6 +4,14 @@ from typing import Optional
 
 
 @dataclass
+class CropResult:
+    width: int = 0
+    height: int = 0
+    x: int = 0
+    y: int = 0
+    is_valid: bool = False
+
+@dataclass
 class MasterDisplayMetadata:
     r_x: float
     r_y: float

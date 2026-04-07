@@ -364,8 +364,8 @@ Examples:
 
     convert_parser.add_argument(
         '--crop',
-        help=f"""{sdr_dot} {hdr_dot}
-Crop black bars from video. Not supported for Dolby Vision encoding.
+        help=f"""{sdr_dot} {hdr_dot} {dolby_vision_dot}
+Crop black bars from video. Only [auto] is supported for Dolby Vision encoding.
 [off]              : Default: No cropping
 [auto]             : Automatically detect and crop black bars
 [width:height:x:y] : Manually specify crop dimensions. The basis for the calculation is the original video, not the target resolution.

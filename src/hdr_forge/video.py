@@ -6,6 +6,7 @@ import subprocess
 from pathlib import Path
 from typing import Dict, Optional, Tuple
 
+from hdr_forge.typedefs.video_typing import CropResult
 from hdr_forge.core.config import get_global_temp_directory
 from hdr_forge.tools import hdr10plus_tool, mkvmerge
 from hdr_forge.tools import dovi_tool
@@ -404,6 +405,31 @@ class Video:
             return DolbyVisionProfile(dv_info.dv_profile)
         except ValueError:
             return None
+
+    def get_dolby_vision_crop(self) -> Optional[CropResult]:
+        dv_info: DolbyVisionInfo | None = self.get_dolby_vision_info()
+        if not dv_info or not dv_info.offset:
+            return None
+
+        h: int = self.get_height()
+        w: int = self.get_width()
+
+        new_w = w - (dv_info.offset.left + dv_info.offset.right)
+        new_h = h - (dv_info.offset.top + dv_info.offset.bottom)
+
+        if new_w <= 0 or new_h <= 0:
+            return None
+
+        if new_w == w and new_h == h:
+            return None
+        
+        return CropResult(
+            x=dv_info.offset.left,
+            y=dv_info.offset.top,
+            width=new_w,
+            height=new_h,
+            is_valid=True,
+        )
 
     def get_master_display(self) -> Optional[MasterDisplayMetadata]:
         """Extract HDR master display metadata.

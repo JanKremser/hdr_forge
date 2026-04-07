@@ -336,6 +336,9 @@ class Encoder:
             if HdrSdrFormat.DOLBY_VISION in self._video.get_hdr_sdr_format() and self._encoder_settings.hdr_sdr_format == HdrSdrFormat.HDR10:
                 return [HdrSdrFormat.HDR10]
             return self._video.get_hdr_sdr_format()
+
+        if HdrSdrFormat.HDR10 in self._video.get_hdr_sdr_format() and self._video_codec_lib.get_encoding_hdr_sdr_format() != HdrSdrFormat.SDR:
+            return [self._video_codec_lib.get_encoding_hdr_sdr_format(), HdrSdrFormat.HDR10]
         return [self._video_codec_lib.get_encoding_hdr_sdr_format()]
 
     def is_dolby_vision_encoding(self) -> bool:

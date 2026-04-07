@@ -6,15 +6,8 @@ from typing import Counter, Optional, Tuple
 from dataclasses import dataclass
 from hdr_forge.cli.cli_output import ProgressBarSpinner, print_err, print_warn
 from hdr_forge.typedefs.encoder_typing import CropMode, CropSettings, HdrSdrFormat
+from hdr_forge.typedefs.video_typing import CropResult
 from hdr_forge.video import Video
-
-@dataclass
-class CropResult:
-    width: int = 0
-    height: int = 0
-    x: int = 0
-    y: int = 0
-    is_valid: bool = False
 
 class VideoCropper:
     def __init__(self, video: Video, crop_settings: CropSettings, encoding_hdr_sdr_format: HdrSdrFormat):
@@ -114,6 +107,12 @@ class VideoCropper:
             return
 
         if self._encoding_hdr_sdr_format == HdrSdrFormat.DOLBY_VISION:
+            if self._crop_settings.mode == CropMode.AUTO:
+                crop: CropResult | None = self._video.get_dolby_vision_crop()
+                if crop and crop.is_valid:
+                    self._crop_result: CropResult = crop
+
+                return
             print_err(msg="Crop detection is not supported for Dolby Vision encoding.")
             sys.exit(1)
 

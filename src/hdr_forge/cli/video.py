@@ -1,11 +1,9 @@
 """CLI output and progress tracking functionality."""
 
-
-
 from hdr_forge.cli.cli_output import ANSI_BLUE, color_str, create_aspect_ratio_str
 from hdr_forge.typedefs.dolby_vision_typing import DolbyVisionInfo
 from hdr_forge.typedefs.mkv_typing import MkvTrack
-from hdr_forge.typedefs.video_typing import MasterDisplayColorPrimaries, MasterDisplayMetadata, build_master_display_string
+from hdr_forge.typedefs.video_typing import CropResult, MasterDisplayColorPrimaries, MasterDisplayMetadata, build_master_display_string
 from hdr_forge.video import Video
 
 def _print_hdr10_metadata(video: Video) -> None:
@@ -94,6 +92,12 @@ def print_video_infos(video: Video) -> None:
         if dolby_vision_info.dv_profile_el:
             print(f" | EL={color_str(dolby_vision_info.dv_profile_el, color)}", end="")
         print()
+        print(f"  + DM Version: {color_str(dolby_vision_info.dm_version or '-', color)} | CM Version: {color_str(dolby_vision_info.cm_version or '-', color)}")
+
+        crop: CropResult | None = video.get_dolby_vision_crop()
+        if crop and crop.is_valid:
+            crop_str: str = color_str(f"{crop.width}:{crop.height}:{crop.x}:{crop.y}", color)
+            print(f"  + RPU Crop: {crop_str}")
         _print_hdr10_metadata(video=video)
     elif video.is_hdr10_video():
         _print_hdr10_metadata(video=video)

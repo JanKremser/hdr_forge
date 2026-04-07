@@ -4,7 +4,8 @@ from pathlib import Path
 import sys
 from typing import Optional, Tuple, Type, TypeVar
 
-from hdr_forge.analyze.crop_video import CropResult, VideoCropper
+from hdr_forge.analyze.crop_video import VideoCropper
+from hdr_forge.typedefs.video_typing import CropResult
 from hdr_forge.analyze.detect_logo import LogoDetector
 from hdr_forge.analyze.grain_score import GrainAnalyzer
 from hdr_forge.cli.cli_output import print_err, print_warn
@@ -218,14 +219,14 @@ class VideoCodecBase(ABC):
         if delogo_filter:
             filters.append(delogo_filter)
 
+        crop_filter: str | None = self._get_crop_filter()
+        if crop_filter:
+            filters.append(crop_filter)
+
         encoding_hdr_sdr_format: HdrSdrFormat = self.get_encoding_hdr_sdr_format()
 
-        # Add video filters (crop and scale), Only for SDR/HDR10 encoding
+        # Add video filters (scale), Only for SDR/HDR10 encoding
         if encoding_hdr_sdr_format != HdrSdrFormat.DOLBY_VISION:
-            crop_filter: str | None = self._get_crop_filter()
-            if crop_filter:
-                filters.append(crop_filter)
-
             scale_filter: str | None = self._get_scale_filter()
             if scale_filter:
                 filters.append(scale_filter)
@@ -234,9 +235,9 @@ class VideoCodecBase(ABC):
             # Upscale to HDR10 color space for SDR to HDR10/DV conversion
             if encoding_hdr_sdr_format == HdrSdrFormat.SDR:
                 if self.get_bit_depth_for_encoding() == 10:
-                    format= "yuv420p10le"
+                    format = "yuv420p10le"
                 else:
-                    format= "yuv420p"
+                    format = "yuv420p"
 
                 filters.extend([
                     f'libplacebo=colorspace=bt709:color_primaries=bt709:color_trc=bt709:format={format}'
@@ -249,9 +250,9 @@ class VideoCodecBase(ABC):
             if self._video.is_hdr_video():
                 # Tone mapping for HDR to SDR conversion
                 if self.get_bit_depth_for_encoding() == 10:
-                    format= "yuv420p10le"
+                    format = "yuv420p10le"
                 else:
-                    format= "yuv420p"
+                    format = "yuv420p"
                 filters.extend([
                     'zscale=t=linear:npl=100',
                     'format=gbrpf32le',
