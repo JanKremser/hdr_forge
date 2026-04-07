@@ -5,9 +5,10 @@ This document provides comprehensive examples for complex encoding scenarios wit
 ## Table of Contents
 
 - [Hardware Acceleration](#hardware-acceleration)
-- [AV1 Encoding (Beta)](#av1-encoding-beta)
+- [AV1 Encoding](#av1-encoding)
 - [Audio Encoding](#audio-encoding)
 - [Subtitle Management](#subtitle-management)
+- [edit Subcommand](#edit-subcommand)
 - [Encoding Presets](#encoding-presets)
 - [Cropping Examples](#cropping-examples)
 - [Grain Analysis](#grain-analysis)
@@ -61,7 +62,7 @@ hdr_forge convert -i input.mkv -o gpu_output.mkv \
 ls -lh *_output.mkv
 ```
 
-## AV1 Encoding (Beta)
+## AV1 Encoding
 
 ### Basic AV1 Encoding
 
@@ -160,9 +161,9 @@ hdr_forge convert -i ./videos -o ./av1_streams \
 - File size is critical (storage/bandwidth constraints)
 - Encoding time is not a constraint
 - Targeting modern platforms (YouTube, Netflix, etc.)
-- Creating long-term SDR archival copies
+- Creating long-term archival copies (SDR and HDR10)
 
-**Current Limitations:** AV1 HDR10 support uses stream metadata flags only. Dolby Vision encoding not yet implemented.
+**Current Limitations:** AV1 HDR10 support uses stream metadata flags only. Dolby Vision encoding not supported.
 
 ## Audio Encoding
 
@@ -268,6 +269,59 @@ hdr_forge convert -i input.mkv -o output.mkv \
 **Supported Modes:** `copy`, `remove`, `auto`, `auto>LANG` (e.g., `auto>ger`, `auto>eng`, `auto>jpn`)
 
 **Note:** Some players (particularly VLC) may have rendering issues with FFmpeg-set subtitle titles.
+
+## edit Subcommand
+
+In-place MKV editing without re-encoding using `mkvpropedit`.
+
+### Auto Subtitle Detection
+
+Auto-detect subtitle track flags (forced, SDH, commentary) and set default track by language:
+
+```bash
+# Auto-detect and set default subtitle track
+hdr_forge edit -i movie.mkv --subtitle-flags auto
+
+# Auto-detect with German as preferred default language
+hdr_forge edit -i movie.mkv --subtitle-flags auto>ger
+
+# Auto-detect with English preference
+hdr_forge edit -i movie.mkv --subtitle-flags auto>eng
+
+# Auto-detect with multiple language priority
+hdr_forge edit -i movie.mkv --subtitle-flags auto>ger,eng
+```
+
+### Per-Track ID and Language Overrides
+
+```bash
+# Force specific track IDs to default
+hdr_forge edit -i movie.mkv --subtitle-flags "1:default"
+
+# Set language-specific flags
+hdr_forge edit -i movie.mkv --subtitle-flags "ger:default;eng:forced"
+
+# Explicit copy (no changes to subtitle flags)
+hdr_forge edit -i movie.mkv --subtitle-flags copy
+```
+
+### When to Use edit vs convert
+
+```bash
+# Use edit when you only need to fix subtitle/audio track flags — no quality loss, very fast
+hdr_forge edit -i movie.mkv --subtitle-flags auto
+
+# Use convert when you also need to re-encode or when track removal is required
+# (edit cannot remove tracks — would require remux)
+hdr_forge convert -i movie.mkv -o output.mkv --subtitle-flags remove
+
+# Use convert for combined operations (re-encode + subtitle fixes)
+hdr_forge convert -i movie.mkv -o output.mkv \
+  --encoder libx265 \
+  --subtitle-flags auto
+```
+
+**Requirements:** `mkvpropedit` (part of MKVToolNix) must be in system PATH or `lib/` directory
 
 ## Encoding Presets
 
@@ -745,6 +799,57 @@ hdr_forge convert -i dolby_vision.mkv -o sdr.mkv \
   --hdr-sdr-format sdr \
   --encoder hevc_nvenc
 ```
+
+### DV with Auto Crop (RPU L5 Offsets)
+
+Auto crop reads L5 Active Area offsets from RPU metadata — no cropdetect scan required:
+
+```bash
+# Auto crop from RPU L5 offsets (default behavior)
+hdr_forge convert -i dolby_vision.mkv -o output.mkv --crop auto
+
+# Verify crop detected with info command
+hdr_forge info -i dolby_vision.mkv  # shows "RPU Crop" if offsets present
+
+# Combine with quality settings
+hdr_forge convert -i dolby_vision.mkv -o output.mkv \
+  --crop auto \
+  --quality 14 \
+  --hw-preset cpu:quality
+
+# Note: Manual and ratio crop modes are NOT supported for DV
+# hdr_forge convert -i dv.mkv -o output.mkv --crop 1920:800:0:140  ← ERROR
+# hdr_forge convert -i dv.mkv -o output.mkv --crop 21:9             ← ERROR
+```
+
+**Workaround for manual crop with DV:** Convert to HDR10 first:
+```bash
+hdr_forge convert -i dolby_vision.mkv -o hdr10_temp.mkv --hdr-sdr-format hdr10
+hdr_forge convert -i hdr10_temp.mkv -o final.mkv --crop 1920:800:0:140
+```
+
+### Profile 5 Conversion
+
+Profile 5 (IPTPQc2) uses a non-standard color space and requires full re-encoding with libplacebo:
+
+```bash
+# Profile 5 → Profile 8.1 (requires Vulkan GPU driver and FFmpeg libplacebo)
+hdr_forge convert -i profile5_dv.mkv -o output_p81.mkv --dv-profile 8
+
+# Profile 5 → HDR10 (extract base layer with re-encode)
+hdr_forge convert -i profile5_dv.mkv -o output_hdr10.mkv --hdr-sdr-format hdr10
+
+# Profile 5 → SDR (full tone mapping)
+hdr_forge convert -i profile5_dv.mkv -o output_sdr.mkv --hdr-sdr-format sdr
+
+# With quality settings
+hdr_forge convert -i profile5_dv.mkv -o output_p81_1080p.mkv \
+  --dv-profile 8 \
+  --quality 15
+```
+
+**Note:** Copy mode is not available for Profile 5 sources (requires re-encoding).
+**Requirements:** FFmpeg compiled with `--enable-libplacebo`, Vulkan-capable GPU.
 
 ### Batch DV Processing
 

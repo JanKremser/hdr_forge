@@ -377,41 +377,41 @@ journalctl -xe
    which dovi_tool
    ```
 
-### "Cannot crop/scale Dolby Vision" Warning
+### Cropping and Scaling with Dolby Vision
 
-**Problem:** Trying to crop or scale while preserving Dolby Vision format
+**Auto crop is now supported for Dolby Vision** via RPU L5 Active Area offsets.  
+**Manual crop, ratio crop, and scale remain unsupported** when preserving DV format.
 
-**Explanation:**
-Dolby Vision RPU metadata is frame-position dependent. Cropping or scaling breaks the RPU metadata.
+#### Supported: Auto Crop (reads RPU L5 offsets)
 
-**Solutions:**
+```bash
+# --crop auto uses RPU L5 Active Area offsets (default behavior)
+hdr_forge convert -i dolby_vision.mkv -o output.mkv --crop auto
 
-1. **Disable Cropping:**
-   ```bash
-   # Must use --crop off when preserving DV
-   hdr_forge convert -i dolby_vision.mkv -o output.mkv --crop off
-   ```
+# Verify crop detected with info command
+hdr_forge info -i dolby_vision.mkv  # shows "RPU Crop" when offsets are detected
+```
 
-2. **Convert to HDR10 First:**
-   ```bash
-   # Crop/scale supported when converting to HDR10
-   hdr_forge convert -i dolby_vision.mkv -o output.mkv \
-     --hdr-sdr-format hdr10 \
-     --crop auto \
-     --scale FHD
-   ```
+No cropdetect scan is run. The crop is embedded in the RPU metadata itself.
 
-3. **Two-Step Process:**
-   ```bash
-   # Step 1: Extract HDR10 base layer
-   hdr_forge convert -i dolby_vision.mkv -o hdr10.mkv \
-     --hdr-sdr-format hdr10
+#### Not Supported: Manual Crop / Ratio Crop / Scale
 
-   # Step 2: Crop/scale HDR10 video
-   hdr_forge convert -i hdr10.mkv -o final.mkv \
-     --crop auto \
-     --scale FHD
-   ```
+```bash
+# These will produce an error when preserving DV:
+hdr_forge convert -i dv.mkv -o output.mkv --crop 1920:800:0:140  ← ERROR
+hdr_forge convert -i dv.mkv -o output.mkv --crop 21:9             ← ERROR
+hdr_forge convert -i dv.mkv -o output.mkv --scale FHD             ← ERROR
+```
+
+**Workaround for manual crop/scale:** Convert to HDR10 first.
+
+```bash
+# Step 1: Extract HDR10 base layer (removes DV RPU)
+hdr_forge convert -i dolby_vision.mkv -o hdr10.mkv --hdr-sdr-format hdr10
+
+# Step 2: Apply manual crop or scale to HDR10 video
+hdr_forge convert -i hdr10.mkv -o final.mkv --crop 1920:800:0:140 --scale FHD
+```
 
 ### Dolby Vision Conversion Takes Very Long
 
@@ -474,6 +474,38 @@ Dolby Vision workflow creates multiple intermediate files (base layer, RPU, enco
    # Remove manually: .hdr_forge_temp_* directories
    rm -rf .hdr_forge_temp_*
    ```
+
+### Profile 5 Dolby Vision: "copy mode not supported"
+
+**Problem:** Using `--video-codec copy` with a Profile 5 source fails with an error
+
+**Explanation:**
+Profile 5 (IPTPQc2) uses a non-standard color space which cannot be stream-copied for profile conversion. Full re-encoding is required.
+
+**Solutions:**
+
+1. **Use Re-encoding with `--dv-profile 8`:**
+   ```bash
+   # Profile 5 → Profile 8.1 via re-encode (requires Vulkan GPU driver)
+   hdr_forge convert -i profile5_dv.mkv -o output.mkv --dv-profile 8 --quality 15
+   ```
+
+2. **Convert to HDR10 (faster alternative):**
+   ```bash
+   # Extracts HDR10 base layer without RPU
+   hdr_forge convert -i profile5_dv.mkv -o output_hdr10.mkv --hdr-sdr-format hdr10
+   ```
+
+3. **Convert to SDR:**
+   ```bash
+   # Profile 5 → SDR with tone mapping
+   hdr_forge convert -i profile5_dv.mkv -o output_sdr.mkv --hdr-sdr-format sdr
+   ```
+
+**Requirements for Profile 5 → 8.1:**
+- FFmpeg compiled with `--enable-libplacebo` support
+- Vulkan-capable GPU with drivers installed
+- Significantly slower than other DV conversions (uses libplacebo color space conversion)
 
 ## Quality Issues
 

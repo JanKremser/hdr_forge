@@ -1,6 +1,6 @@
 # HDR Forge - SDR/HDR10/HDR10+/DolbyVision Video Converter
 
-[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.13+](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 A powerful command-line tool for converting video files with hardware-accelerated encoding (NVIDIA NVENC), intelligent HDR metadata preservation, automatic quality optimization, grain analysis, flexible cropping, and advanced format conversion (H.264, H.265/HEVC, AV1, Dolby Vision).
@@ -8,11 +8,12 @@ A powerful command-line tool for converting video files with hardware-accelerate
 ## Features
 
 -   **Multiple Encoder Support:** CPU (libx265, libx264, libsvtav1) and GPU-accelerated encoding (NVIDIA NVENC)
--   **AV1 Encoding (Beta):** Next-generation codec with superior compression, HDR10 support (stream metadata)
+-   **AV1 Encoding:** Next-generation codec with superior compression, full HDR10 support
 -   **Hardware Acceleration:** NVIDIA NVENC support for H.265/HEVC and H.264 encoding
 -   **Multiple Format Support:** Convert between Dolby Vision, HDR/HDR10, and SDR formats
 -   **Format Conversion:** DV → HDR/HDR10 → SDR with tone mapping support
--   **Dolby Vision Profiles:** Support for Profile 5, 7 (with EL), and 8.1
+-   **Dolby Vision Profiles:** Support for Profiles 5, 7 (with EL), and 8.1 (Profile 5 re-encoding with libplacebo)
+-   **DV Crop (Auto):** Reads RPU L5 Active Area offsets — no black bar scan needed
 -   **HDR Metadata Injection:** Add or update HDR10/HDR10+/Dolby Vision metadata without re-encoding
 -   **Advanced Cropping:** Automatic black bar detection, manual cropping, aspect ratio presets
 -   **Flexible Scaling:** Height-based and adaptive scaling modes
@@ -42,8 +43,14 @@ hdr_forge convert -i input.mkv -o output.mkv --hw-preset gpu:balanced
 # High-quality CPU encoding
 hdr_forge convert -i input.mkv -o output.mkv --hw-preset cpu:quality
 
-# AV1 encoding (Beta - next-generation codec)
+# AV1 encoding (next-generation codec)
 hdr_forge convert -i input.mkv -o output.mkv -v av1
+
+# In-place subtitle editing (no re-encode)
+hdr_forge edit -i video.mkv --subtitle-flags auto
+
+# Launch GUI
+hdr_forge_ui
 
 # Convert Dolby Vision to HDR10
 hdr_forge convert -i dv.mkv -o output.mkv --hdr-sdr-format hdr10
@@ -62,47 +69,12 @@ hdr_forge inject-metadata -i video.mkv -o output.mkv \
 
 ## Version History
 
-**v1.0.0**
-
--   **AV1 Encoding (Beta):** AV1 codec support via libsvtav1 encoder with HDR10 support (stream metadata flags)
-
-**v0.7.11**
-
--   **Audio Encoding:** Per-track audio codec selection with language and ID-based targeting
--   **Audio Default Track:** Set default audio track by language or track ID
--   **Subtitle Management:** Intelligent subtitle handling with auto-detection and custom flags
--   **Logo Removal:** Automatic logo detection and removal with two algorithms:
-    -   `delogo` - FFmpeg delogo filter (fast)
-    -   `mask` - Mask-based removal (better quality) (beta)
--   **New Presets:**
-    -   `banding` - Banding reduction preset (8-bit → 10-bit for SDR)
-    -   `video` - Neutral preset for mixed content
--   **Enhanced Speed Control:**
-    -   `medium:plus` - Improved quality over medium
-    -   `slow:plus` - Better quality/speed tradeoff than slow
--   **New Scale Options:**
-    -   `QHD+` (1800p) and `QHD` (540p) resolutions
--   **Display Aspect Ratio:** Custom DAR with `--dar-ratio` parameter
--   **Custom Filters:** Add FFmpeg video filters with `--vfilter`
--   **New Subcommands:**
-    -   `detect-logo` - Analyze and detect logos in videos
-    -   `extract-metadata` - Extract Dolby Vision/HDR10/HDR10+ metadata
-    -   `inject-metadata` - Inject Dolby Vision/HDR10/HDR10+ metadata without re-encoding
-
-**v0.6.0**
-
--   Master-display support for GPU encoded videos
-
-**v0.4.0** (Complete rewrite in Python)
-
--   Previous Rust version removed from main branch
--   Hardware acceleration support (NVIDIA NVENC)
--   Multiple encoder support (libx265, libx264, HEVC NVENC, H.264 NVENC)
--   Advanced cropping modes (auto, manual, aspect ratio)
--   Flexible scaling modes (height-based, adaptive)
--   Grain analysis and optimization
--   HDR metadata injection without re-encoding
--   Content-aware encoding presets (film, action, animation)
+| Version | Highlights |
+|---------|-----------|
+| **1.1.0** | DV auto crop via L5 offsets, Profile 5→8.1 re-encoding with libplacebo, `edit` subcommand for in-place MKV editing, GTK4 Adwaita-themed GUI, AV1 HDR10 fully supported |
+| **1.0.0** | AV1 encoding (libsvtav1), audio/subtitle management, logo removal, batch processing |
+| **0.7.x** | HDR metadata injection, DV profile support, audio/subtitle management, logo detection |
+| **0.4.0** | Python rewrite with NVENC, multiple encoders, advanced cropping/scaling, grain analysis |
 -   Video sampling for testing
 -   Enhanced CLI with comprehensive parameter support
 
@@ -157,6 +129,8 @@ hdr_forge inject-metadata -i video.mkv -o output.mkv \
 -   **[mkvmerge](https://mkvtoolnix.download/)** (part of MKVToolNix) - MKV muxing/demuxing
     -   **Linux:** `sudo pacman -S mkvtoolnix` or `sudo apt install mkvtoolnix`
     -   **Windows/macOS:** Download installer from website
+-   **[mkvpropedit](https://mkvtoolnix.download/)** (part of MKVToolNix) - In-place MKV property editing (required for `hdr_forge edit`)
+    -   Included in MKVToolNix installation above
 
 ### Install HDR Forge
 
@@ -191,11 +165,50 @@ hevc_hdr_editor --help
 # For HDR10+ metadata
 hdr10plus_tool --help
 
+# For container operations
+mkvmerge --version
+mkvpropedit --version
+
 # Check available hardware encoders
 ffmpeg -hide_banner -encoders | grep nvenc
 ```
 
 **For GPU setup instructions, see [Encoder Guide - GPU Setup](documentation/encoders.md#checking-gpu-support).**
+
+## Quick Examples
+
+### GUI Mode
+```bash
+# Launch interactive GUI
+hdr_forge_ui
+```
+
+### In-Place MKV Editing (No Re-encode)
+```bash
+# Auto-detect subtitle tracks and set default
+hdr_forge edit -i video.mkv --subtitle-flags auto
+
+# Auto-detect with language preference
+hdr_forge edit -i video.mkv --subtitle-flags auto>ger
+```
+
+### DV Auto Crop via L5 Offsets
+```bash
+# Crop from RPU metadata (no cropdetect scan)
+hdr_forge convert -i dolby_vision.mkv -o output.mkv --crop auto
+
+# Verify crop detected
+hdr_forge info -i dolby_vision.mkv  # shows "RPU Crop" if detected
+```
+
+### Profile 5 Dolby Vision
+```bash
+# Profile 5 → 8.1 (requires Vulkan GPU driver)
+hdr_forge convert -i profile5_dv.mkv -o output.mkv --dv-profile 8
+
+# Profile 5 → HDR10 (fast format conversion)
+hdr_forge convert -i profile5_dv.mkv -o output.mkv --hdr-sdr-format hdr10
+```
 
 ## Usage
 
@@ -238,7 +251,7 @@ hdr_forge convert -i input.mkv -o output.mkv --video-codec h264
 # GPU encoding (NVENC) - 3-10x faster
 hdr_forge convert -i input.mkv -o output.mkv --video-codec h264 --hw-preset "gpu:balanced"
 
-# AV1 for best compression (Beta)
+# AV1 for best compression
 hdr_forge convert -i input.mkv -o output.mkv --encoder libsvtav1
 
 # Stream copy (no re-encoding)
@@ -261,17 +274,7 @@ hdr_forge convert -i input.mkv -o output.mkv --hw-preset cpu:balanced
 hdr_forge convert -i input.mkv -o output.mkv --hw-preset cpu:quality
 ```
 
-**Encoder Comparison:**
-
-| Aspect | CPU (libx265) | GPU (NVENC) | AV1 (Beta) |
-|--------|---------------|-------------|------------|
-| Speed | Slower | 3-10x faster | Slowest |
-| Quality | Highest | Good (slightly lower) | Excellent |
-| File Size | Small | Larger (10-20%) | Smallest (20-40% smaller) |
-| Compatibility | Excellent | Excellent | Growing |
-| Best For | Archival, max quality | Fast encoding, testing | Long-term archival, streaming |
-
-**See [Encoder Guide - Performance Comparison](documentation/encoders.md#performance-comparison) for detailed benchmarks.**
+**See [Encoder Guide](documentation/encoders.md) for detailed encoder comparisons and benchmarks.**
 
 ### Encoding Presets
 
@@ -322,12 +325,11 @@ hdr_forge convert -i input.mkv -o output.mkv --crop 1920:800:0:140
 hdr_forge convert -i input.mkv -o output.mkv --crop 16:9
 hdr_forge convert -i input.mkv -o output.mkv --crop 21:9
 
-# CinemaScope presets
-hdr_forge convert -i input.mkv -o output.mkv --crop cinema          # 2.35:1
-hdr_forge convert -i input.mkv -o output.mkv --crop cinema-modern   # 2.39:1
-
 # Disable cropping
 hdr_forge convert -i input.mkv -o output.mkv --crop off
+
+# DV auto crop (reads RPU L5 offsets)
+hdr_forge convert -i dolby_vision.mkv -o output.mkv --crop auto
 ```
 
 ### Resolution Scaling
@@ -365,23 +367,15 @@ hdr_forge convert -i input.mkv -o output.mkv --grain cat3  # Heavy grain
 ### Logo Removal
 
 ```bash
-# Automatic logo detection and removal
+# Automatic logo detection
 hdr_forge convert -i input.mkv -o output.mkv --remove-logo auto
 
-# Delogo filter (fast, good for simple logos)
+# Delogo filter or mask-based removal
 hdr_forge convert -i input.mkv -o output.mkv --remove-logo delogo:auto
-hdr_forge convert -i input.mkv -o output.mkv --remove-logo delogo:top-left
-hdr_forge convert -i input.mkv -o output.mkv --remove-logo delogo:bot-right
-
-# Mask-based removal (better quality, recommended)
 hdr_forge convert -i input.mkv -o output.mkv --remove-logo mask:auto
-hdr_forge convert -i input.mkv -o output.mkv --remove-logo mask:top-right
-hdr_forge convert -i input.mkv -o output.mkv --remove-logo mask:bot-left
 ```
 
-**Available positions:** `auto`, `top-left`, `top-right`, `bot-left`, `bot-right`
-
-**Note:** Logo removal is not supported for Dolby Vision encoding.
+**See [Advanced Examples - Logo Removal](documentation/advanced-examples.md) for more options and techniques.**
 
 ### Dolby Vision
 
@@ -404,7 +398,8 @@ hdr_forge convert -i dolby_vision.mkv -o output.mkv \
 hdr_forge convert -i dolby_vision.mkv -o output.mkv --hdr-sdr-format sdr
 ```
 
-**Important:** Cropping and scaling NOT supported when preserving DV format.
+**Crop:** Auto crop (with `--crop auto`) reads RPU L5 offsets. Manual and ratio crop modes are blocked. Scale not supported.  
+**See [Troubleshooting - Cropping with Dolby Vision](documentation/troubleshooting.md#cropping-and-scaling-with-dolby-vision) and [Advanced Examples - Profile 5](documentation/advanced-examples.md#profile-5-conversion).**
 
 ### Format Conversion
 
@@ -443,65 +438,26 @@ hdr_forge convert -i input.mkv -o sample_av1.mkv \
   --encoder libsvtav1
 ```
 
-### Audio Encoding
-
-Configure audio codec per track using language, track ID, or format conversion:
+### Audio & Subtitle Management
 
 ```bash
-# Copy all audio tracks (default)
-hdr_forge convert -i input.mkv -o output.mkv
-
-# Convert all audio to AAC
-hdr_forge convert -i input.mkv -o output.mkv --audio-codec aac
-
-# Per-language encoding
+# Per-language audio encoding
 hdr_forge convert -i input.mkv -o output.mkv --audio-codec "ger:aac;eng:ac3"
-
-# Per-track ID encoding
-hdr_forge convert -i input.mkv -o output.mkv --audio-codec "1:aac;2:ac3"
-
-# Format conversion (DTS → AAC)
-hdr_forge convert -i input.mkv -o output.mkv --audio-codec "dts>aac"
-
-# Language-specific format conversion
-hdr_forge convert -i input.mkv -o output.mkv --audio-codec "eng:dts>aac;ger:copy"
-
-# Remove specific tracks
-hdr_forge convert -i input.mkv -o output.mkv --audio-codec "1:remove;2:copy"
 
 # Set default audio track
 hdr_forge convert -i input.mkv -o output.mkv --audio-default ger
 
-# Set default by track ID
-hdr_forge convert -i input.mkv -o output.mkv --audio-default 2
-
-# Supported codecs: copy, remove, aac, ac3, eac3, flac
-```
-
-### Subtitle Management
-
-Intelligently manage subtitles with auto-detection and custom flags:
-
-```bash
-# Copy all subtitles (default)
-hdr_forge convert -i input.mkv -o output.mkv
-
-# Auto-detect subtitle types and set flags
+# Auto-detect subtitles
 hdr_forge convert -i input.mkv -o output.mkv --subtitle-flags auto
 
-# Auto-detect with default language preference
+# Auto-detect with language preference
 hdr_forge convert -i input.mkv -o output.mkv --subtitle-flags auto>ger
 
 # Remove all subtitles
 hdr_forge convert -i input.mkv -o output.mkv --subtitle-flags remove
-
-# Copy all subtitles (explicit)
-hdr_forge convert -i input.mkv -o output.mkv --subtitle-flags copy
-
-# Supported options: copy, remove, auto, auto>LANG (e.g., auto>ger, auto>eng)
 ```
 
-**Note:** Some players (like VLC) may have issues with FFmpeg-set subtitle titles. Use `dovi_tool` or external tools for better compatibility if needed.
+**See [Advanced Examples](documentation/advanced-examples.md#audio-encoding) for complete audio/subtitle workflows.**
 
 ### Custom Quality Settings
 
@@ -589,261 +545,32 @@ hdr_forge convert -i ./videos -o ./av1_encoded \
 
 ## Command Reference
 
-### Global Options
+For the complete list of CLI parameters and subcommands, see [Technical Details - Command Reference](documentation/technical-details.md#command-reference).
 
-```
-hdr_forge --version              Show program version
-hdr_forge --help                 Show help message
-```
+See the **[complete CLI parameter reference](documentation/technical-details.md#command-reference)** in Technical Details for all subcommands and options.
 
-### Info Subcommand
-
-```
-hdr_forge info -i INPUT          Display video metadata
-
-Options:
-  -i, --input INPUT         Input video file
-  -d, --debug               Enable debug output
-```
-
-### detect-logo Subcommand
-
-```
-hdr_forge detect-logo -i INPUT   Detect logos in video
-
-Options:
-  -i, --input INPUT         Input video file
-  -e, --export PATH         Export detected logo mask as PNG image
-  -d, --debug               Enable debug output
-```
-
-### extract-metadata Subcommand
-
-```
-hdr_forge extract-metadata -i INPUT   Extract DV/HDR10/HDR10+ metadata
-
-Options:
-  -i, --input INPUT         Input video file
-  -o, --output FOLDER       Output folder for metadata files
-  --to-dv-8                 Convert extracted DV metadata to Profile 8.1
-  -d, --debug               Enable debug output
-```
-
-### inject-metadata Subcommand
-
-```
-hdr_forge inject-metadata -i INPUT -o OUTPUT   Inject DV/HDR10/HDR10+ metadata
-
-Description:
-  Inject Dolby Vision/HDR10/HDR10+ metadata into HEVC stream without re-encoding
-
-Required Arguments:
-  -i, --input INPUT         Input video file
-  -o, --output OUTPUT       Output video file
-
-Optional Arguments:
-  --rpu PATH                RPU file (Dolby Vision metadata)
-  --el PATH                 Enhancement Layer file (DV)
-  --hdr10 PATH              HDR10 metadata JSON file
-  --hdr10plus PATH          HDR10+ metadata JSON file
-  -d, --debug               Enable debug output
-```
-
-### Convert Subcommand
-
-```
-hdr_forge convert -i INPUT -o OUTPUT [OPTIONS]
-
-Required Arguments:
-  -i, --input INPUT         Input video file or folder
-  -o, --output OUTPUT       Output video file or folder
-
-Encoder Selection:
-  -v, --video-codec CODEC   Video codec: h265, h264, av1, copy (default: h265)
-  --encoder CODEC           Force specific encoder: auto, libx265, libx264,
-                            libsvtav1, hevc_nvenc, h264_nvenc (default: auto)
-
-Audio Options:
-  -a, --audio-codec CODEC   Audio codec per track: copy, remove, aac, ac3,
-                            eac3, flac. Use language/ID targeting:
-                            ger:aac, eng:ac3, 1:remove, dts>aac (default: copy)
-  --audio-default LANG_ID   Set default audio track by language (ger, eng)
-                            or track ID (1, 2, etc.)
-
-Subtitle Options:
-  -s, --subtitle-flags MODE Subtitle management: copy, remove, auto,
-                            auto>LANG (e.g., auto>ger) (default: copy)
-
-Encoding Presets:
-  -p, --preset PRESET       Content preset: auto, film, film4k, film4k:fast,
-                            grain, grain:ffmpeg, banding, video, action,
-                            animation (default: auto)
-  --hw-preset PRESET        Hardware preset: cpu, cpu:balanced, cpu:quality,
-                            gpu, gpu:balanced, gpu:quality, balanced, quality
-                            (default: cpu:balanced)
-
-Quality Settings:
-  --quality VALUE           Universal quality (0-51, lower = better)
-  --speed PRESET            Speed preset (libx265/libx264 only):
-                            ultrafast, superfast, veryfast, faster, fast,
-                            medium, medium:plus, slow, slow:plus, slower, veryslow
-
-Cropping & Scaling:
-  --crop MODE               Crop mode: off, auto, width:height:x:y,
-                            16:9, 21:9, european, us-widescreen,
-                            cinema, cinema-modern (default: off)
-  --scale RESOLUTION        Target resolution: FUHD, UHD, QHD+, WQHD, FHD, HD,
-                            QHD, SD, or numeric height
-  --scale-mode MODE         Scale mode: height, adaptive (default: height)
-
-Content Analysis & Filtering:
-  --grain MODE              Grain analysis: off, auto, cat1, cat2, cat3 (default: off)
-  --remove-logo MODE        Logo removal: off, auto, delogo:auto, delogo:top-left,
-                            mask:auto, mask:top-left (default: off)
-  --sample TIME             Process sample: auto or start:end in seconds
-  --dar-ratio RATIO         Custom display aspect ratio (e.g., 16:9, cinema)
-  --vfilter FILTERS         Custom FFmpeg video filters
-
-Format Conversion:
-  --hdr-sdr-format FORMAT   Target format: auto, hdr, hdr10, sdr (default: auto)
-  --dv-profile PROFILE      Dolby Vision profile: auto, 8 (default: auto)
-
-Expert Options:
-  --encoder-params PARAMS   Encoder-specific parameters
-  --master-display STRING   Custom master display metadata
-  --max-cll STRING          Custom MaxCLL/MaxFALL values
-  --bit-depth DEPTH         Bit depth override for SDR: auto, 8, 10
-  --color-primaries-flag PRIM  Color primaries (libx265/libx264 only):
-                            bt470bg, smpte170m, bt709, bt2020
-  --try-fix                 Ignore non-fatal errors during video import
-  --threads COUNT           Number of threads for encoding
-
-Debug:
-  -d, --debug               Enable debug output
-```
-
-**For detailed parameter explanations, see [Technical Details](documentation/technical-details.md).**
-
-### calc_maxcll Subcommand
-
-```
-hdr_forge calc_maxcll -i INPUT   Calculate MaxCLL and MaxFALL (BETA)
-
-Options:
-  -i, --input INPUT         Input video file
-  -d, --debug               Enable debug output
-```
-
-## Automatic Quality Optimization
-
-HDR Forge automatically adjusts encoding parameters based on video resolution:
-
-### CRF/CQ (Quality) - Lower = Better
-
-| Resolution | Pixel Count | CPU Balanced | GPU Balanced | AV1 Balanced |
-|------------|-------------|--------------|--------------|--------------|
-| 4K+ | 6.1M+ | 13 | 15 | 25 |
-| Full HD | 2.1M | 18 | 20 | 23 |
-| HD | 1M-2.1M | 19 | 21 | 23 |
-
-**Adjustments:**
-- HDR10/DV: +1.0 CRF/CQ (libx265/libx264/NVENC only)
-- Action preset: -2.0 CRF/CQ (weighted, libx265/libx264/NVENC only)
-- Grain: -1 to -3 CRF/CQ based on category (libx265/libx264 only)
-
-**Note:** AV1 uses higher CRF values due to superior compression efficiency. CRF 25 in AV1 roughly equals CRF 18 in HEVC.
-
-**For detailed calculations, see [Technical Details - Auto-CRF Calculation](documentation/technical-details.md#auto-crfcq-calculation).**
-
-## Examples
-
-### Basic Examples
+### Common Subcommands
 
 ```bash
-# High-quality CPU encoding
-hdr_forge convert -i input.mkv -o output.mkv --hw-preset cpu:quality
-
-# Fast GPU encoding
-hdr_forge convert -i input.mkv -o output.mkv --encoder hevc_nvenc
-
-# AV1 encoding for long-term archival
-hdr_forge convert -i input.mkv -o output.mkv --encoder libsvtav1 --quality 21
-
-# 4K to 1080p with auto crop
-hdr_forge convert -i 4k_video.mkv -o 1080p.mkv \
-  --scale FHD \
-  --crop auto
+hdr_forge --version                                    # Show version
+hdr_forge info -i video.mkv                            # Display metadata
+hdr_forge convert -i input.mkv -o output.mkv           # Convert video
+hdr_forge edit -i video.mkv --subtitle-flags auto      # Edit in-place
+hdr_forge extract-metadata -i video.mkv -o ./meta      # Extract metadata
+hdr_forge inject-metadata -i video.mkv -o out.mkv --rpu file.rpu   # Inject metadata
+hdr_forge detect-logo -i video.mkv --export mask.png   # Detect logos
 ```
 
-### Complex Workflows
+### Automatic Quality Optimization
 
-```bash
-# Film restoration with grain
-hdr_forge convert -i old_film.mkv -o restored.mkv \
-  --preset film \
-  --grain cat3 \
-  --crop auto \
-  --quality 14
+HDR Forge adjusts encoding quality based on resolution. For details, see:
+- **[Technical Details - Auto-CRF Calculation](documentation/technical-details.md#auto-crfcq-calculation)** - Quality tables and formulas
 
-# Fast batch with GPU
-hdr_forge convert -i ./4k_videos -o ./1080p_videos \
-  --encoder hevc_nvenc \
-  --hw-preset gpu:balanced \
-  --crop auto \
-  --scale FHD
+## More Examples
 
-# Archival encoding with AV1
-hdr_forge convert -i source.mkv -o archive.mkv \
-  --encoder libsvtav1 \
-  --quality 18 \
-  --crop auto
-
-# Maximum quality HEVC archival
-hdr_forge convert -i source.mkv -o archive.mkv \
-  --encoder libx265 \
-  --encoder-params "preset=veryslow:crf=12:tune=grain" \
-  --crop auto
-```
-
-**See [Advanced Examples](documentation/advanced-examples.md) for many more scenarios.**
-
-## Troubleshooting
-
-### Common Issues
-
-**NVENC not available:**
-```bash
-# Check available encoders
-ffmpeg -hide_banner -encoders | grep nvenc
-
-# Update drivers and reinstall FFmpeg with NVENC support
-```
-
-**AV1 encoder not found:**
-```bash
-# Check if SVT-AV1 is available
-ffmpeg -hide_banner -encoders | grep svt_av1
-```
-
-**Slow crop detection:**
-```bash
-# Use manual crop instead
-hdr_forge convert -i input.mkv -o output.mkv --crop 1920:800:0:140
-
-# Or disable cropping
-hdr_forge convert -i input.mkv -o output.mkv --crop off
-```
-
-**Quality issues:**
-```bash
-# Lower CRF for better quality
-hdr_forge convert -i input.mkv -o output.mkv --quality 14
-
-# Use CPU encoding for maximum quality
-hdr_forge convert -i input.mkv -o output.mkv --hw-preset cpu:quality
-```
-
-**See [Troubleshooting Guide](documentation/troubleshooting.md) for detailed solutions.**
+Basic and complex workflows are covered in the documentation:
+- **[Advanced Examples](documentation/advanced-examples.md)** - Complete workflow examples for all features
+- **[Troubleshooting Guide](documentation/troubleshooting.md)** - Solutions to common issues
 
 ## Contributing
 
