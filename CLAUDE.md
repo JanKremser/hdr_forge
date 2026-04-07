@@ -76,7 +76,6 @@ src/hdr_forge/
 │   └── helper.py                  # Utility functions
 ├── analyze/                       # Content analysis
 │   ├── grain_score.py             # Grain detection
-│   ├── motion_score.py            # Motion detection
 │   ├── crop_video.py              # Crop detection
 │   └── detect_logo.py             # Logo detection
 └── core/                          # Global configuration
