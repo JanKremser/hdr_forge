@@ -134,11 +134,4 @@ class H264NvencCodec(VideoCodecBase):
         )
         cq -= action_crf * action_w
 
-        grain_crf: float = self._grain.get_crf_x265_x264_adjustment()
-        grain_w = self._calculate_crf_adjustment_weight(
-            current_crf=cq,
-            crf_delta=grain_crf,
-        )
-        cq -= grain_crf * grain_w
-
         return round(cq)

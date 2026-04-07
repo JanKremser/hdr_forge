@@ -58,7 +58,7 @@ def _get_video_codec_lib_instance():
 **Priority Chain:**
 
 1. **`--encoder-params`** (Highest)
-   - libx265: `crf=14` in `preset=slow:crf=14:tune=grain`
+   - libx265: `crf=14` in `preset=slow:crf=14`
    - NVENC: `cq=16` in `preset=hq:cq=16:rc=vbr_hq`
 
 2. **`--quality`** (Universal parameter)
@@ -67,14 +67,14 @@ def _get_video_codec_lib_instance():
 
 3. **Auto-detection** (Lowest)
    - Base value from hardware preset
-   - Adjustments for HDR/DV, action preset, grain
+   - Adjustments for HDR/DV, action preset
 
 ### Speed Parameters (Preset)
 
 **Priority Chain (libx265/libx264 only):**
 
 1. **`--encoder-params`** (Highest)
-   - `preset=slow` in `preset=slow:crf=14:tune=grain`
+   - `preset=slow` in `preset=slow:crf=14`
 
 2. **`--speed`**
    - ultrafast, superfast, veryfast, faster, fast, medium, slow, slower, veryslow
@@ -93,7 +93,6 @@ def _get_video_codec_lib_instance():
 
 2. **Auto-detection** (Lowest)
    - Animation preset → `tune=animation`
-   - Grain category ≥2 → `tune=grain`
 
 ## Auto-CRF/CQ Calculation
 
@@ -113,11 +112,6 @@ def _get_auto_crf(hw_preset):
         action_crf_delta = 2.0
         weight = _calculate_crf_adjustment_weight(base_crf, action_crf_delta)
         base_crf -= action_crf_delta * weight
-
-    # Grain adjustment
-    grain_crf_delta = grain.get_crf_adjustment()  # 0, 1, 2, or 3
-    weight = _calculate_crf_adjustment_weight(base_crf, grain_crf_delta)
-    base_crf -= grain_crf_delta * weight
 
     return round(base_crf)
 ```
@@ -430,60 +424,6 @@ def calculate_adaptive_scale(video_width, video_height, max_width, max_height):
 -   **Even Dimensions:** Required for 4:2:0 chroma subsampling
 -   **Upscaling:** Blocked (no quality improvement)
 -   **Dolby Vision:** Not supported (RPU metadata is resolution-dependent)
-
-## Grain Analysis
-
-### Detection Method
-
-Currently uses manual specification (`--grain cat1/cat2/cat3`). Auto-detection planned for future release.
-
-### Category Definitions
-
-| Category | Description | CRF Adjustment | Tune |
-|----------|-------------|----------------|------|
-| off | No grain optimization | 0 | none |
-| cat1 | Light grain | -1 | none |
-| cat2 | Medium grain | -2 | grain |
-| cat3 | Heavy grain | -3 | grain |
-
-### Encoding Adjustments
-
-#### CRF Adjustment
-
-Lowers CRF to preserve grain detail:
-
-```python
-def get_crf_adjustment():
-    if grain_category == 1:
-        return 1.0
-    elif grain_category == 2:
-        return 2.0
-    elif grain_category == 3:
-        return 3.0
-    return 0.0
-```
-
-#### Tune Parameter
-
-Sets `tune=grain` for libx265/libx264 when category ≥2:
-
-```python
-def should_use_grain_tune():
-    return grain_category >= 2
-```
-
-### Effect on Encoding
-
-**Without grain optimization:**
-- Higher CRF values
-- Grain may be over-compressed
-- Loss of film texture
-
-**With grain optimization:**
-- Lower CRF values
-- Better grain preservation
-- Larger file size (acceptable trade-off)
-- More natural film look
 
 ## Dolby Vision Processing
 

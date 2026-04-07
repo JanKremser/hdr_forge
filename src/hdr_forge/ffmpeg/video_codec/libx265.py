@@ -399,9 +399,6 @@ class Libx265Codec(VideoCodecBase):
         if hdr_forge_preset == HdrForgeEncodingTuningPresets.GRAIN_FFMPEG:
             return X265Tune.GRAIN
 
-        if self._grain.get_category() >= 2:
-            return X265Tune.GRAIN
-
         return None
 
     def _get_auto_preset(self, calc_preset: HdrForgeSpeedPreset) -> CodecPreset:
@@ -461,12 +458,5 @@ class Libx265Codec(VideoCodecBase):
             crf_delta=action_crf,
         )
         crf -= action_crf * action_w
-
-        grain_crf: float = self._grain.get_crf_x265_x264_adjustment()
-        grain_w = self._calculate_crf_adjustment_weight(
-            current_crf=crf,
-            crf_delta=grain_crf,
-        )
-        crf -= grain_crf * grain_w
 
         return round(crf)

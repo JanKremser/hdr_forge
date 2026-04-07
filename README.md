@@ -344,18 +344,6 @@ hdr_forge convert -i input.mkv -o output.mkv --scale 1920 --scale-mode adaptive 
 
 **Note:** Only downscaling is supported. Not compatible with Dolby Vision preservation.
 
-### Grain Analysis
-
-```bash
-# Automatic grain detection
-hdr_forge convert -i old_film.mkv -o output.mkv --grain auto
-
-# Manual grain categories
-hdr_forge convert -i input.mkv -o output.mkv --grain cat1  # Light grain
-hdr_forge convert -i input.mkv -o output.mkv --grain cat2  # Medium grain
-hdr_forge convert -i input.mkv -o output.mkv --grain cat3  # Heavy grain
-```
-
 ### Logo Removal
 
 ```bash

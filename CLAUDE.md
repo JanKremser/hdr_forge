@@ -75,7 +75,6 @@ src/hdr_forge/
 │   ├── mkvpropedit.py             # In-place MKV property editing
 │   └── helper.py                  # Utility functions
 ├── analyze/                       # Content analysis
-│   ├── grain_score.py             # Grain detection
 │   ├── crop_video.py              # Crop detection
 │   └── detect_logo.py             # Logo detection
 └── core/                          # Global configuration
@@ -129,7 +128,6 @@ Key methods:
 **Auto-CRF Adjustments:**
 - HDR10/DV: +1.0 CRF (10-bit allows higher compression)
 - Action preset: -2.0 CRF (weighted, better for fast motion)
-- Grain: -1/-2/-3 CRF (cat1/cat2/cat3)
 - Weighting to avoid extreme values
 
 **Codec Implementations:**
@@ -313,7 +311,6 @@ hdr_forge edit -i input.mkv --subtitle-flags "forced:eng"
 - Base from hw_preset (resolution-based)
 - HDR10/DV: +1.0 CRF
 - Action: -2.0 CRF (weighted)
-- Grain: -1/-2/-3 CRF (cat1/2/3)
 - Weighting function prevents extreme values
 
 ### Crop Detection

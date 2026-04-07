@@ -11,7 +11,6 @@ This document provides comprehensive examples for complex encoding scenarios wit
 - [edit Subcommand](#edit-subcommand)
 - [Encoding Presets](#encoding-presets)
 - [Cropping Examples](#cropping-examples)
-- [Grain Analysis](#grain-analysis)
 - [Scaling Examples](#scaling-examples)
 - [Video Sampling](#video-sampling)
 - [HDR Metadata Injection](#hdr-metadata-injection)
@@ -340,18 +339,16 @@ hdr_forge convert -i action_movie.mkv -o output.mkv \
 
 # Animation with vibrant colors
 hdr_forge convert -i anime.mkv -o output.mkv \
-  --preset animation \
-  --grain auto
+  --preset animation
 ```
 
 ### Preset Combinations
 
 ```bash
-# Film + CPU quality + grain analysis
+# Film + CPU quality + crop analysis
 hdr_forge convert -i old_film.mkv -o output.mkv \
   --preset film \
   --hw-preset cpu:quality \
-  --grain auto \
   --crop auto
 
 # Action + GPU fast encoding
@@ -443,70 +440,9 @@ hdr_forge convert -i input.mkv -o output.mkv \
   --scale FHD \
   --quality 16
 
-# Crop + grain + film preset
+# Crop + film preset
 hdr_forge convert -i old_film.mkv -o output.mkv \
   --crop auto \
-  --grain cat2 \
-  --preset film
-```
-
-## Grain Analysis
-
-### Automatic Grain Detection
-
-```bash
-# Basic auto grain detection
-hdr_forge convert -i old_film.mkv -o output.mkv --grain auto
-
-# Auto grain with CPU quality
-hdr_forge convert -i film.mkv -o output.mkv \
-  --grain auto \
-  --hw-preset cpu:quality
-
-# Auto grain with film preset
-hdr_forge convert -i film.mkv -o output.mkv \
-  --grain auto \
-  --preset film
-```
-
-### Manual Grain Categories
-
-```bash
-# Light grain (cat1)
-hdr_forge convert -i input.mkv -o output.mkv \
-  --grain cat1 \
-  --quality 17
-
-# Medium grain (cat2)
-hdr_forge convert -i grainy_film.mkv -o output.mkv \
-  --grain cat2 \
-  --hw-preset cpu:quality
-
-# Heavy grain (cat3)
-hdr_forge convert -i very_grainy.mkv -o output.mkv \
-  --grain cat3 \
-  --encoder libx265 \
-  --encoder-params "preset=slow:crf=14:tune=grain"
-```
-
-### Grain with Different Content Types
-
-```bash
-# Old film restoration
-hdr_forge convert -i old_film.mkv -o restored.mkv \
-  --grain cat3 \
-  --preset film \
-  --crop auto \
-  --quality 14
-
-# Documentary with moderate grain
-hdr_forge convert -i documentary.mkv -o output.mkv \
-  --grain cat2 \
-  --hw-preset cpu:balanced
-
-# Modern film with slight grain
-hdr_forge convert -i modern_film.mkv -o output.mkv \
-  --grain cat1 \
   --preset film
 ```
 
@@ -598,7 +534,6 @@ hdr_forge convert -i input.mkv -o sample.mkv \
   --sample auto \
   --crop auto \
   --scale FHD \
-  --grain auto
 ```
 
 ### Custom Time Ranges
@@ -620,10 +555,9 @@ hdr_forge convert -i input.mkv -o sample.mkv --sample 3540:3600
 ### Testing Workflows
 
 ```bash
-# Test grain settings
-hdr_forge convert -i film.mkv -o test_grain.mkv \
+# Test sample with film preset
+hdr_forge convert -i film.mkv -o test_sample.mkv \
   --sample 60:90 \
-  --grain cat2 \
   --encoder hevc_nvenc
 
 # Test crop settings
@@ -876,7 +810,6 @@ hdr_forge convert -i 4k_film.mkv -o archive.mkv \
   --encoder-params "preset=veryslow:crf=12:tune=grain" \
   --crop auto \
   --scale FHD \
-  --grain cat2
 
 # With custom metadata
 hdr_forge convert -i 4k_film.mkv -o archive.mkv \
@@ -884,7 +817,6 @@ hdr_forge convert -i 4k_film.mkv -o archive.mkv \
   --encoder-params "preset=veryslow:crf=12:tune=grain" \
   --crop auto \
   --scale FHD \
-  --grain cat2 \
   --master-display "G(13250,34500)B(7500,30000)R(34000,16000)WP(15635,16450)L(1000,0.05)" \
   --max-cll "1000,400"
 ```
@@ -899,21 +831,19 @@ hdr_forge convert -i ./4k_videos -o ./1080p_encoded \
   --crop auto \
   --scale FHD
 
-# With grain optimization
+# High quality GPU encoding
 hdr_forge convert -i ./videos -o ./encoded \
   --encoder hevc_nvenc \
   --hw-preset gpu:quality \
-  --grain auto \
   --crop auto
 ```
 
 ### Film Restoration Workflow
 
 ```bash
-# Old film with heavy grain
+# Old film restoration
 hdr_forge convert -i old_film.mkv -o restored.mkv \
   --preset film \
-  --grain cat3 \
   --crop auto \
   --quality 13 \
   --hw-preset cpu:quality
@@ -922,7 +852,6 @@ hdr_forge convert -i old_film.mkv -o restored.mkv \
 hdr_forge convert -i old_film.mkv -o test_sample.mkv \
   --sample 60:90 \
   --preset film \
-  --grain cat3 \
   --quality 13 \
   --encoder hevc_nvenc
 ```
@@ -955,10 +884,9 @@ hdr_forge convert -i anime.mkv -o output.mkv \
   --crop auto \
   --scale FHD
 
-# With grain analysis
+# High quality animation
 hdr_forge convert -i anime.mkv -o output.mkv \
   --preset animation \
-  --grain auto \
   --hw-preset cpu:balanced
 ```
 
@@ -1028,7 +956,6 @@ hdr_forge convert -i ./hdr_videos -o ./sdr_videos \
 # Batch films
 hdr_forge convert -i ./films -o ./encoded_films \
   --preset film \
-  --grain auto \
   --crop auto
 
 # Batch action content
@@ -1079,10 +1006,9 @@ hdr_forge convert -i input.mkv -o test_gpu_qual.mkv --sample auto --hw-preset gp
 ### Content-Type Optimization
 
 ```bash
-# Film with grain optimization
+# Film with quality optimization
 hdr_forge convert -i film.mkv -o optimized_film.mkv \
   --preset film \
-  --grain auto \
   --hw-preset cpu:quality \
   --crop auto
 

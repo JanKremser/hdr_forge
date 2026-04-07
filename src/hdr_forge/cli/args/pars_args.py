@@ -302,18 +302,6 @@ Note: This parameter is NOT compatible with NVENC encoders. Use --encoder-params
     )
 
     convert_parser.add_argument(
-        '--grain',
-        help=f"""{sdr_dot} {hdr_dot} {dolby_vision_dot}
-Analyze grain in the input video and optimize encoding settings accordingly.
-[off]              : Default: Do not analyze grain
-[auto]             : Automatically detect grain and adjust encoding settings
-[cat1]             : Apply light grain settings
-[cat2]             : Apply medium grain settings
-[cat3]             : Apply strong grain settings\n
-"""
-    )
-
-    convert_parser.add_argument(
         '--remove-logo',
         help=f"""{sdr_dot} {hdr_dot} {dolby_vision_dot}
 Remove logos from video. Not supported for Dolby Vision encoding.

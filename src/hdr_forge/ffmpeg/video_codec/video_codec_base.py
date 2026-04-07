@@ -7,7 +7,6 @@ from typing import Optional, Tuple, Type, TypeVar
 from hdr_forge.analyze.crop_video import VideoCropper
 from hdr_forge.typedefs.video_typing import CropResult
 from hdr_forge.analyze.detect_logo import LogoDetector
-from hdr_forge.analyze.grain_score import GrainAnalyzer
 from hdr_forge.cli.cli_output import print_err, print_warn
 from hdr_forge.ffmpeg.video_codec.service.presets import calc_hw_prest_params
 from hdr_forge.typedefs.codec_typing import HDR_FORGE_SPEED_PRESET, CodecPreset, VideoEncoderLibrary
@@ -54,12 +53,6 @@ class VideoCodecBase(ABC):
             encoding_hdr_sdr_format=self._hdr_sdr_format_for_encoding,
         )
         self._cropper.detect_crop()
-
-        self._grain = GrainAnalyzer(
-            video=video,
-            grain_mode=encoder_settings.grain,
-        )
-        self._grain.analyze_by_mode()
 
         self._scale_width: Optional[int]
         self._scale_height: Optional[int]

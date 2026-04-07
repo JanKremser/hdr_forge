@@ -9,7 +9,7 @@ from typing import Tuple
 from hdr_forge import __version__
 from hdr_forge.cli.cli_output import print_err, print_warn
 from hdr_forge.typedefs.codec_typing import ColorPrimaries, HEVC_NVENC_Preset, VideoEncoderLibrary, x265_x264_Preset
-from hdr_forge.typedefs.encoder_typing import AudioCodec, AudioCodecItem, CropMode, CropSettings, EncoderOverride, GrainMode, HdrForgeEncodingHardwarePresets, HdrForgeEncodingPresetSettings, HdrForgeEncodingTuningPresets, HdrForgeSpeedPreset, HdrSdrFormat, EncoderSettings, LogoRemovalAutoDetectMode, LogoRemovalMode, LogoRemovelSettings, NvencParams, NvencRcMode, SampleSettings, ScaleMode, SubtitleMode, SubtitleModeItem, SubtitleTrackAction, SubtitleTrackOverride, UniversalEncoderParams, VideoCodec, Libx264Params, X264Tune, Libx265Params, X265Tune
+from hdr_forge.typedefs.encoder_typing import AudioCodec, AudioCodecItem, CropMode, CropSettings, EncoderOverride, HdrForgeEncodingHardwarePresets, HdrForgeEncodingPresetSettings, HdrForgeEncodingTuningPresets, HdrForgeSpeedPreset, HdrSdrFormat, EncoderSettings, LogoRemovalAutoDetectMode, LogoRemovalMode, LogoRemovelSettings, NvencParams, NvencRcMode, SampleSettings, ScaleMode, SubtitleMode, SubtitleModeItem, SubtitleTrackAction, SubtitleTrackOverride, UniversalEncoderParams, VideoCodec, Libx264Params, X264Tune, Libx265Params, X265Tune
 from hdr_forge.typedefs.dolby_vision_typing import DolbyVisionProfileEncodingMode
 from hdr_forge.typedefs.video_typing import BT_2020_MASTER_DISPLAY, BT_709_MASTER_DISPLAY, DISPLAY_P3_MASTER_DISPLAY, ContentLightLevelMetadata, HdrMetadata, MasterDisplayMetadata
 
@@ -345,33 +345,6 @@ def _get_dar_ratio_settings_from_string(ratio_str: str | None) -> Tuple[int, int
         except ValueError:
             pass
     print_err(f"Invalid dar ratio value '{ratio_str}'")
-    sys.exit(1)
-
-def _get_grain_settings_from_string(grain_str: str | None) -> GrainMode:
-    """Convert grain argument string to GrainMode enum.
-
-    Args:
-        grain_str: Grain argument string
-
-    Returns:
-        GrainMode enum value
-    """
-    if grain_str is None:
-        return GrainMode.OFF
-
-    grain_str = grain_str.lower()
-    if grain_str == 'off':
-        return GrainMode.OFF
-    elif grain_str == 'auto':
-        return GrainMode.AUTO
-    elif grain_str == 'cat1':
-        return GrainMode.CAT1
-    elif grain_str == 'cat2':
-        return GrainMode.CAT2
-    elif grain_str == 'cat3':
-        return GrainMode.CAT3
-
-    print_err(f"Invalid grain value '{grain_str}', using 'off'")
     sys.exit(1)
 
 def _get_logo_removal_mode_from_string(logo_str: str | None) -> LogoRemovelSettings:
@@ -907,7 +880,6 @@ def create_encoder_settings_from_args(args) -> EncoderSettings:
         scale_height=_get_scale_height(scale=args.scale),
         scale_mode=ScaleMode(args.scale_mode),
         crop=_get_crop_settings_from_string(crop_str=args.crop),
-        grain=_get_grain_settings_from_string(grain_str=args.grain),
         logo_removal=_get_logo_removal_mode_from_string(logo_str=args.remove_logo),
         sample=_get_sample_settings_from_string(sample_str=args.sample),
         hdr_metadata=hdr_metadata,

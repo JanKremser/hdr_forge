@@ -115,14 +115,6 @@ class CropSettings:
     check_samples: int = 10  # Number of samples to analyze for auto crop detection
 
 
-class GrainMode(Enum):
-    """Grain analysis and application modes."""
-    OFF = "off"
-    AUTO = "auto"
-    CAT1 = "cat1"
-    CAT2 = "cat2"
-    CAT3 = "cat3"
-
 @dataclass
 class SampleSettings:
     """Settings for processing a video sample."""
@@ -267,7 +259,6 @@ class EncoderSettings:
     override_color_primaries_flag: Optional[ColorPrimaries] = None  # Override color primaries flag
 
     crop: CropSettings = field(default_factory=lambda: CropSettings(mode=CropMode.AUTO))
-    grain: GrainMode = GrainMode.OFF
     logo_removal: LogoRemovelSettings = field(default_factory=lambda: LogoRemovelSettings())
 
     scale_height: Optional[int] = None
