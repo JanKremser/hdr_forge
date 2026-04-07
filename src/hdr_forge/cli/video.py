@@ -90,10 +90,10 @@ def print_video_infos(video: Video) -> None:
     dolby_vision_info: DolbyVisionInfo | None = video.get_dolby_vision_info()
     if dolby_vision_info:
         print(f"- Dolby Vision: Profile {color_str(dolby_vision_info.dv_profile or '-', color)}")
-        print(f"  + Layout: {color_str(dolby_vision_info.dv_layout, color)}")
+        print(f"  + Layout: {color_str(dolby_vision_info.dv_layout, color)}", end="")
         if dolby_vision_info.dv_profile_el:
-            print(f"  + EL={color_str(dolby_vision_info.dv_profile_el, color)}")
-
+            print(f" | EL={color_str(dolby_vision_info.dv_profile_el, color)}", end="")
+        print()
         _print_hdr10_metadata(video=video)
     elif video.is_hdr10_video():
         _print_hdr10_metadata(video=video)
