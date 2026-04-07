@@ -329,15 +329,40 @@ class Encoder:
     def get_encoding_hdr_sdr_format(self) -> list[HdrSdrFormat]:
         """Get the effective color format for encoding.
 
+        Returns all formats that will be present in the encoded output, including base layer
+        formats for Dolby Vision and HDR10+ preservation.
+
         Returns:
-            Effective ColorFormat
+            List of all output HDR/SDR formats (including base layers for DV)
         """
+        # COPY mode: source formats pass through directly
         if self._video_codec_lib is None:
             if HdrSdrFormat.DOLBY_VISION in self._video.get_hdr_sdr_format() and self._encoder_settings.hdr_sdr_format == HdrSdrFormat.HDR10:
                 return [HdrSdrFormat.HDR10]
             return self._video.get_hdr_sdr_format()
 
-        return [self._video_codec_lib.get_encoding_hdr_sdr_format()]
+        # Re-encoding: start with the codec's primary format and add secondary formats
+        primary_format = self._video_codec_lib.get_encoding_hdr_sdr_format()
+        formats: list[HdrSdrFormat] = [primary_format]
+
+        # DV encoding: add the base layer format
+        if primary_format == HdrSdrFormat.DOLBY_VISION:
+            dv_profile = self._video.get_dolby_vision_profile()
+            if dv_profile == DolbyVisionProfile._5:
+                # Profile 5: libplacebo tone-maps base layer to HDR
+                formats.append(HdrSdrFormat.HDR)
+            else:
+                # Profile 7/8: HDR10-compatible base layer
+                if self._video.is_hdr10_video():
+                    formats.append(HdrSdrFormat.HDR10)
+                elif self._video.is_hdr_video():
+                    formats.append(HdrSdrFormat.HDR)
+
+        # HDR10+ is preserved during encoding if source has it and output is not SDR/plain HDR
+        if self._video.is_hdr10plus_video() and primary_format not in (HdrSdrFormat.SDR, HdrSdrFormat.HDR):
+            formats.append(HdrSdrFormat.HDR10_PLUS)
+
+        return formats
 
     def is_dolby_vision_encoding(self) -> bool:
         """Check if encoding to Dolby Vision format."""
