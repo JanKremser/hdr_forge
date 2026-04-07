@@ -846,7 +846,7 @@ class Encoder:
         Returns:
             True if conversion succeeded, False otherwise.
         """
-        only_hdr10_or_sdr_encoding: bool = not self.is_dolby_vision_encoding()
+        only_hdr10_hdr10plus_or_sdr_encoding: bool = not self.is_dolby_vision_encoding()
 
         input_file: Path = self._video.get_filepath()
         total_frames: int = self._video.get_total_frames()
@@ -879,7 +879,7 @@ class Encoder:
         encoded_base_layer_mkv: Path = temp_dir / f"video_BL_Encoded.mkv"
 
         # For HDR10 or SDR encoding, we can write directly to target file
-        if only_hdr10_or_sdr_encoding:
+        if only_hdr10_hdr10plus_or_sdr_encoding:
             encoded_base_layer_mkv = self._target_file
 
         ffmpeg_encoding_input_file: Path = base_layer_mkv_path if extract_base_layer else input_file
@@ -896,7 +896,7 @@ class Encoder:
             return False
 
         # For HDR10 or SDR encoding, apply subtitle properties and we are done here
-        if only_hdr10_or_sdr_encoding:
+        if only_hdr10_hdr10plus_or_sdr_encoding:
             return self._apply_subtitle_properties(self._target_file)
 
         print()
@@ -954,9 +954,14 @@ class Encoder:
         if self._video.is_dolby_vision_video():
 
             # Simple passthrough for DV: only if target is also DV (not HDR10/HDR10_PLUS/HDR)
-            if (self.get_encoding_video_codec() == VideoCodec.COPY
+            _source_has_hdr10plus = self._video.is_hdr10plus_video()
+            _target_keeps_hdr10plus = HdrSdrFormat.HDR10_PLUS in self._encoder_settings.hdr_sdr_format
+            _needs_hdr10plus_strip = _source_has_hdr10plus and not _target_keeps_hdr10plus
+
+            if (HdrSdrFormat.DOLBY_VISION in self._encoder_settings.hdr_sdr_format
+                    and self.get_encoding_video_codec() == VideoCodec.COPY
                     and self._encoder_settings.target_dv_profile == DolbyVisionProfileEncodingMode.AUTO
-                    and self._encoder_settings.hdr_sdr_format == [HdrSdrFormat.DOLBY_VISION]):
+                    and not _needs_hdr10plus_strip):
                 # Dolby Vision Profile copy without re-encoding (simple passthrough)
                 return self.convert_sdr_hdr10_or_video_copy()
 
@@ -974,8 +979,14 @@ class Encoder:
                     return self.convert_dolby_vision_to_hdr10_without_re_encoding()
 
             # Dolby Vision encoding workflow
+            # Only extract base layer if we need to strip HDR10+ or convert out of DV
+            need_strip_hdr10plus = (HdrSdrFormat.HDR10_PLUS not in self._encoder_settings.hdr_sdr_format
+                                    and self._video.is_hdr10plus_video())
+            need_drop_dv = not self.is_dolby_vision_encoding()
+            extract_bl = need_strip_hdr10plus or need_drop_dv
+
             return self.convert_dolby_vision(
-                extract_base_layer=False,
+                extract_base_layer=extract_bl,
             )
 
         return self.convert_sdr_hdr10_or_video_copy()
