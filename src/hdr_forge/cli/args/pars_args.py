@@ -705,29 +705,6 @@ Example:
 """
     )
 
-#     inject_parser.add_argument(
-#         '--master-display',
-#         required=True,
-#         help="""
-# Set custom Master Display metadata for HDR10 videos. Format:
-# G(x,y)B(x,y)R(x,y)WP(x,y)L(max,min)
-
-# Example:
-#     --master-display "G(13250,34500)B(7500,30000)R(34000,16000)WP(15635,16450)L(1000,0.05)"
-# """
-#     )
-
-#     inject_parser.add_argument(
-#         '--max-cll',
-#         required=False,
-#         help="""
-# Set custom MaxCLL and MaxFALL values for HDR10 videos. Format:
-
-# Example:
-#     --max-cll "1000,400"
-# """
-#     )
-
     inject_parser.add_argument(
         '-d', '--debug',
         action='store_true',
