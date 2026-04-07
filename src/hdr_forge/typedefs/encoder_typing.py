@@ -203,7 +203,6 @@ class LogoRemovalAutoDetectMode(Enum):
 class LogoRemovalMode(Enum):
     OFF = "off"
     DELOGO = "delogo"
-    MASK = "mask"
 
 @dataclass
 class LogoRemovelSettings:

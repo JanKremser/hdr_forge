@@ -364,8 +364,6 @@ def _get_logo_removal_mode_from_string(logo_str: str | None) -> LogoRemovelSetti
         return LogoRemovelSettings(mode=LogoRemovalMode.OFF, position=LogoRemovalAutoDetectMode.AUTO)
     elif logo_str == 'auto':
         return LogoRemovelSettings(mode=LogoRemovalMode.DELOGO, position=LogoRemovalAutoDetectMode.AUTO)
-    elif logo_str == 'mask':
-        return LogoRemovelSettings(mode=LogoRemovalMode.MASK, position=LogoRemovalAutoDetectMode.AUTO)
     elif logo_str == 'delogo':
         return LogoRemovelSettings(mode=LogoRemovalMode.DELOGO, position=LogoRemovalAutoDetectMode.AUTO)
 
@@ -381,8 +379,6 @@ def _get_logo_removal_mode_from_string(logo_str: str | None) -> LogoRemovelSetti
             # Determine mode
             if mode_part == 'delogo':
                 mode = LogoRemovalMode.DELOGO
-            elif mode_part == 'mask':
-                mode = LogoRemovalMode.MASK
             else:
                 print_err(f"Invalid logo removal mode '{mode_part}', using 'off'")
                 sys.exit(1)

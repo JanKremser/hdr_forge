@@ -82,20 +82,6 @@ class VideoCodecBase(ABC):
         if vf:
             output_options["vf"] = vf
 
-        new_input: Path | None = self._logo_remover.get_ffmpeg_overlay_video_input()
-        if new_input:
-            filter_complex: str | None = self._logo_remover.get_ffmpeg_filter_filter_complex()
-            if filter_complex:
-                output_options = {
-                    "i": str(new_input),
-                    **output_options
-                }
-                output_options["map"] = ['[v]', '0:a?', '0:s?']
-                filter_vf: str | None = output_options.get("vf", None)
-                if filter_vf:
-                    del output_options["vf"]
-                output_options["filter_complex"] = f"{filter_complex}{"," + filter_vf if filter_vf else ""}[v]"
-
         if self._encoder_settings.dar_ratio is not None:
             dar_w, dar_h = self._encoder_settings.dar_ratio
             output_options["aspect"] = f"{dar_w}:{dar_h}"
