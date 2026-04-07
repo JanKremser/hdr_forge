@@ -242,7 +242,7 @@ class EncoderSettings:
         default_factory=lambda: HdrForgeEncodingPresetSettings()
     )
     enable_gpu_acceleration: bool = False
-    hdr_sdr_format: HdrSdrFormat = HdrSdrFormat.AUTO
+    hdr_sdr_format: list[HdrSdrFormat] = field(default_factory=lambda: [HdrSdrFormat.AUTO])
     hdr_metadata: HdrMetadata = field(default_factory=HdrMetadata)
     target_dv_profile: DolbyVisionProfileEncodingMode = DolbyVisionProfileEncodingMode.AUTO
 

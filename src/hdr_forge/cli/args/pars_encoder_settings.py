@@ -47,31 +47,57 @@ def _get_scale_height(scale: str | None) -> int | None:
     return target_height
 
 
-def _get_hdr_sdr_format_from_string(format_str: str | None) -> HdrSdrFormat:
-    """Convert string to ColorFormat enum.
+def _get_hdr_sdr_format_from_string(format_str: str | None) -> list[HdrSdrFormat]:
+    """Parse --hdr argument (incl. semicolon combinations) to format list.
 
     Args:
-        format_str: Color format string
+        format_str: Color format string (e.g., 'dv', 'hdr10plus', 'dv;hdr10plus')
 
     Returns:
-        Corresponding ColorFormat enum value
+        List of HdrSdrFormat values (primary format first, then secondary formats)
+
+    Examples:
+        'dv;hdr10plus' → [DOLBY_VISION, HDR10_PLUS]
+        'hdr10plus' → [HDR10_PLUS]
+        'auto' → [AUTO]
     """
     if format_str is None:
-        return HdrSdrFormat.AUTO
+        return [HdrSdrFormat.AUTO]
 
-    format_str = format_str.lower()
-    if format_str == 'sdr':
-        return HdrSdrFormat.SDR
-    elif format_str == 'hdr':
-        return HdrSdrFormat.HDR
-    elif format_str == 'hdr10':
-        return HdrSdrFormat.HDR10
-    elif format_str == 'dv' or format_str == 'dv8':
-        return HdrSdrFormat.DOLBY_VISION
-    elif format_str == 'dolby_vision':
-        return HdrSdrFormat.DOLBY_VISION
+    # Split on semicolon, normalize whitespace and case
+    tokens = {t.strip().lower() for t in format_str.split(';')}
+
+    # Validate tokens
+    valid_tokens = {'auto', 'hdr', 'hdr10', 'sdr', 'dv', 'dv8', 'hdr10plus', 'dolby_vision'}
+    if not tokens.issubset(valid_tokens):
+        invalid = tokens - valid_tokens
+        print_err(f"Error: Invalid --hdr tokens: {', '.join(invalid)}. Valid: {', '.join(valid_tokens)}")
+        sys.exit(1)
+
+    formats: list[HdrSdrFormat] = []
+
+    # Determine primary format (mutually exclusive)
+    if 'dv' in tokens or 'dv8' in tokens or 'dolby_vision' in tokens:
+        formats.append(HdrSdrFormat.DOLBY_VISION)
+    elif 'sdr' in tokens:
+        formats.append(HdrSdrFormat.SDR)
+    elif 'hdr10plus' in tokens and 'hdr10' not in tokens:
+        # hdr10plus alone (no hdr10) → HDR10_PLUS is primary
+        formats.append(HdrSdrFormat.HDR10_PLUS)
+    elif 'hdr10' in tokens:
+        formats.append(HdrSdrFormat.HDR10)
+    elif 'hdr' in tokens:
+        formats.append(HdrSdrFormat.HDR)
     else:
-        return HdrSdrFormat.AUTO
+        return [HdrSdrFormat.AUTO]
+
+    # Add secondary formats
+    if 'hdr10plus' in tokens and formats[0] != HdrSdrFormat.HDR10_PLUS:
+        # hdr10plus can be added to DV or HDR10
+        if formats[0] in (HdrSdrFormat.DOLBY_VISION, HdrSdrFormat.HDR10):
+            formats.append(HdrSdrFormat.HDR10_PLUS)
+
+    return formats
 
 def _get_dv_profile_from_hdr_string(hdr_str: str | None) -> DolbyVisionProfileEncodingMode:
     """Determine DV profile mode from --hdr argument.
@@ -80,13 +106,13 @@ def _get_dv_profile_from_hdr_string(hdr_str: str | None) -> DolbyVisionProfileEn
         hdr_str: Value from --hdr argument
 
     Returns:
-        DolbyVisionProfileEncodingMode.AUTO for 'dv', _8 for 'dv8', AUTO for everything else
+        DolbyVisionProfileEncodingMode._8 for 'dv8', AUTO for everything else
     """
     if hdr_str is None:
         return DolbyVisionProfileEncodingMode.AUTO
 
-    hdr_str = hdr_str.lower()
-    if hdr_str == 'dv8':
+    tokens = {t.strip().lower() for t in (hdr_str or '').split(';')}
+    if 'dv8' in tokens:
         return DolbyVisionProfileEncodingMode._8
 
     return DolbyVisionProfileEncodingMode.AUTO

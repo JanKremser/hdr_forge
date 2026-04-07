@@ -11,6 +11,7 @@ class Libx265Codec(VideoCodecBase):
     HDR_SDR_SUPPORT: list[HdrSdrFormat] = [
         HdrSdrFormat.HDR,
         HdrSdrFormat.HDR10,
+        HdrSdrFormat.HDR10_PLUS,
         HdrSdrFormat.SDR,
         HdrSdrFormat.DOLBY_VISION,
     ]

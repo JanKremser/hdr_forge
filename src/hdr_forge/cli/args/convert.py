@@ -314,16 +314,18 @@ Example:
 
     convert_parser.add_argument(
         '--hdr',
-        choices=['auto', 'hdr10', 'hdr', 'sdr', 'dv', 'dv8'],
         default='auto',
         help=f"""{sdr_dot} {hdr_dot} {dolby_vision_dot}
-User-specified target color format for the output video.
-[auto]   : Automatically determine target color format based on input video
-[hdr10]  : Convert to HDR10 format
-[hdr]    : Convert to HDR format, without HDR10 metadata
-[sdr]    : Convert to SDR format
-[dv]     : Keep or convert to Dolby Vision (auto-detect profile)
-[dv8]    : Convert to Dolby Vision Profile 8.1
+User-specified target color format for the output video. Can combine formats with semicolons.
+[auto]           : Automatically determine target color format based on input video
+[hdr10]          : Convert to HDR10 format
+[hdr]            : Convert to HDR format, without HDR10 metadata
+[sdr]            : Convert to SDR format
+[hdr10plus]      : Strip Dolby Vision, keep HDR10+ (requires DV source)
+[dv]             : Keep or convert to Dolby Vision (auto-detect profile), strip HDR10+
+[dv8]            : Convert to Dolby Vision Profile 8.1, strip HDR10+
+[dv;hdr10plus]   : Keep both Dolby Vision and HDR10+ (requires DV+HDR10+ source)
+[dv8;hdr10plus]  : Dolby Vision Profile 8.1 with HDR10+ (requires DV+HDR10+ source)
 
 Dolby Vision notes:
 - Encoding to profiles 7 and 5 is not supported. Convert to profile 8.1 (dv8) or use copy mode (dv).

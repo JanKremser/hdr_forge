@@ -11,6 +11,7 @@ class HevcNvencCodec(VideoCodecBase):
 
     HDR_SDR_SUPPORT: list[HdrSdrFormat] = [
         HdrSdrFormat.HDR10,
+        HdrSdrFormat.HDR10_PLUS,
         HdrSdrFormat.HDR,
         HdrSdrFormat.SDR,
         HdrSdrFormat.DOLBY_VISION,

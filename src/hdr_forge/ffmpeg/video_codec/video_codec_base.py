@@ -34,8 +34,10 @@ class VideoCodecBase(ABC):
         self._encoder_settings: EncoderSettings = encoder_settings
         self._supported_hdr_sdr_formats: list[HdrSdrFormat] = supported_hdr_sdr_formats
 
+        # Extract primary format from settings list (first element is the main format for codec decisions)
+        primary_format = encoder_settings.hdr_sdr_format[0] if encoder_settings.hdr_sdr_format else HdrSdrFormat.AUTO
         self._hdr_sdr_format_for_encoding: HdrSdrFormat = self._get_hdr_sdr_format_for_encoding(
-            hdr_sdr_format=encoder_settings.hdr_sdr_format
+            hdr_sdr_format=primary_format
         )
         if self._hdr_sdr_format_for_encoding not in supported_hdr_sdr_formats:
             print_err(f"{self.lib.value} does not support the selected {self._hdr_sdr_format_for_encoding.value}-format for encoding.")
@@ -351,6 +353,7 @@ class VideoCodecBase(ABC):
             HdrSdrFormat.SDR: 0,
             HdrSdrFormat.HDR: 1,
             HdrSdrFormat.HDR10: 1,
+            HdrSdrFormat.HDR10_PLUS: 1,  # HDR10+ is equivalent to HDR10 (superset)
             HdrSdrFormat.DOLBY_VISION: 2
         }
 
