@@ -9,7 +9,6 @@ A powerful command-line tool for converting video files with hardware-accelerate
 
 -   **Multiple Encoder Support:** CPU (libx265, libx264, libsvtav1) and GPU-accelerated encoding (NVIDIA NVENC)
 -   **AV1 Encoding:** Next-generation codec with superior compression, HDR10 pass-through via stream metadata (SiteData)
--   **Hardware Acceleration:** NVIDIA NVENC support for H.265/HEVC and H.264 encoding
 -   **Multiple Format Support:** Convert between Dolby Vision, HDR/HDR10, and SDR formats
 -   **Format Conversion:** DV → HDR/HDR10 → SDR with tone mapping support
 -   **Dolby Vision Profiles:** Support for Profiles 5, 7 (with EL), and 8.1 (Profile 5 re-encoding with libplacebo)
@@ -49,7 +48,7 @@ hdr_forge convert -i input.mkv -o output.mkv -v av1
 # In-place subtitle editing (no re-encode)
 hdr_forge edit -i video.mkv --subtitle-flags auto
 
-# Launch GUI
+# GUI (experimental)
 hdr_forge_ui
 
 # Convert Dolby Vision to HDR10
@@ -71,7 +70,7 @@ hdr_forge inject-metadata -i video.mkv -o output.mkv \
 
 | Version | Highlights |
 |---------|-----------|
-| **1.1.0** | DV auto crop via L5 offsets, Profile 5→8.1 re-encoding with libplacebo, `edit` subcommand for in-place MKV editing, GTK4 Adwaita-themed GUI |
+| **1.1.0** | DV auto crop via L5 offsets, Profile 5→8.1 re-encoding with libplacebo, `edit` subcommand for in-place MKV editing, GUI (experimental) |
 | **1.0.0** | AV1 encoding (libsvtav1), audio/subtitle management, logo removal, batch processing |
 | **0.7.x** | HDR metadata injection, DV profile support, audio/subtitle management, logo detection |
 | **0.4.0** | Python rewrite with NVENC, multiple encoders, advanced cropping/scaling, grain analysis |
@@ -138,12 +137,11 @@ hdr_forge inject-metadata -i video.mkv -o output.mkv \
 # Install from source
 git clone https://github.com/JanKremser/hdr_forge.git
 cd hdr_forge
-pip install -r requirements.txt
 
-./build.sh
+chmod +x ./build_with_docker.sh
+./build_with_docker.sh
 
-chmod +x ./dist/main
-mv ./dist/main ./hdr_forge
+./dist/hdr_forge --version
 ```
 
 ### Verify Installation
@@ -176,12 +174,6 @@ ffmpeg -hide_banner -encoders | grep nvenc
 **For GPU setup instructions, see [Encoder Guide - GPU Setup](documentation/encoders.md#checking-gpu-support).**
 
 ## Quick Examples
-
-### GUI Mode
-```bash
-# Launch interactive GUI
-hdr_forge_ui
-```
 
 ### In-Place MKV Editing (No Re-encode)
 ```bash
@@ -398,7 +390,7 @@ hdr_forge convert -i dolby_vision.mkv -o output.mkv \
 hdr_forge convert -i dolby_vision.mkv -o output.mkv --hdr-sdr-format sdr
 ```
 
-**Crop:** Auto crop (with `--crop auto`) reads RPU L5 offsets. Manual and ratio crop modes are blocked. Scale not supported.  
+**Crop:** Auto crop (with `--crop auto`) reads RPU L5 offsets. Manual and ratio crop modes are blocked. Scale not supported.
 **See [Troubleshooting - Cropping with Dolby Vision](documentation/troubleshooting.md#cropping-and-scaling-with-dolby-vision) and [Advanced Examples - Profile 5](documentation/advanced-examples.md#profile-5-conversion).**
 
 ### Format Conversion
