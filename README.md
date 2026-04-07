@@ -3,7 +3,7 @@
 [![Python 3.13+](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-A powerful command-line tool for converting video files with hardware-accelerated encoding (NVIDIA NVENC), intelligent HDR metadata preservation, automatic quality optimization, grain analysis, flexible cropping, and advanced format conversion (H.264, H.265/HEVC, AV1, Dolby Vision).
+A powerful command-line tool for converting video files with hardware-accelerated encoding (NVIDIA NVENC), intelligent HDR metadata preservation, automatic quality optimization, flexible cropping, and advanced format conversion (H.264, H.265/HEVC, AV1, Dolby Vision).
 
 ## Features
 
@@ -16,16 +16,15 @@ A powerful command-line tool for converting video files with hardware-accelerate
 -   **HDR Metadata Injection:** Add or update HDR10/HDR10+/Dolby Vision metadata without re-encoding
 -   **Advanced Cropping:** Automatic black bar detection, manual cropping, aspect ratio presets
 -   **Flexible Scaling:** Height-based and adaptive scaling modes
--   **Grain Analysis:** Automatic grain detection with encoding optimization
 -   **Content-Aware Presets:** Film, banding, video, action, and animation-optimized encoding profiles
--   **Logo Removal:** Automatic logo detection and removal with multiple algorithms (delogo, mask)
+-   **Logo Removal:** Automatic logo detection and removal with delogo filter
 -   **Hardware Presets:** CPU/GPU-specific encoding presets (balanced, quality)
 -   **Video Sampling:** Test encoding settings on short video samples
 -   **Intelligent Quality Control:** Resolution and content-based auto-optimization
 -   **Batch Processing:** Convert entire folders with one command
 -   **Real-time Progress:** Live encoding progress with ETA and statistics
 
-All videos are converted with compression settings dynamically adjusted based on resolution, content type, and grain. Settings can be customized using various CLI parameters.
+All videos are converted with compression settings dynamically adjusted based on resolution and content type. Settings can be customized using various CLI parameters.
 
 ## Quick Start
 
@@ -286,10 +285,10 @@ hdr_forge convert -i action.mkv -o output.mkv --preset action
 
 hdr_forge convert -i anime.mkv -o output.mkv --preset animation
 
-# Grain preservation presets
+# Grain preservation with x265 parameters
 hdr_forge convert -i grainy_film.mkv -o output.mkv --preset grain
 
-# Grain with FFmpeg grain analysis
+# Grain preservation with FFmpeg tune=grain
 hdr_forge convert -i grainy_film.mkv -o output.mkv --preset grain:ffmpeg
 
 # Banding reduction (and 8-bit to 10-bit for SDR)
@@ -350,9 +349,8 @@ hdr_forge convert -i input.mkv -o output.mkv --scale 1920 --scale-mode adaptive 
 # Automatic logo detection
 hdr_forge convert -i input.mkv -o output.mkv --remove-logo auto
 
-# Delogo filter or mask-based removal
+# Delogo filter removal
 hdr_forge convert -i input.mkv -o output.mkv --remove-logo delogo:auto
-hdr_forge convert -i input.mkv -o output.mkv --remove-logo mask:auto
 ```
 
 **See [Advanced Examples - Logo Removal](documentation/advanced-examples.md) for more options and techniques.**
