@@ -7,7 +7,7 @@ import time
 from pathlib import Path
 from typing import Optional
 
-from hdr_forge.cli.cli_output import print_debug, create_dovi_tool_progress_handler
+from hdr_forge.cli.cli_output import monitor_process_progress, print_debug, create_dovi_tool_progress_handler
 from hdr_forge.core.config import PROJECT_ROOT
 from hdr_forge.core.service import build_cmd_array_to_str
 from hdr_forge.tools.helper import run_ffmpeg_tool_pipeline, dovi_tool_progress_reader_thread
@@ -175,6 +175,7 @@ def extract_rpu(
     total_frames: Optional[int] = None,
     use_cache: bool = False,
     crop: bool = False,
+    limit: Optional[int] = None,
 ) -> Path:
     """Extract Dolby Vision RPU (Reference Processing Unit) metadata.
 
@@ -224,29 +225,65 @@ def extract_rpu(
         if crop:
             dovi_cmd.append('--crop')
 
-        dovi_cmd.extend([
-            'extract-rpu',
-            '-',
-            '-o', str(output_rpu)
-        ])
+        dovi_cmd.append('extract-rpu')
 
-        # Execute pipeline using helper function
-        returncode, stderr = run_ffmpeg_tool_pipeline(
-            input_path=input_path,
-            tool_cmd=dovi_cmd,
-            process_name="Extracting RPU metadata:",
-            total_frames=total_frames,
-        )
+        if limit:
+            dovi_cmd.extend([
+                '--limit', str(limit),
+                '-o', str(output_rpu),
+                str(input_path)
+            ])
+            print_debug(build_cmd_array_to_str(dovi_cmd))
 
-        if returncode != 0:
-            error_msg = stderr.decode('utf-8', errors='ignore')
-            raise RuntimeError(f"dovi_tool failed: {error_msg}")
+            # Execute dovi_tool to extract RPU
+            dovi_process = subprocess.Popen(
+                dovi_cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL
+            )
 
-        if not output_rpu.exists():
-            raise RuntimeError("RPU file was not created")
+            # Start a thread to monitor and show progress
+            monitor_thread = threading.Thread(
+                target=monitor_process_progress,
+                args=(dovi_process, "Extracting RPU metadata:"),
+                daemon=True
+            )
+            monitor_thread.start()
 
-        print_debug(f"RPU extracted successfully: {str(output_rpu)}")
-        return output_rpu
+            # Wait for dovi_tool to complete
+            dovi_process.wait()
+
+            # Wait for the monitor thread to finish
+            monitor_thread.join(timeout=1.0)
+
+            if not output_rpu.exists():
+                raise RuntimeError("RPU file was not created")
+
+            print_debug(f"RPU extracted successfully: {str(output_rpu)}")
+            return output_rpu
+        else:
+            dovi_cmd.extend([
+                '-',
+                '-o', str(output_rpu)
+            ])
+
+            # Execute pipeline using helper function
+            returncode, stderr = run_ffmpeg_tool_pipeline(
+                input_path=input_path,
+                tool_cmd=dovi_cmd,
+                process_name="Extracting RPU metadata:",
+                total_frames=total_frames,
+            )
+
+            if returncode != 0:
+                error_msg = stderr.decode('utf-8', errors='ignore')
+                raise RuntimeError(f"dovi_tool failed: {error_msg}")
+
+            if not output_rpu.exists():
+                raise RuntimeError("RPU file was not created")
+
+            print_debug(f"RPU extracted successfully: {str(output_rpu)}")
+            return output_rpu
 
     except FileNotFoundError as e:
         raise RuntimeError(

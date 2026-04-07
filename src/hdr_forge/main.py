@@ -105,7 +105,7 @@ def convert_video(
         True if conversion succeeded, False otherwise
     """
     try:
-        video = Video(filepath=video_file, with_out_rpu_extraction=True)
+        video = Video(filepath=video_file, with_out_rpu_extraction=False)
         print_video_infos(video=video)
 
         # Create encoder with settings

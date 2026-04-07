@@ -52,6 +52,13 @@ class DolbyVisionEnhancementLayer(Enum):
     MEL = "MEL"
 
 @dataclass
+class DolbyVisionOffset:
+    bottom: int
+    top: int
+    left: int
+    right: int
+
+@dataclass
 class DolbyVisionInfo:
     """Structure for Dolby Vision RPU information from dovi_tool info."""
     dv_profile: int
@@ -62,3 +69,4 @@ class DolbyVisionInfo:
     rpu_preset: bool
     dm_version: Optional[int]
     cm_version: Optional[str]
+    offset: Optional[DolbyVisionOffset]
