@@ -36,6 +36,7 @@ def extract_base_layer(
     input_path: Path,
     output_hevc: Optional[Path] = None,
     total_frames: Optional[int] = None,
+    drop_hdr10plus: bool = False
 ) -> Path:
     """Extract Dolby Vision base layer (HEVC without RPU).
 
@@ -44,6 +45,7 @@ def extract_base_layer(
         output_hevc: Optional path for HEVC output file. If None, generates
                     filename based on input (input.mkv -> input.hevc)
         total_frames: Total number of frames in the video (for progress tracking)
+        drop_hdr10plus: If True, adds --drop-hdr10plus flag to dovi_tool command to remove HDR10+ metadata from the extracted base layer
 
     Returns:
         Path to the extracted base layer HEVC file
@@ -60,10 +62,16 @@ def extract_base_layer(
         # Build dovi_tool command
         dovi_cmd: list[str] = [
             dovi_tool_exec,
+        ]
+
+        if drop_hdr10plus:
+            dovi_cmd.append('--drop-hdr10plus')
+
+        dovi_cmd.extend([
             'remove',
             '-',
             '-o', str(output_hevc)
-        ]
+        ])
 
         # Execute pipeline using helper function
         returncode, stderr = run_ffmpeg_tool_pipeline(
