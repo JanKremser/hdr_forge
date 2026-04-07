@@ -381,6 +381,7 @@ Crop black bars from video. Only [auto] is supported for Dolby Vision encoding.
         '--scale',
         help=f"""{sdr_dot} {hdr_dot}
 Scale video to specified resolution. Default is original resolution.
+Not supported for Dolby Vision encoding.
 [FUHD]     : 4320p (8K)
 [UHD]      : 2160p (4K)
 [QHD+]     : 1800p

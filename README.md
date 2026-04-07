@@ -8,7 +8,7 @@ A powerful command-line tool for converting video files with hardware-accelerate
 ## Features
 
 -   **Multiple Encoder Support:** CPU (libx265, libx264, libsvtav1) and GPU-accelerated encoding (NVIDIA NVENC)
--   **AV1 Encoding:** Next-generation codec with superior compression, full HDR10 support
+-   **AV1 Encoding:** Next-generation codec with superior compression, HDR10 pass-through via stream metadata (SiteData)
 -   **Hardware Acceleration:** NVIDIA NVENC support for H.265/HEVC and H.264 encoding
 -   **Multiple Format Support:** Convert between Dolby Vision, HDR/HDR10, and SDR formats
 -   **Format Conversion:** DV → HDR/HDR10 → SDR with tone mapping support
@@ -71,7 +71,7 @@ hdr_forge inject-metadata -i video.mkv -o output.mkv \
 
 | Version | Highlights |
 |---------|-----------|
-| **1.1.0** | DV auto crop via L5 offsets, Profile 5→8.1 re-encoding with libplacebo, `edit` subcommand for in-place MKV editing, GTK4 Adwaita-themed GUI, AV1 HDR10 fully supported |
+| **1.1.0** | DV auto crop via L5 offsets, Profile 5→8.1 re-encoding with libplacebo, `edit` subcommand for in-place MKV editing, GTK4 Adwaita-themed GUI |
 | **1.0.0** | AV1 encoding (libsvtav1), audio/subtitle management, logo removal, batch processing |
 | **0.7.x** | HDR metadata injection, DV profile support, audio/subtitle management, logo detection |
 | **0.4.0** | Python rewrite with NVENC, multiple encoders, advanced cropping/scaling, grain analysis |

@@ -38,10 +38,10 @@ HDR Forge supports multiple encoders for different use cases:
 -   SDR content only
 
 #### libsvtav1 - AV1 Encoding
--   **Best for:** HDR10 and SDR archival with maximum compression
+-   **Best for:** SDR archival and HDR10 pass-through with maximum compression
 -   **Performance:** Very slow encoding (2-5x slower than libx265)
 -   **Quality:** Excellent, superior to HEVC
--   **HDR Support:** Full (HDR10 via stream metadata flags)
+-   **HDR Support:** Pass-through only — HDR10 metadata is carried as SiteData from source; not generated or modified by HDR Forge
 -   **SDR Support:** Yes
 -   **10-bit Support:** Yes
 -   **Special Features:** Next-generation codec, royalty-free, superior compression

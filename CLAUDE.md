@@ -137,7 +137,7 @@ Key methods:
 **Codec Implementations:**
 - `libx265.py` - Software HEVC (HDR10, SDR, DV base layer)
 - `libx264.py` - Software H.264 (SDR only)
-- `libsvtav1.py` - Software AV1 (HDR10 via stream metadata, SDR)
+- `libsvtav1.py` - Software AV1 (HDR10 pass-through via SiteData, SDR; no HDR generation/modification)
 - `hevc_nvenc.py` - Hardware HEVC (HDR10, SDR, DV base layer)
 - `h264_nvenc.py` - Hardware H.264 (SDR only)
 

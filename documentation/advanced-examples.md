@@ -128,7 +128,7 @@ hdr_forge convert -i dolby_vision.mkv -o sdr_av1.mkv \
   --hdr-sdr-format sdr
 ```
 
-**Note:** AV1 HDR10 support uses stream metadata flags (Site Data). Dolby Vision encoding not supported.
+**Note:** AV1 HDR10 is pass-through only — HDR10 metadata from the source is carried as SiteData and not modified. Dolby Vision encoding not supported.
 
 ### AV1 Comparison with HEVC
 
@@ -161,9 +161,9 @@ hdr_forge convert -i ./videos -o ./av1_streams \
 - File size is critical (storage/bandwidth constraints)
 - Encoding time is not a constraint
 - Targeting modern platforms (YouTube, Netflix, etc.)
-- Creating long-term archival copies (SDR and HDR10)
+- Creating long-term archival copies (SDR, or HDR10 pass-through from source)
 
-**Current Limitations:** AV1 HDR10 support uses stream metadata flags only. Dolby Vision encoding not supported.
+**Current Limitations:** AV1 HDR10 is pass-through only (SiteData) — HDR metadata is not generated or modified by HDR Forge. Dolby Vision encoding not supported.
 
 ## Audio Encoding
 
