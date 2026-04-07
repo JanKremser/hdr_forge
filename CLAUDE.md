@@ -193,7 +193,7 @@ Key functions:
 - Mux with audio/subs
 
 **Workflow 2: DV → DV (Copy Mode, Profile Conversion)**
-- Command: `--video-codec copy --dv-profile 8`
+- Command: `--video-codec copy --hdr dv8`
 - Extract base layer and RPU
 - Convert RPU profile
 - Extract/multiplex EL if Profile 7
@@ -269,7 +269,7 @@ hdr_forge convert -i input.mkv -o output.mkv --grain auto
 hdr_forge convert -i dv.mkv -o output.mkv --hdr hdr10|sdr
 
 # DV profile conversion (copy mode)
-hdr_forge convert -i dv.mkv -o output.mkv --video-codec copy --dv-profile 8
+hdr_forge convert -i dv.mkv -o output.mkv --video-codec copy --hdr dv8
 
 # Video sampling
 hdr_forge convert -i input.mkv -o sample.mkv --sample auto|90:120

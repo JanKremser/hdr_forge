@@ -314,31 +314,22 @@ Example:
 
     convert_parser.add_argument(
         '--hdr',
-        choices=['auto', 'hdr10', 'hdr', 'sdr'],
+        choices=['auto', 'hdr10', 'hdr', 'sdr', 'dv', 'dv8'],
         default='auto',
         help=f"""{sdr_dot} {hdr_dot} {dolby_vision_dot}
 User-specified target color format for the output video.
 [auto]   : Automatically determine target color format based on input video
 [hdr10]  : Convert to HDR10 format
 [hdr]    : Convert to HDR format, without HDR10 metadata
-[sdr]    : Convert to SDR format\n
-"""
-    )
+[sdr]    : Convert to SDR format
+[dv]     : Keep or convert to Dolby Vision (auto-detect profile)
+[dv8]    : Convert to Dolby Vision Profile 8.1
 
-    convert_parser.add_argument(
-        '--dv-profile',
-        choices=['auto', '8'],
-        default='auto',
-        help=f"""{dolby_vision_dot}
-Dolby Vision profile for encoding (auto = automatic detection, 8 = force profile 8.1)
-
-Encoding according to profiles 7 and 5 is not supported. You must convert to profile 8.1 or use a copy mode.
-Libplacebo tone mapping is used automatically when converting from profile 5 to 8.1.
-Profile 5 to 8.1 does not support copy mode.
-
-[auto] : Automatically detect and use appropriate Dolby Vision profile based on input video.
-         For Profile 7 or 5 use copy mode. By h265 encoding only Profile 8.1 is supported.
-[8]    : Force Dolby Vision Profile 8.1 encoding\n
+Dolby Vision notes:
+- Encoding to profiles 7 and 5 is not supported. Convert to profile 8.1 (dv8) or use copy mode (dv).
+- Libplacebo tone mapping is used automatically when converting from profile 5 to 8.1.
+- Profile 5 to 8.1 does not support copy mode.
+- Dolby Vision is not supported with AV1 (libsvtav1) encoding.\n
 """
     )
 

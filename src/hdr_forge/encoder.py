@@ -890,6 +890,18 @@ class Encoder:
     def convert(
         self,
     ) -> bool:
+        # Validate Dolby Vision requirements
+        if self._encoder_settings.hdr_sdr_format == HdrSdrFormat.DOLBY_VISION:
+            # Check if source is Dolby Vision
+            if self._video.get_dolby_vision_profile() is None:
+                print_err("Error: --hdr dv/dv8 requires a Dolby Vision source. Use --hdr auto to preserve the source format.")
+                sys.exit(1)
+
+            # Check if AV1 codec is being used
+            if self.get_encoding_video_codec() == VideoCodec.AV1:
+                print_err("Error: Dolby Vision encoding is not supported with AV1 (libsvtav1).")
+                sys.exit(1)
+
         if self._video.is_dolby_vision_video():
 
             if (self.get_encoding_video_codec() == VideoCodec.COPY and self._encoder_settings.target_dv_profile == DolbyVisionProfileEncodingMode.AUTO):

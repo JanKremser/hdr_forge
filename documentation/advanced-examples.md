@@ -686,14 +686,14 @@ hdr_forge convert -i dolby_vision.mkv -o output.mkv \
 ```bash
 # Convert to Profile 8.1 with re-encoding
 hdr_forge convert -i dolby_vision.mkv -o output.mkv \
-  --dv-profile 8 \
+  --hdr dv8 \
   --crop off \
   --quality 16
 
 # Fast profile conversion without re-encoding
 hdr_forge convert -i dolby_vision.mkv -o output.mkv \
   --video-codec copy \
-  --dv-profile 8
+  --hdr dv8
 ```
 
 ### DV to HDR10
@@ -768,7 +768,7 @@ Profile 5 (IPTPQc2) uses a non-standard color space and requires full re-encodin
 
 ```bash
 # Profile 5 → Profile 8.1 (requires Vulkan GPU driver and FFmpeg libplacebo)
-hdr_forge convert -i profile5_dv.mkv -o output_p81.mkv --dv-profile 8
+hdr_forge convert -i profile5_dv.mkv -o output_p81.mkv --hdr dv8
 
 # Profile 5 → HDR10 (extract base layer with re-encode)
 hdr_forge convert -i profile5_dv.mkv -o output_hdr10.mkv --hdr hdr10
@@ -778,7 +778,7 @@ hdr_forge convert -i profile5_dv.mkv -o output_sdr.mkv --hdr sdr
 
 # With quality settings
 hdr_forge convert -i profile5_dv.mkv -o output_p81_1080p.mkv \
-  --dv-profile 8 \
+  --hdr dv8 \
   --quality 15
 ```
 

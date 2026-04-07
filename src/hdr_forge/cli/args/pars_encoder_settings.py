@@ -66,25 +66,27 @@ def _get_hdr_sdr_format_from_string(format_str: str | None) -> HdrSdrFormat:
         return HdrSdrFormat.HDR
     elif format_str == 'hdr10':
         return HdrSdrFormat.HDR10
+    elif format_str == 'dv' or format_str == 'dv8':
+        return HdrSdrFormat.DOLBY_VISION
     elif format_str == 'dolby_vision':
         return HdrSdrFormat.DOLBY_VISION
     else:
         return HdrSdrFormat.AUTO
 
-def _get_dolby_vision_profile_from_string(profile_str: str | None) -> DolbyVisionProfileEncodingMode:
-    """Convert string to DolbyVision enum.
+def _get_dv_profile_from_hdr_string(hdr_str: str | None) -> DolbyVisionProfileEncodingMode:
+    """Determine DV profile mode from --hdr argument.
 
     Args:
-        profile_str: Dolby Vision profile string
+        hdr_str: Value from --hdr argument
 
     Returns:
-        Corresponding DolbyVision enum value
+        DolbyVisionProfileEncodingMode.AUTO for 'dv', _8 for 'dv8', AUTO for everything else
     """
-    if profile_str is None:
+    if hdr_str is None:
         return DolbyVisionProfileEncodingMode.AUTO
 
-    profile_str = profile_str.lower()
-    if profile_str == '8':
+    hdr_str = hdr_str.lower()
+    if hdr_str == 'dv8':
         return DolbyVisionProfileEncodingMode._8
 
     return DolbyVisionProfileEncodingMode.AUTO
@@ -865,7 +867,7 @@ def create_encoder_settings_from_args(args) -> EncoderSettings:
         hdr_forge_encoding_preset=hdr_forge_preset_settings,
         hdr_sdr_format=_get_hdr_sdr_format_from_string(format_str=args.hdr),
         enable_gpu_acceleration=hdr_forge_preset_settings.hardware_preset.value.startswith('gpu:'),
-        target_dv_profile=_get_dolby_vision_profile_from_string(profile_str=args.dv_profile),
+        target_dv_profile=_get_dv_profile_from_hdr_string(hdr_str=args.hdr),
         libx265_params=libx265_params,
         libx264_params=libx264_params,
         nvenc_params=nvenc_params,

@@ -526,7 +526,7 @@ If target is Dolby Vision Profile 8.1:
 - Vulkan GPU driver
 - `-init_hw_device vulkan` prepended to ffmpeg command
 
-**Important:** Profile 5 sources cannot use `--video-codec copy` for profile conversion. Full re-encode with `--dv-profile 8` or format conversion (`--hdr hdr10`/`sdr`) is required.
+**Important:** Profile 5 sources cannot use `--video-codec copy` for profile conversion. Full re-encode with `--hdr dv8` or format conversion (`--hdr hdr10`/`sdr`) is required.
 
 ### RPU Extraction Pipeline
 
@@ -759,10 +759,11 @@ Content Analysis & Filtering:
   --vfilter FILTERS         Custom FFmpeg video filters
 
 Format Conversion:
-  --hdr FORMAT   Target format: auto, hdr, hdr10, sdr (default: auto)
-  --dv-profile PROFILE      Dolby Vision profile: auto, 8 (default: auto)
-                            Note: Profile 5 and Profile 7 → 7 preserve format via copy mode
-                            Profile 5 → 8.1 and Profile 7 → 8.1 require re-encoding
+  --hdr FORMAT   Target format: auto, hdr, hdr10, sdr, dv, dv8 (default: auto)
+                 dv   : Preserve/convert to Dolby Vision (auto-detect profile)
+                 dv8  : Convert to Dolby Vision Profile 8.1
+                 Note: Profile 5 and Profile 7 → 7 preserve format via copy mode
+                       Profile 5 → 8.1 and Profile 7 → 8.1 require re-encoding
 
 Expert Options:
   --encoder-params PARAMS   Encoder-specific parameters

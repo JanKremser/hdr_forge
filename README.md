@@ -195,7 +195,7 @@ hdr_forge info -i dolby_vision.mkv  # shows "RPU Crop" if detected
 ### Profile 5 Dolby Vision
 ```bash
 # Profile 5 → 8.1 (requires Vulkan GPU driver)
-hdr_forge convert -i profile5_dv.mkv -o output.mkv --dv-profile 8
+hdr_forge convert -i profile5_dv.mkv -o output.mkv --hdr dv8
 
 # Profile 5 → HDR10 (fast format conversion)
 hdr_forge convert -i profile5_dv.mkv -o output.mkv --hdr hdr10
@@ -362,7 +362,7 @@ hdr_forge convert -i input.mkv -o output.mkv --remove-logo delogo:auto
 hdr_forge convert -i dolby_vision.mkv -o output.mkv --crop off
 
 # Force Profile 8.1
-hdr_forge convert -i dolby_vision.mkv -o output.mkv --dv-profile 8 --crop off
+hdr_forge convert -i dolby_vision.mkv -o output.mkv --hdr dv8 --crop off
 
 # Convert to HDR10 (extract base layer)
 hdr_forge convert -i dolby_vision.mkv -o output.mkv --hdr hdr10

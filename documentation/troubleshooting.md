@@ -424,7 +424,7 @@ Dolby Vision workflow involves multiple steps (base layer extraction, RPU extrac
    # Profile conversion without re-encoding (fast)
    hdr_forge convert -i dolby_vision.mkv -o output.mkv \
      --video-codec copy \
-     --dv-profile 8
+     --hdr dv8
    ```
 
 2. **Convert to HDR10:**
@@ -481,10 +481,10 @@ Profile 5 (IPTPQc2) uses a non-standard color space which cannot be stream-copie
 
 **Solutions:**
 
-1. **Use Re-encoding with `--dv-profile 8`:**
+1. **Use Re-encoding with `--hdr dv8`:**
    ```bash
    # Profile 5 → Profile 8.1 via re-encode (requires Vulkan GPU driver)
-   hdr_forge convert -i profile5_dv.mkv -o output.mkv --dv-profile 8 --quality 15
+   hdr_forge convert -i profile5_dv.mkv -o output.mkv --hdr dv8 --quality 15
    ```
 
 2. **Convert to HDR10 (faster alternative):**
