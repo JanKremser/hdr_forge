@@ -315,15 +315,15 @@ def print_progress_info(first_update: bool, current_frame: int, total_frames: in
     info_line: str = f"""
 {bar_str}
 Frame         : {color_str(current_frame, ANSI_GREEN)}/{total_frames}
-Speed         : {color_str(speed_str, ANSI_GREEN)}x | {color_str(fps, ANSI_GREEN)} FPS
 Duration      : {color_str(time_str, ANSI_GREEN)}/{duration_str}
+Speed         : {color_str(speed_str, ANSI_GREEN)}x | {color_str(fps, ANSI_GREEN)} FPS
 
 ETA           : {color_str(eta, ANSI_GREEN)} | Done at {color_str(finish_time_str, ANSI_GREEN)}
 Process Time  : {color_str(process_time_str, ANSI_GREEN)}
 
 Bitrate       : {color_str(bitrate_str, ANSI_GREEN)} kb/s
-Size          : {color_str(size_gib_str, ANSI_GREEN)} GiB | {color_str(size_gb_str, ANSI_GREEN)} GB ~> ({color_str(size_bytes_str, ANSI_GREEN)} Bytes)
-Final size    : {color_str(estimated_size_gib_str, ANSI_GREEN)} GiB | {color_str(estimated_size_gb_str, ANSI_GREEN)} GB ~> ({color_str(estimated_size_bytes_str, ANSI_GREEN)} Bytes)
+Size          : {color_str(size_gib_str, ANSI_GREEN)} GiB | {color_str(size_gb_str, ANSI_GREEN)} GB ~> [{color_str(size_bytes_str, ANSI_GREEN)} Bytes]
+Final size    : {color_str(estimated_size_gib_str, ANSI_GREEN)} GiB | {color_str(estimated_size_gb_str, ANSI_GREEN)} GB ~> [{color_str(estimated_size_bytes_str, ANSI_GREEN)} Bytes]
 {progress_bar}
 {color_str("-" * bar_len, ANSI_GREEN)}"""
 
@@ -342,7 +342,9 @@ def print_progress_info_minimal(process_name: str, first_update: bool, current_f
     percent: float = (current_frame / total_frames * 100) if total_frames > 0 else 0.0
 
     # Calculate ETA
-    eta: str = format_time(calculate_eta(fps=fps, current_frame=current_frame, total_frames=total_frames))
+    eta_seconds = calculate_eta(fps=fps, current_frame=current_frame, total_frames=total_frames)
+    eta: str = format_time(seconds=eta_seconds)
+    finish_time_str: str = (datetime.now() + timedelta(seconds=eta_seconds)).strftime("%H:%M")
 
     # Create progress bar
     progress_bar: str = create_progress_bar_with_percent(percent=percent)
@@ -355,7 +357,7 @@ def print_progress_info_minimal(process_name: str, first_update: bool, current_f
     info_line: str = f"""
 {color_str(f"-- {process_name} " + ("-" * bar_len), ANSI_GREEN)}
 Frame         : {color_str(current_frame, ANSI_GREEN)}/{total_frames}
-ETA           : {color_str(eta, color=ANSI_GREEN)}
+ETA           : {color_str(eta, ANSI_GREEN)} | Done at {color_str(finish_time_str, ANSI_GREEN)}
 Process Time  : {color_str(process_time_str, ANSI_GREEN)}
 {progress_bar}
 {color_str("-" * 70, ANSI_GREEN)}"""
