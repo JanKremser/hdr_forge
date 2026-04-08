@@ -26,7 +26,7 @@ Extract Dolby Vision/HDR10 and/or HDR10Plus metadata from a encoded video file.
     extract_parser.add_argument(
         '-o', '--output',
         required=False,
-        help='Output folder for extracted HDR-JSON, RPU and EL files'
+        help='Output folder for extracted HDR10-JSON, HDR10Plus-JSON, RPU and EL files'
     )
 
     extract_parser.add_argument(

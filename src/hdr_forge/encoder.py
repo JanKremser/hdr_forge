@@ -46,6 +46,9 @@ class Encoder:
         self._target_video_codec: VideoCodec = settings.video_codec
         self._encoder_settings: EncoderSettings = settings
 
+        # Effective HDR/SDR formats that will be present in the output (including base layer formats for DV)
+        self._target_hdr_sdr_format: list[HdrSdrFormat] = self._determine_hdr_sdr_format()
+
         self._video_codec_lib: VideoCodecBase | None = self._get_video_codec_lib_instance(
             video=video,
             encoder_settings=settings,
@@ -294,6 +297,76 @@ class Encoder:
 
         return DolbyVisionProfile._8
 
+    def _determine_hdr_sdr_format(self) -> list[HdrSdrFormat]:
+        """Determine the effective HDR/SDR formats that will be present in the output.
+
+        This includes the primary format determined by the video codec and any additional formats
+        that will be present due to Dolby Vision base layer encoding or HDR10+ preservation.
+
+        Returns:
+            List of HdrSdrFormat values representing all formats in the output
+        """
+        encoder_settings_formats: list[HdrSdrFormat] = [self._encoder_settings.hdr_sdr_format]
+
+        # COPY mode: source formats pass through directly
+        if self.get_encoding_video_codec() == VideoCodec.COPY:
+            if HdrSdrFormat.DOLBY_VISION in self._video.get_hdr_sdr_format() and HdrSdrFormat.HDR10 in encoder_settings_formats:
+                return [HdrSdrFormat.HDR10]
+            return self._video.get_hdr_sdr_format()
+
+        # Re-encoding: start with the codec's primary format and add secondary formats
+        formats: list[HdrSdrFormat] = []
+
+        video_formats: list[HdrSdrFormat] = self._video.get_hdr_sdr_format()
+        if HdrSdrFormat.AUTO in encoder_settings_formats:
+            encoder_settings_formats = video_formats
+
+        if HdrSdrFormat.DOLBY_VISION in encoder_settings_formats:
+            if HdrSdrFormat.DOLBY_VISION in video_formats:
+                formats.append(HdrSdrFormat.DOLBY_VISION)
+                dv_version: DolbyVisionProfile | None = self._video.get_dolby_vision_profile()
+                if dv_version is not None and dv_version == DolbyVisionProfile._5:
+                    # Profile 5: libplacebo tone-maps base layer to HDR, so add HDR as effective output format
+                    formats.append(HdrSdrFormat.HDR)
+                elif dv_version is not None and dv_version in (DolbyVisionProfile._7, DolbyVisionProfile._8):
+                    # Profile 7/8: HDR10-compatible base layer, so add HDR10 as effective output format if source is HDR10 or HDR
+                    if self._video.is_hdr10_video():
+                        formats.append(HdrSdrFormat.HDR10)
+                    elif self._video.is_hdr_video():
+                        formats.append(HdrSdrFormat.HDR)
+            else:
+                print_err("Cannot encode to Dolby Vision format because source video does not contain Dolby Vision.")
+                sys.exit(1)
+        if HdrSdrFormat.HDR10 in encoder_settings_formats and HdrSdrFormat.HDR10 not in formats:
+            if HdrSdrFormat.HDR10 in video_formats:
+                formats.append(HdrSdrFormat.HDR10)
+            else:
+                print_err("Cannot encode to HDR10 format because source video does not contain HDR10.")
+                sys.exit(1)
+        if HdrSdrFormat.HDR in encoder_settings_formats and HdrSdrFormat.HDR not in formats:
+            if HdrSdrFormat.HDR in video_formats or HdrSdrFormat.HDR10 in video_formats:
+                formats.append(HdrSdrFormat.HDR)
+            else:
+                print_err("Cannot encode to HDR format because source video does not contain HDR.")
+                sys.exit(1)
+        if HdrSdrFormat.SDR in encoder_settings_formats and HdrSdrFormat.SDR not in formats:
+            if HdrSdrFormat.SDR in video_formats:
+                formats.append(HdrSdrFormat.SDR)
+            else:
+                print_err("Cannot encode to SDR format because source video does not contain SDR.")
+                sys.exit(1)
+
+        if (
+            HdrSdrFormat.HDR10_PLUS in video_formats and
+            HdrSdrFormat.SDR not in formats and
+            HdrSdrFormat.HDR not in formats and
+            HdrSdrFormat.HDR10_PLUS not in formats
+        ):
+            # HDR10+ is preserved during encoding if source has it and output is not SDR/plain HDR
+            formats.append(HdrSdrFormat.HDR10_PLUS)
+
+        return formats
+
     def get_encoding_dolby_vision_profile(self) -> Optional[DolbyVisionProfile]:
         """Get the Dolby Vision profile number for encoding.
 
@@ -327,42 +400,12 @@ class Encoder:
         return self._encoder_settings.audio_codecs
 
     def get_encoding_hdr_sdr_format(self) -> list[HdrSdrFormat]:
-        """Get the effective color format for encoding.
-
-        Returns all formats that will be present in the encoded output, including base layer
-        formats for Dolby Vision and HDR10+ preservation.
+        """Get the effective HDR/SDR formats that will be present in the output.
 
         Returns:
-            List of all output HDR/SDR formats (including base layers for DV)
+            List of HdrSdrFormat values representing all formats in the output
         """
-        # COPY mode: source formats pass through directly
-        if self._video_codec_lib is None:
-            if HdrSdrFormat.DOLBY_VISION in self._video.get_hdr_sdr_format() and self._encoder_settings.hdr_sdr_format == HdrSdrFormat.HDR10:
-                return [HdrSdrFormat.HDR10]
-            return self._video.get_hdr_sdr_format()
-
-        # Re-encoding: start with the codec's primary format and add secondary formats
-        primary_format = self._video_codec_lib.get_encoding_hdr_sdr_format()
-        formats: list[HdrSdrFormat] = [primary_format]
-
-        # DV encoding: add the base layer format
-        if primary_format == HdrSdrFormat.DOLBY_VISION:
-            dv_profile = self._video.get_dolby_vision_profile()
-            if dv_profile == DolbyVisionProfile._5:
-                # Profile 5: libplacebo tone-maps base layer to HDR
-                formats.append(HdrSdrFormat.HDR)
-            else:
-                # Profile 7/8: HDR10-compatible base layer
-                if self._video.is_hdr10_video():
-                    formats.append(HdrSdrFormat.HDR10)
-                elif self._video.is_hdr_video():
-                    formats.append(HdrSdrFormat.HDR)
-
-        # HDR10+ is preserved during encoding if source has it and output is not SDR/plain HDR
-        if self._video.is_hdr10plus_video() and primary_format not in (HdrSdrFormat.SDR, HdrSdrFormat.HDR):
-            formats.append(HdrSdrFormat.HDR10_PLUS)
-
-        return formats
+        return self._target_hdr_sdr_format
 
     def is_dolby_vision_encoding(self) -> bool:
         """Check if encoding to Dolby Vision format."""
@@ -371,6 +414,14 @@ class Encoder:
     def is_hdr10_encoding(self) -> bool:
         """Check if encoding to HDR10 format."""
         return HdrSdrFormat.HDR10 in self.get_encoding_hdr_sdr_format()
+
+    def is_hdr_encoding(self) -> bool:
+        """Check if encoding to HDR format."""
+        return HdrSdrFormat.HDR in self.get_encoding_hdr_sdr_format()
+
+    def is_hdr10plus_encoding(self) -> bool:
+        """Check if encoding to HDR10+ format."""
+        return HdrSdrFormat.HDR10_PLUS in self.get_encoding_hdr_sdr_format()
 
     def is_sdr_encoding(self) -> bool:
         """Check if encoding to SDR format."""
