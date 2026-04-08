@@ -359,10 +359,10 @@ hdr_forge convert -i input.mkv -o output.mkv --remove-logo delogo:auto
 
 ```bash
 # Preserve Dolby Vision (re-encode with DV)
-hdr_forge convert -i dolby_vision.mkv -o output.mkv --crop off
+hdr_forge convert -i dolby_vision.mkv -o output.mkv
 
 # Force Profile 8.1
-hdr_forge convert -i dolby_vision.mkv -o output.mkv --hdr dv8 --crop off
+hdr_forge convert -i dolby_vision.mkv -o output.mkv --hdr dv8
 
 # Convert to HDR10 (extract base layer)
 hdr_forge convert -i dolby_vision.mkv -o output.mkv --hdr hdr10
