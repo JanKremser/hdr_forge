@@ -6,11 +6,12 @@ import subprocess
 from pathlib import Path
 from typing import Dict, Optional, Tuple
 
+from hdr_forge.typedefs.video_typing import CropResult
 from hdr_forge.core.config import get_global_temp_directory
 from hdr_forge.tools import hdr10plus_tool, mkvmerge
 from hdr_forge.tools import dovi_tool
 from hdr_forge.typedefs.encoder_typing import HdrSdrFormat
-from hdr_forge.typedefs.dolby_vision_typing import DolbyVisionEnhancementLayer, DolbyVisionInfo, DolbyVisionProfile, DolbyVisionSiteDataInfo, DolbyVisionRpuInfo
+from hdr_forge.typedefs.dolby_vision_typing import DolbyVisionEnhancementLayer, DolbyVisionInfo, DolbyVisionOffset, DolbyVisionProfile, DolbyVisionSiteDataInfo, DolbyVisionRpuInfo
 from hdr_forge.typedefs.video_typing import MASTER_DISPLAY_PRESETS, ContentLightLevelMetadata, HdrMetadata, MasterDisplayColorPrimaries, MasterDisplayMetadata
 from hdr_forge.typedefs.mkv_typing import MkvInfo, MkvTrack, MkvTrackType
 
@@ -51,6 +52,7 @@ class Video:
                 dv_profile_source=self.get_dolby_vision_profile(),
                 total_frames=self.get_total_frames(),
                 use_cache=False,
+                limit=1,
             )
             self._dolby_vision_rpu_info = dovi_tool.get_rpu_info(
                 rpu_path=Path(rpu_file_path)
@@ -333,6 +335,7 @@ class Video:
         dv_profile_el: str | None  = None
         dm_version: int | None = None
         cm_version: str | None = None
+        dv_offset: DolbyVisionOffset | None = None
 
         dv_rpu_info: DolbyVisionRpuInfo | None = self._dolby_vision_rpu_info
         dv_site_data: DolbyVisionSiteDataInfo | None = self._get_dolby_vision_side_data_infos()
@@ -341,6 +344,13 @@ class Video:
             dv_profile_el = dv_rpu_info.profile_el
             dm_version = dv_rpu_info.dm_version
             cm_version = dv_rpu_info.cm_version
+
+            dv_offset = DolbyVisionOffset(
+                top=dv_rpu_info.l5_offset_top or 0,
+                bottom=dv_rpu_info.l5_offset_bottom or 0,
+                left=dv_rpu_info.l5_offset_left or 0,
+                right=dv_rpu_info.l5_offset_right or 0,
+            )
         else:
             dv_profile = dv_site_data.dv_profile if dv_site_data else None
 
@@ -364,6 +374,7 @@ class Video:
             dm_version=dm_version,
             cm_version=cm_version,
             dv_layout=f"BL+{dv_map_el}RPU",
+            offset=dv_offset,
         )
 
     def get_dolby_vision_enhancement_layer(self) -> Optional[DolbyVisionEnhancementLayer]:
@@ -394,6 +405,31 @@ class Video:
             return DolbyVisionProfile(dv_info.dv_profile)
         except ValueError:
             return None
+
+    def get_dolby_vision_crop(self) -> Optional[CropResult]:
+        dv_info: DolbyVisionInfo | None = self.get_dolby_vision_info()
+        if not dv_info or not dv_info.offset:
+            return None
+
+        h: int = self.get_height()
+        w: int = self.get_width()
+
+        new_w = w - (dv_info.offset.left + dv_info.offset.right)
+        new_h = h - (dv_info.offset.top + dv_info.offset.bottom)
+
+        if new_w <= 0 or new_h <= 0:
+            return None
+
+        if new_w == w and new_h == h:
+            return None
+        
+        return CropResult(
+            x=dv_info.offset.left,
+            y=dv_info.offset.top,
+            width=new_w,
+            height=new_h,
+            is_valid=True,
+        )
 
     def get_master_display(self) -> Optional[MasterDisplayMetadata]:
         """Extract HDR master display metadata.

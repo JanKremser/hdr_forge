@@ -1,12 +1,13 @@
 """Shared helper functions for FFmpeg pipeline operations with progress tracking."""
 
+import re
 import subprocess
 import threading
 import time
 from pathlib import Path
 from typing import Callable, Optional
 
-from hdr_forge.cli.cli_output import ProgressBarSpinner, monitor_process_progress, print_debug, create_ffmpeg_minimal_progress_handler
+from hdr_forge.cli.cli_output import ProgressBarSpinner, monitor_process_progress, print_debug, create_ffmpeg_minimal_progress_handler, create_dovi_tool_progress_handler
 from hdr_forge.core.service import build_cmd_pipe_str
 from hdr_forge.typedefs.ffmpeg_typing import FfmpegMiniProgressInfo
 
@@ -57,6 +58,54 @@ def _create_ffmpeg_progress_info(progress_data: dict, total_frames: int) -> Ffmp
         fps=progress_data.get('fps', 0.0),
         total_frames=total_frames
     )
+
+
+def dovi_tool_progress_reader_thread(
+    pipe,
+    progress_callback: Optional[Callable[[float], None]],
+    total_steps: int = 3
+) -> None:
+    """Thread function to read dovi_tool progress output.
+
+    dovi_tool outputs progress by printing status lines when not attached to TTY:
+    "Parsing RPU file..."
+    "Processing input video for frame order info..."
+    "Rewriting file with interleaved RPU NALs.."
+
+    This thread counts each non-empty line as one progress step and calculates
+    the percentage: (steps_done / total_steps) * 100
+
+    Args:
+        pipe: The stdout/stderr pipe from the dovi_tool subprocess
+        progress_callback: Optional callback function to handle progress updates (receives percent: float)
+        total_steps: Total number of expected steps/lines (default 3 for inject-rpu)
+    """
+    steps_done = 0
+
+    try:
+        for line in iter(pipe.readline, ''):
+            if not line:
+                break
+
+            line = line.strip()
+            if not line:
+                continue
+
+            # Each non-empty line is one progress step
+            steps_done += 1
+            percent = min((steps_done / total_steps) * 100, 100.0)
+
+            if progress_callback:
+                progress_callback(percent)
+
+    except Exception:
+        # Silently ignore errors in reader thread to avoid crashing main process
+        pass
+    finally:
+        try:
+            pipe.close()
+        except Exception:
+            pass
 
 
 def _ffmpeg_progress_reader_thread(

@@ -37,15 +37,14 @@ HDR Forge supports multiple encoders for different use cases:
 -   Targeting older devices without H.265 support
 -   SDR content only
 
-#### libsvtav1 - AV1 Encoding (Beta)
--   **Best for:** HDR10 and SDR archival with maximum compression
+#### libsvtav1 - AV1 Encoding
+-   **Best for:** SDR archival and HDR10 pass-through with maximum compression
 -   **Performance:** Very slow encoding (2-5x slower than libx265)
 -   **Quality:** Excellent, superior to HEVC
--   **HDR Support:** Full (HDR10 via stream metadata flags)
+-   **HDR Support:** Pass-through only — HDR10 metadata is carried as SiteData from source; not generated or modified by HDR Forge
 -   **SDR Support:** Yes
 -   **10-bit Support:** Yes
 -   **Special Features:** Next-generation codec, royalty-free, superior compression
--   **Status:** Beta feature (HDR10 support via stream metadata)
 
 **When to use:**
 -   HDR10 and SDR archival with smallest possible file sizes (20-40% smaller than HEVC)
@@ -61,10 +60,9 @@ HDR Forge supports multiple encoders for different use cases:
 
 **Limitations:**
 -   **Stream Metadata Only:** HDR10 via stream metadata flags, not OBU-based HDR
--   **Dolby Vision Not Supported:** DV encoding not yet implemented
+-   **Dolby Vision Not Supported:** DV encoding not supported
 -   Very slow encoding (slower than libx265)
 -   Limited device compatibility (requires recent hardware/software)
--   Beta status
 
 ### GPU Encoders (Hardware-Accelerated)
 
@@ -111,14 +109,18 @@ HDR Forge supports multiple encoders for different use cases:
 -   **Performance:** Extremely fast (just container operations)
 -   **Quality:** No quality loss (original stream)
 -   **Use Cases:**
-    -   Dolby Vision profile conversion (Profile 5/7 → Profile 8)
+    -   Dolby Vision profile conversion (Profile 5 → 5, Profile 7 → 7 with EL, Profile 7/8 → 8.1)
     -   Dolby Vision to HDR10 base layer extraction
     -   Container format conversion
 
 **When to use:**
--   Converting Dolby Vision profiles without re-encoding
+-   Converting Dolby Vision profiles without re-encoding (copy mode only preserves original profile or downgrades to 8.1)
 -   Extracting HDR10 base layer from Dolby Vision
 -   Container format changes only
+
+**Dolby Vision Copy Mode Limitations:**
+-   Profile 5 → 8.1 requires full re-encoding (copy mode not supported) due to non-standard IPTPQc2 color space
+-   Profile 7 → 7 (with EL) supported via copy mode; Profile 7 → 8.1 requires re-encoding if EL must be preserved
 
 **Limitations:**
 -   Cannot apply filters (crop, scale, tone mapping)
@@ -134,7 +136,7 @@ HDR Forge automatically selects the best encoder based on:
 1. **`--video-codec` parameter:**
    - `h265` → libx265 (default), hevc_nvenc
    - `h264` → libx264, h264_nvenc
-   - `av1` → libsvtav1 (Beta)
+   - `av1` → libsvtav1
    - `copy` → Stream copy mode
 
 2. **`--hw-preset` parameter:**
@@ -329,8 +331,7 @@ hdr_forge convert -i input.mkv -o output.mkv \
 ```bash
 hdr_forge convert -i input.mkv -o output.mkv \
   --encoder libx265 \
-  --hw-preset cpu:quality \
-  --grain auto
+  --hw-preset cpu:quality
 ```
 
 ### For Fast Batch Processing
@@ -356,7 +357,7 @@ hdr_forge convert -i input.mkv -o archive.mkv \
   --crop auto
 ```
 
-### For Archival (AV1 - Beta)
+### For Archival (AV1)
 ```bash
 # Smallest file sizes with excellent quality
 hdr_forge convert -i input.mkv -o archive_av1.mkv \

@@ -23,13 +23,16 @@ Complete information about all available video encoders:
 ### 🎯 [Advanced Examples](advanced-examples.md)
 Comprehensive collection of encoding workflows:
 - Hardware acceleration examples
+- AV1 encoding (all resolutions and formats)
+- Audio and subtitle management
+- In-place MKV editing (edit subcommand)
 - Encoding preset combinations
 - Complex cropping scenarios
 - Grain analysis workflows
 - Scaling examples
 - Video sampling strategies
 - HDR metadata injection
-- Dolby Vision processing
+- Dolby Vision processing (including DV auto crop and Profile 5)
 - Batch processing
 - Quality optimization
 
@@ -38,35 +41,40 @@ Comprehensive collection of encoding workflows:
 - Learn how to combine multiple features
 - Find workflows for specific use cases
 - Optimize your encoding pipeline
+- Use the edit subcommand for in-place MKV editing
 
 ### 🔧 [Technical Details](technical-details.md)
 In-depth technical information about HDR Forge internals:
+- Complete Command Reference (all subcommands and parameters)
 - Encoder selection algorithm
 - Parameter priority system
 - Auto-CRF/CQ calculation
-- Crop detection algorithm
+- Crop detection algorithm (including DV auto crop via L5 offsets)
 - HDR metadata extraction
 - Tone mapping process
 - Resolution scaling logic
 - Grain analysis system
-- Dolby Vision processing workflows
-- Progress tracking implementation
+- Dolby Vision processing workflows (including Profile 5 re-encoding and profile conversion matrix)
+- Profile Conversion Matrix and modes
+- Video sampling implementation
 
 **Read this if you want to:**
+- Reference all CLI parameters (Command Reference)
 - Understand how HDR Forge works internally
 - Debug encoding issues
 - Contribute to the codebase
 - Fine-tune advanced parameters
+- Understand DV Profile 5 and profile conversion workflows
 
 ### 🛠️ [Troubleshooting Guide](troubleshooting.md)
 Solutions to common problems:
 - Installation issues
 - NVENC/GPU encoding problems
 - Encoding failures and crashes
-- Dolby Vision issues
+- Dolby Vision issues (including DV auto crop and Profile 5)
 - Quality problems
 - Performance issues
-- Crop/scale problems
+- Cropping and scaling with DV
 - Error message explanations
 
 **Read this if you:**
@@ -74,6 +82,7 @@ Solutions to common problems:
 - Need help with setup
 - Experience quality problems
 - Have performance issues
+- Need help with Dolby Vision workflows
 
 ## Quick Reference
 
@@ -96,7 +105,7 @@ hdr_forge convert -i input.mkv -o output.mkv --hw-preset cpu:quality
 
 **Convert Dolby Vision to HDR10:**
 ```bash
-hdr_forge convert -i dv.mkv -o hdr10.mkv --hdr-sdr-format hdr10
+hdr_forge convert -i dv.mkv -o hdr10.mkv --hdr hdr10
 ```
 
 **Batch conversion:**
@@ -106,11 +115,15 @@ hdr_forge convert -i ./input_folder -o ./output_folder
 
 ### Most Useful Links
 
+- **Full command reference:** [Technical Details - Command Reference](technical-details.md#command-reference)
 - **Installation help:** [Troubleshooting - Installation Issues](troubleshooting.md#installation-issues)
 - **GPU setup:** [Encoder Guide - GPU Setup](encoders.md#checking-gpu-support)
 - **Encoder comparison:** [Encoder Guide - Performance Comparison](encoders.md#performance-comparison)
 - **Parameter priority:** [Technical Details - Parameter Priority](technical-details.md#parameter-priority-system)
-- **Dolby Vision workflow:** [Technical Details - Dolby Vision Processing](technical-details.md#dolby-vision-processing)
+- **DV crop via L5 offsets:** [Technical Details - Crop Detection](technical-details.md#limitations)
+- **DV Profile 5 workflow:** [Technical Details - Dolby Vision Processing](technical-details.md#profile-5-re-encoding-workflow)
+- **DV auto crop examples:** [Advanced Examples - DV Auto Crop](advanced-examples.md#dv-with-auto-crop-rpu-l5-offsets)
+- **Edit subcommand:** [Advanced Examples - edit Subcommand](advanced-examples.md#edit-subcommand)
 - **Complex examples:** [Advanced Examples](advanced-examples.md)
 
 ## Getting Started

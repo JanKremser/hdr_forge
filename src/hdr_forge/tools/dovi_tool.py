@@ -3,13 +3,14 @@
 import re
 import subprocess
 import threading
+import time
 from pathlib import Path
 from typing import Optional
 
-from hdr_forge.cli.cli_output import monitor_process_progress, print_debug
+from hdr_forge.cli.cli_output import monitor_process_progress, print_debug, create_dovi_tool_progress_handler
 from hdr_forge.core.config import PROJECT_ROOT
 from hdr_forge.core.service import build_cmd_array_to_str
-from hdr_forge.tools.helper import run_ffmpeg_tool_pipeline
+from hdr_forge.tools.helper import run_ffmpeg_tool_pipeline, dovi_tool_progress_reader_thread
 from hdr_forge.typedefs.dolby_vision_typing import DolbyVisionProfile, DolbyVisionRpuInfo
 
 
@@ -35,6 +36,7 @@ def extract_base_layer(
     input_path: Path,
     output_hevc: Optional[Path] = None,
     total_frames: Optional[int] = None,
+    drop_hdr10plus: bool = False
 ) -> Path:
     """Extract Dolby Vision base layer (HEVC without RPU).
 
@@ -43,6 +45,7 @@ def extract_base_layer(
         output_hevc: Optional path for HEVC output file. If None, generates
                     filename based on input (input.mkv -> input.hevc)
         total_frames: Total number of frames in the video (for progress tracking)
+        drop_hdr10plus: If True, adds --drop-hdr10plus flag to dovi_tool command to remove HDR10+ metadata from the extracted base layer
 
     Returns:
         Path to the extracted base layer HEVC file
@@ -59,10 +62,16 @@ def extract_base_layer(
         # Build dovi_tool command
         dovi_cmd: list[str] = [
             dovi_tool_exec,
+        ]
+
+        if drop_hdr10plus:
+            dovi_cmd.append('--drop-hdr10plus')
+
+        dovi_cmd.extend([
             'remove',
             '-',
             '-o', str(output_hevc)
-        ]
+        ])
 
         # Execute pipeline using helper function
         returncode, stderr = run_ffmpeg_tool_pipeline(
@@ -125,27 +134,36 @@ def inject_rpu(input_path: Path, input_rpu: Path, output_hevc: Optional[Path] = 
         dovi_process = subprocess.Popen(
             dovi_cmd,
             stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL
+            stderr=subprocess.STDOUT,
+            text=True
         )
 
-        # Start a thread to monitor and show progress
-        monitor_thread = threading.Thread(
-            target=monitor_process_progress,
-            args=(dovi_process, "Injecting RPU metadata:"),
+        # Start progress tracking thread for dovi_tool's percentage output
+        process_start_time = time.time()
+        progress_callback = create_dovi_tool_progress_handler(
+            process_name="Injecting RPU metadata:",
+            process_start_time=process_start_time
+        )
+
+        reader_thread = threading.Thread(
+            target=dovi_tool_progress_reader_thread,
+            args=(dovi_process.stdout, progress_callback),
             daemon=True
         )
-        monitor_thread.start()
+        reader_thread.start()
 
         # Wait for dovi_tool to complete
         dovi_process.wait()
 
-        # Wait for the monitor thread to finish
-        monitor_thread.join(timeout=1.0)
+        # Wait for the reader thread to finish
+        reader_thread.join(timeout=1.0)
+        print()  # Newline after progress output
 
         if not output_hevc.exists():
             raise RuntimeError("HEVC file with RPU was not created")
 
         print_debug(f"RPU injected successfully: {str(output_hevc)}")
+        print()
         return output_hevc
 
     except FileNotFoundError as e:
@@ -164,6 +182,8 @@ def extract_rpu(
     dv_profile_encoding: Optional[DolbyVisionProfile] = None,
     total_frames: Optional[int] = None,
     use_cache: bool = False,
+    crop: bool = False,
+    limit: Optional[int] = None,
 ) -> Path:
     """Extract Dolby Vision RPU (Reference Processing Unit) metadata.
 
@@ -174,6 +194,7 @@ def extract_rpu(
         dv_profile_source: Source Dolby Vision profile
         dv_profile_encoding: Target Dolby Vision profile for encoding
         total_frames: Total number of frames in the video (for progress tracking)
+        crop: If True, adds --crop flag to dovi_tool command
 
     Returns:
         Path to the extracted RPU file
@@ -209,29 +230,68 @@ def extract_rpu(
                 if dv_profile_source.value in map_dv_profile8_mode:
                     dovi_cmd.extend(['-m', map_dv_profile8_mode[dv_profile_source.value]])
 
-        dovi_cmd.extend([
-            'extract-rpu',
-            '-',
-            '-o', str(output_rpu)
-        ])
+        if crop:
+            dovi_cmd.append('--crop')
 
-        # Execute pipeline using helper function
-        returncode, stderr = run_ffmpeg_tool_pipeline(
-            input_path=input_path,
-            tool_cmd=dovi_cmd,
-            process_name="Extracting RPU metadata:",
-            total_frames=total_frames,
-        )
+        dovi_cmd.append('extract-rpu')
 
-        if returncode != 0:
-            error_msg = stderr.decode('utf-8', errors='ignore')
-            raise RuntimeError(f"dovi_tool failed: {error_msg}")
+        if limit:
+            dovi_cmd.extend([
+                '--limit', str(limit),
+                '-o', str(output_rpu),
+                str(input_path)
+            ])
+            print_debug(build_cmd_array_to_str(dovi_cmd))
 
-        if not output_rpu.exists():
-            raise RuntimeError("RPU file was not created")
+            # Execute dovi_tool to extract RPU
+            dovi_process = subprocess.Popen(
+                dovi_cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL
+            )
 
-        print_debug(f"RPU extracted successfully: {str(output_rpu)}")
-        return output_rpu
+            # Start a thread to monitor and show progress
+            monitor_thread = threading.Thread(
+                target=monitor_process_progress,
+                args=(dovi_process, "Extracting RPU metadata:"),
+                daemon=True
+            )
+            monitor_thread.start()
+
+            # Wait for dovi_tool to complete
+            dovi_process.wait()
+
+            # Wait for the monitor thread to finish
+            monitor_thread.join(timeout=1.0)
+
+            if not output_rpu.exists():
+                raise RuntimeError("RPU file was not created")
+
+            print_debug(f"RPU extracted successfully: {str(output_rpu)}")
+            return output_rpu
+        else:
+            dovi_cmd.extend([
+                '-',
+                '-o', str(output_rpu)
+            ])
+
+            # Execute pipeline using helper function
+            returncode, stderr = run_ffmpeg_tool_pipeline(
+                input_path=input_path,
+                tool_cmd=dovi_cmd,
+                process_name="Extracting RPU metadata:",
+                total_frames=total_frames,
+            )
+
+            if returncode != 0:
+                error_msg = stderr.decode('utf-8', errors='ignore')
+                raise RuntimeError(f"dovi_tool failed: {error_msg}")
+
+            if not output_rpu.exists():
+                raise RuntimeError("RPU file was not created")
+
+            print_debug(f"RPU extracted successfully: {str(output_rpu)}")
+            return output_rpu
 
     except FileNotFoundError as e:
         raise RuntimeError(
@@ -276,26 +336,32 @@ def inject_dolby_vision_layers(bl_path: Path, el_path: Path, output_bl_el: Optio
         dovi_process = subprocess.Popen(
             dovi_cmd,
             stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
+            stderr=subprocess.STDOUT,
+            text=True
         )
 
-        # Start a thread to monitor and show progress
-        monitor_thread = threading.Thread(
-            target=monitor_process_progress,
-            args=(dovi_process, "Multiplexing Dolby Vision layers:"),
+        # Start progress tracking thread for dovi_tool's percentage output
+        process_start_time = time.time()
+        progress_callback = create_dovi_tool_progress_handler(
+            process_name="Multiplexing Dolby Vision layers:",
+            process_start_time=process_start_time
+        )
+
+        reader_thread = threading.Thread(
+            target=dovi_tool_progress_reader_thread,
+            args=(dovi_process.stdout, progress_callback, 1),
             daemon=True
         )
-        monitor_thread.start()
+        reader_thread.start()
 
         # Wait for dovi_tool to complete
-        _stdout, stderr = dovi_process.communicate()
+        dovi_process.wait()
 
-        # Wait for the monitor thread to finish
-        monitor_thread.join(timeout=1.0)
+        # Wait for the reader thread to finish
+        reader_thread.join(timeout=1.0)
 
         if dovi_process.returncode != 0:
-            error_msg = stderr.decode('utf-8', errors='ignore')
-            raise RuntimeError(f"dovi_tool muxing failed: {error_msg}")
+            raise RuntimeError("dovi_tool muxing failed")
 
         if not output_bl_el.exists():
             raise RuntimeError("Multiplexed file was not created")

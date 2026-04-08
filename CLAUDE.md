@@ -6,7 +6,7 @@
 
 HDR Forge is a Python CLI tool for video conversion with HDR metadata preservation, hardware acceleration (NVIDIA NVENC), and advanced features like grain analysis, cropping, and Dolby Vision support.
 
-**Version:** Python v0.7.11
+**Version:** 1.1.0 | Language: Python 3.13+
 
 ## Documentation Structure
 
@@ -18,28 +18,68 @@ HDR Forge is a Python CLI tool for video conversion with HDR metadata preservati
   - `technical-details.md` - Internal algorithms and processing
   - `troubleshooting.md` - Common issues and solutions
 
+## Recent Features (v1.1.0)
+
+- **GUI**: GTK4 Adwaita-inspired dark/light theme using pure tkinter
+- **In-place MKV Editing**: `edit` subcommand for subtitle-track flag management (no re-encoding)
+- **AV1 HDR10**: Full HDR10 support with stream metadata flags (via libsvtav1)
+- **Audio/Subtitle Management**: Per-language/track ID targeting, format conversion, auto-detection
+- **Refactored UI**: Modular `ui/` package with theme, widgets, and app components
+
 ## Technology Stack
 
 - **Language:** Python 3.13+
 - **Video Processing:** ffmpeg, ffprobe
 - **Hardware Acceleration:** NVIDIA NVENC (HEVC/H.264)
-- **Video Codecs:** libx265 (HEVC), libx264 (H.264), libsvtav1 (AV1 - Beta), hevc_nvenc, h264_nvenc
+- **Video Codecs:** libx265 (HEVC), libx264 (H.264), libsvtav1 (AV1), hevc_nvenc, h264_nvenc
+- **GUI:** tkinter + ttk (Python stdlib)
 - **Key Dependencies:** ffmpeg, dovi_tool, hevc_hdr_editor, hdr10plus_tool, mkvmerge, numpy
+- **Optional:** Pillow (for rounded button UI in GUI)
 
 ## Project Structure
 
 ```
 src/hdr_forge/
-├── main.py                        # CLI entry point (info, convert, calc_maxcll, extract-metadata, inject-metadata, detect-logo)
+├── main.py                        # CLI entry point (info, convert, extract-metadata, inject-metadata, edit, detect-logo)
+├── main_ui.py                     # GUI entry point (shim, calls ui.main_ui)
 ├── video.py                       # Video metadata extraction (Video class)
 ├── encoder.py                     # Encoder orchestration (Encoder class)
-├── hdr_metadata_injector.py       # HDR metadata injection without re-encoding
+├── metadata_injector.py           # HDR metadata injection without re-encoding
+├── ui/                            # GUI (tkinter) - GTK4 Adwaita theme
+│   ├── app.py                     # HdrForgeGui main class
+│   ├── theme.py                   # Light/Dark theme colors and styling
+│   ├── widgets.py                 # RoundedButton, PIL-based custom widgets
+│   └── redirect.py                # StdOut capture for GUI output
+├── edit_files/                    # In-place MKV editing (subtitle-flags, etc.)
+│   ├── subcommand.py              # Edit command handler
+│   └── subtitle_editor.py         # Subtitle track manipulation
 ├── cli/                           # CLI output and argument parsing
+│   ├── args/                      # Argument parsing (pars_args, pars_encoder_settings)
+│   ├── cli_output.py              # Progress bars, formatting
+│   ├── encoder.py                 # CLI-specific encoder output
+│   ├── video.py                   # CLI-specific video info output
+│   └── detect_logo.py             # Logo detection output
 ├── typedefs/                      # Type definitions and enums
-├── ffmpeg/video_codec/            # Codec implementations (libx265, libx264, libsvtav1, hevc_nvenc, h264_nvenc)
-├── tools/                         # External tools (dovi_tool, hevc_hdr_editor, mkvmerge)
-├── analyze/                       # MaxCLL/MaxFALL calculation
+├── ffmpeg/                        # FFmpeg wrapper and codec implementations
+│   ├── ffmpeg_wrapper.py          # FFmpeg execution
+│   └── video_codec/               # Codec classes (libx265, libx264, libsvtav1, hevc_nvenc, h264_nvenc)
+│       ├── video_codec_base.py    # Abstract base class
+│       ├── service/
+│       │   └── presets.py         # Quality and preset calculations
+│       └── *.py                   # Codec implementations
+├── tools/                         # External tools
+│   ├── dovi_tool.py               # Dolby Vision RPU/EL handling
+│   ├── hevc_hdr_editor.py         # HDR10 metadata injection
+│   ├── hdr10plus_tool.py          # HDR10+ metadata handling
+│   ├── mkvmerge.py                # MKV container operations
+│   ├── mkvpropedit.py             # In-place MKV property editing
+│   └── helper.py                  # Utility functions
+├── analyze/                       # Content analysis
+│   ├── crop_video.py              # Crop detection
+│   └── detect_logo.py             # Logo detection
 └── core/                          # Global configuration
+    ├── config.py                  # Configuration handling
+    └── service.py                 # Shutdown/cleanup service
 ```
 
 ## Key Modules
@@ -88,15 +128,35 @@ Key methods:
 **Auto-CRF Adjustments:**
 - HDR10/DV: +1.0 CRF (10-bit allows higher compression)
 - Action preset: -2.0 CRF (weighted, better for fast motion)
-- Grain: -1/-2/-3 CRF (cat1/cat2/cat3)
 - Weighting to avoid extreme values
 
 **Codec Implementations:**
 - `libx265.py` - Software HEVC (HDR10, SDR, DV base layer)
 - `libx264.py` - Software H.264 (SDR only)
-- `libsvtav1.py` - Software AV1 (SDR only) - **Beta** (HDR10/DV not yet implemented)
+- `libsvtav1.py` - Software AV1 (HDR10 pass-through via SiteData, SDR; no HDR generation/modification)
 - `hevc_nvenc.py` - Hardware HEVC (HDR10, SDR, DV base layer)
 - `h264_nvenc.py` - Hardware H.264 (SDR only)
+
+### ui/ - GUI Package (GTK4 Adwaita Theme)
+
+**HdrForgeGui class** (`ui/app.py`):
+- Tkinter-based GUI with file pickers, codec dropdowns, progress tracking
+- Input/output file selection with auto-generation
+- Codec options: h265/h264/av1/copy for video, copy/remove/aac/ac3/eac3/flac for audio
+- Subtitle modes: copy/remove/auto for subtitle handling
+- Real-time encoding progress with ANSI code stripping
+
+**Theming** (`ui/theme.py`):
+- Light/Dark GTK4 Adwaita color palettes (21 colors each)
+- Pure ttk.Style() configuration (no external CSS/themes)
+- Auto-applies colors to: TFrame, TLabel, TEntry, TButton, TCombobox, TScrollbar, TProgressbar
+- Light toggle button (🌙/☀) in header
+
+**Widgets** (`ui/widgets.py`):
+- `RoundedButton`: PIL-based custom buttons with truly rounded corners
+- Text rendered directly on RGBA image buttons
+- Falls back to flat buttons if PIL unavailable
+- Per-button color/radius/sizing support
 
 ### tools/dovi_tool.py - Dolby Vision Operations
 
@@ -128,12 +188,12 @@ Key functions:
 ### Dolby Vision Conversion
 
 **Workflow 1: DV → HDR10/SDR (Copy Mode)**
-- Command: `--video-codec copy --hdr-sdr-format hdr10`
+- Command: `--video-codec copy --hdr hdr10`
 - Extract base layer (dovi_tool remove)
 - Mux with audio/subs
 
 **Workflow 2: DV → DV (Copy Mode, Profile Conversion)**
-- Command: `--video-codec copy --dv-profile 8`
+- Command: `--video-codec copy --hdr dv8`
 - Extract base layer and RPU
 - Convert RPU profile
 - Extract/multiplex EL if Profile 7
@@ -159,6 +219,21 @@ Key functions:
 1. Extract HEVC stream
 2. Inject metadata (dovi_tool, hevc_hdr_editor, hdr10plus_tool)
 3. Mux back with audio/subs
+
+### In-Place MKV Editing
+
+**Edit Command:** `edit -i input.mkv --subtitle-flags [mode]`
+1. Validates input (MKV only - no re-encoding)
+2. Parses subtitle-flags mode (auto, auto>LANG, forced:LANG, default:LANG, remove:LANG, none)
+3. Uses `mkvpropedit` for track property modification
+4. No container remux required; video/audio/metadata unchanged
+
+**Supported Modes:**
+- `auto` - Auto-detect default track by language preference
+- `auto>ENG,SPA` - Auto-detect with language priority list
+- `forced:ENG` - Mark ENG tracks as forced
+- `default:ENG` - Mark ENG tracks as default
+- `none` - Remove default/forced flags from all tracks
 
 ## CLI Quick Reference
 
@@ -191,10 +266,10 @@ hdr_forge convert -i input.mkv -o output.mkv --scale FHD|UHD --scale-mode height
 hdr_forge convert -i input.mkv -o output.mkv --grain auto
 
 # Format conversion
-hdr_forge convert -i dv.mkv -o output.mkv --hdr-sdr-format hdr10|sdr
+hdr_forge convert -i dv.mkv -o output.mkv --hdr hdr10|sdr
 
 # DV profile conversion (copy mode)
-hdr_forge convert -i dv.mkv -o output.mkv --video-codec copy --dv-profile 8
+hdr_forge convert -i dv.mkv -o output.mkv --video-codec copy --hdr dv8
 
 # Video sampling
 hdr_forge convert -i input.mkv -o sample.mkv --sample auto|90:120
@@ -204,10 +279,14 @@ hdr_forge convert -i input.mkv -o output.mkv --encoder libx265 --encoder-params 
 
 # Other commands
 hdr_forge info -i input.mkv
-hdr_forge calc_maxcll -i input.mkv
 hdr_forge detect-logo -i input.mkv --export logo_mask.png
 hdr_forge extract-metadata -i input.mkv -o ./metadata
 hdr_forge inject-metadata -i input.mkv -o output.mkv --hdr10 metadata.json
+
+# In-place MKV editing (no re-encoding)
+hdr_forge edit -i input.mkv --subtitle-flags auto
+hdr_forge edit -i input.mkv --subtitle-flags "remove:spa"
+hdr_forge edit -i input.mkv --subtitle-flags "forced:eng"
 ```
 
 ## Key Technical Details
@@ -232,7 +311,6 @@ hdr_forge inject-metadata -i input.mkv -o output.mkv --hdr10 metadata.json
 - Base from hw_preset (resolution-based)
 - HDR10/DV: +1.0 CRF
 - Action: -2.0 CRF (weighted)
-- Grain: -1/-2/-3 CRF (cat1/2/3)
 - Weighting function prevents extreme values
 
 ### Crop Detection
@@ -270,6 +348,19 @@ hdr_forge inject-metadata -i input.mkv -o output.mkv --hdr10 metadata.json
 4. Update `main.py`
 5. Update documentation
 
+### Adding Edit Subcommand Features
+1. Update `SubtitleMode` enum in `typedefs/encoder_typing.py` if adding modes
+2. Add parsing logic in `cli/args/pars_encoder_settings.py`
+3. Implement in `edit_files/subtitle_editor.py` or new handler module
+4. Register in `edit_files/__init__.py` and `main.py`
+5. Add CLI tests
+
+### Extending GUI
+1. Add new widgets/styles in `ui/theme.py` or `ui/widgets.py`
+2. Update `HdrForgeGui` in `ui/app.py`
+3. Add color support in `ui/theme.py` light/dark palettes if needed
+4. Theme toggle auto-applies colors via `_toggle_theme()`
+
 ### Debugging
 ```bash
 hdr_forge convert -i input.mkv -o output.mkv --debug
@@ -284,7 +375,8 @@ Shows: FFmpeg commands, encoder parameter selection, format detection, filter ch
 4. **Upscaling:** Not supported (only downscaling)
 5. **Format Upgrades:** Not possible (SDR → HDR10, HDR10 → DV)
 6. **Hardware:** Only NVIDIA NVENC supported (no Intel QSV, AMD VCE, Apple VideoToolbox)
-7. **AV1 Beta:** AV1 encoding is in beta status - currently SDR only, HDR10/Dolby Vision not yet implemented
+7. **AV1:** HDR10 support via stream metadata flags (no DV); SDR full support
+8. **Edit Command:** Subtitle-flags mode only; other edits require full remux
 
 ## External Dependencies
 

@@ -5,12 +5,12 @@ This document provides comprehensive examples for complex encoding scenarios wit
 ## Table of Contents
 
 - [Hardware Acceleration](#hardware-acceleration)
-- [AV1 Encoding (Beta)](#av1-encoding-beta)
+- [AV1 Encoding](#av1-encoding)
 - [Audio Encoding](#audio-encoding)
 - [Subtitle Management](#subtitle-management)
+- [edit Subcommand](#edit-subcommand)
 - [Encoding Presets](#encoding-presets)
 - [Cropping Examples](#cropping-examples)
-- [Grain Analysis](#grain-analysis)
 - [Scaling Examples](#scaling-examples)
 - [Video Sampling](#video-sampling)
 - [HDR Metadata Injection](#hdr-metadata-injection)
@@ -61,7 +61,7 @@ hdr_forge convert -i input.mkv -o gpu_output.mkv \
 ls -lh *_output.mkv
 ```
 
-## AV1 Encoding (Beta)
+## AV1 Encoding
 
 ### Basic AV1 Encoding
 
@@ -113,21 +113,21 @@ hdr_forge convert -i hdr10_video.mkv -o hdr10_av1.mkv \
 # Convert HDR10 to SDR with AV1 (tone mapping)
 hdr_forge convert -i hdr10_video.mkv -o sdr_av1.mkv \
   --encoder libsvtav1 \
-  --hdr-sdr-format sdr \
+  --hdr sdr \
   --quality 23
 
 # Dolby Vision to HDR10 with AV1
 hdr_forge convert -i dolby_vision.mkv -o hdr10_av1.mkv \
   --encoder libsvtav1 \
-  --hdr-sdr-format hdr10
+  --hdr hdr10
 
 # Dolby Vision to SDR with AV1
 hdr_forge convert -i dolby_vision.mkv -o sdr_av1.mkv \
   --encoder libsvtav1 \
-  --hdr-sdr-format sdr
+  --hdr sdr
 ```
 
-**Note:** AV1 HDR10 support uses stream metadata flags (Site Data). Dolby Vision encoding not supported.
+**Note:** AV1 HDR10 is pass-through only — HDR10 metadata from the source is carried as SiteData and not modified. Dolby Vision encoding not supported.
 
 ### AV1 Comparison with HEVC
 
@@ -160,9 +160,9 @@ hdr_forge convert -i ./videos -o ./av1_streams \
 - File size is critical (storage/bandwidth constraints)
 - Encoding time is not a constraint
 - Targeting modern platforms (YouTube, Netflix, etc.)
-- Creating long-term SDR archival copies
+- Creating long-term archival copies (SDR, or HDR10 pass-through from source)
 
-**Current Limitations:** AV1 HDR10 support uses stream metadata flags only. Dolby Vision encoding not yet implemented.
+**Current Limitations:** AV1 HDR10 is pass-through only (SiteData) — HDR metadata is not generated or modified by HDR Forge. Dolby Vision encoding not supported.
 
 ## Audio Encoding
 
@@ -269,6 +269,59 @@ hdr_forge convert -i input.mkv -o output.mkv \
 
 **Note:** Some players (particularly VLC) may have rendering issues with FFmpeg-set subtitle titles.
 
+## edit Subcommand
+
+In-place MKV editing without re-encoding using `mkvpropedit`.
+
+### Auto Subtitle Detection
+
+Auto-detect subtitle track flags (forced, SDH, commentary) and set default track by language:
+
+```bash
+# Auto-detect and set default subtitle track
+hdr_forge edit -i movie.mkv --subtitle-flags auto
+
+# Auto-detect with German as preferred default language
+hdr_forge edit -i movie.mkv --subtitle-flags auto>ger
+
+# Auto-detect with English preference
+hdr_forge edit -i movie.mkv --subtitle-flags auto>eng
+
+# Auto-detect with multiple language priority
+hdr_forge edit -i movie.mkv --subtitle-flags auto>ger,eng
+```
+
+### Per-Track ID and Language Overrides
+
+```bash
+# Force specific track IDs to default
+hdr_forge edit -i movie.mkv --subtitle-flags "1:default"
+
+# Set language-specific flags
+hdr_forge edit -i movie.mkv --subtitle-flags "ger:default;eng:forced"
+
+# Explicit copy (no changes to subtitle flags)
+hdr_forge edit -i movie.mkv --subtitle-flags copy
+```
+
+### When to Use edit vs convert
+
+```bash
+# Use edit when you only need to fix subtitle/audio track flags — no quality loss, very fast
+hdr_forge edit -i movie.mkv --subtitle-flags auto
+
+# Use convert when you also need to re-encode or when track removal is required
+# (edit cannot remove tracks — would require remux)
+hdr_forge convert -i movie.mkv -o output.mkv --subtitle-flags remove
+
+# Use convert for combined operations (re-encode + subtitle fixes)
+hdr_forge convert -i movie.mkv -o output.mkv \
+  --encoder libx265 \
+  --subtitle-flags auto
+```
+
+**Requirements:** `mkvpropedit` (part of MKVToolNix) must be in system PATH or `lib/` directory
+
 ## Encoding Presets
 
 ### Content-Aware Presets
@@ -286,18 +339,16 @@ hdr_forge convert -i action_movie.mkv -o output.mkv \
 
 # Animation with vibrant colors
 hdr_forge convert -i anime.mkv -o output.mkv \
-  --preset animation \
-  --grain auto
+  --preset animation
 ```
 
 ### Preset Combinations
 
 ```bash
-# Film + CPU quality + grain analysis
+# Film + CPU quality + crop analysis
 hdr_forge convert -i old_film.mkv -o output.mkv \
   --preset film \
   --hw-preset cpu:quality \
-  --grain auto \
   --crop auto
 
 # Action + GPU fast encoding
@@ -389,70 +440,9 @@ hdr_forge convert -i input.mkv -o output.mkv \
   --scale FHD \
   --quality 16
 
-# Crop + grain + film preset
+# Crop + film preset
 hdr_forge convert -i old_film.mkv -o output.mkv \
   --crop auto \
-  --grain cat2 \
-  --preset film
-```
-
-## Grain Analysis
-
-### Automatic Grain Detection
-
-```bash
-# Basic auto grain detection
-hdr_forge convert -i old_film.mkv -o output.mkv --grain auto
-
-# Auto grain with CPU quality
-hdr_forge convert -i film.mkv -o output.mkv \
-  --grain auto \
-  --hw-preset cpu:quality
-
-# Auto grain with film preset
-hdr_forge convert -i film.mkv -o output.mkv \
-  --grain auto \
-  --preset film
-```
-
-### Manual Grain Categories
-
-```bash
-# Light grain (cat1)
-hdr_forge convert -i input.mkv -o output.mkv \
-  --grain cat1 \
-  --quality 17
-
-# Medium grain (cat2)
-hdr_forge convert -i grainy_film.mkv -o output.mkv \
-  --grain cat2 \
-  --hw-preset cpu:quality
-
-# Heavy grain (cat3)
-hdr_forge convert -i very_grainy.mkv -o output.mkv \
-  --grain cat3 \
-  --encoder libx265 \
-  --encoder-params "preset=slow:crf=14:tune=grain"
-```
-
-### Grain with Different Content Types
-
-```bash
-# Old film restoration
-hdr_forge convert -i old_film.mkv -o restored.mkv \
-  --grain cat3 \
-  --preset film \
-  --crop auto \
-  --quality 14
-
-# Documentary with moderate grain
-hdr_forge convert -i documentary.mkv -o output.mkv \
-  --grain cat2 \
-  --hw-preset cpu:balanced
-
-# Modern film with slight grain
-hdr_forge convert -i modern_film.mkv -o output.mkv \
-  --grain cat1 \
   --preset film
 ```
 
@@ -544,7 +534,6 @@ hdr_forge convert -i input.mkv -o sample.mkv \
   --sample auto \
   --crop auto \
   --scale FHD \
-  --grain auto
 ```
 
 ### Custom Time Ranges
@@ -566,10 +555,9 @@ hdr_forge convert -i input.mkv -o sample.mkv --sample 3540:3600
 ### Testing Workflows
 
 ```bash
-# Test grain settings
-hdr_forge convert -i film.mkv -o test_grain.mkv \
+# Test sample with film preset
+hdr_forge convert -i film.mkv -o test_sample.mkv \
   --sample 60:90 \
-  --grain cat2 \
   --encoder hevc_nvenc
 
 # Test crop settings
@@ -698,14 +686,14 @@ hdr_forge convert -i dolby_vision.mkv -o output.mkv \
 ```bash
 # Convert to Profile 8.1 with re-encoding
 hdr_forge convert -i dolby_vision.mkv -o output.mkv \
-  --dv-profile 8 \
+  --hdr dv8 \
   --crop off \
   --quality 16
 
 # Fast profile conversion without re-encoding
 hdr_forge convert -i dolby_vision.mkv -o output.mkv \
   --video-codec copy \
-  --dv-profile 8
+  --hdr dv8
 ```
 
 ### DV to HDR10
@@ -713,18 +701,18 @@ hdr_forge convert -i dolby_vision.mkv -o output.mkv \
 ```bash
 # Extract HDR10 base layer with re-encoding
 hdr_forge convert -i dolby_vision.mkv -o hdr10.mkv \
-  --hdr-sdr-format hdr10
+  --hdr hdr10
 
 # With crop and scale (supported when converting to HDR10)
 hdr_forge convert -i dolby_vision.mkv -o hdr10_1080p.mkv \
-  --hdr-sdr-format hdr10 \
+  --hdr hdr10 \
   --crop auto \
   --scale FHD
 
 # Fast extraction without re-encoding
 hdr_forge convert -i dolby_vision.mkv -o hdr10.mkv \
   --video-codec copy \
-  --hdr-sdr-format hdr10
+  --hdr hdr10
 ```
 
 ### DV to SDR
@@ -732,31 +720,82 @@ hdr_forge convert -i dolby_vision.mkv -o hdr10.mkv \
 ```bash
 # Convert to SDR with tone mapping
 hdr_forge convert -i dolby_vision.mkv -o sdr.mkv \
-  --hdr-sdr-format sdr
+  --hdr sdr
 
 # With crop and scale
 hdr_forge convert -i dolby_vision.mkv -o sdr_720p.mkv \
-  --hdr-sdr-format sdr \
+  --hdr sdr \
   --crop auto \
   --scale HD
 
 # Fast GPU conversion
 hdr_forge convert -i dolby_vision.mkv -o sdr.mkv \
-  --hdr-sdr-format sdr \
+  --hdr sdr \
   --encoder hevc_nvenc
 ```
+
+### DV with Auto Crop (RPU L5 Offsets)
+
+Auto crop reads L5 Active Area offsets from RPU metadata — no cropdetect scan required:
+
+```bash
+# Auto crop from RPU L5 offsets (default behavior)
+hdr_forge convert -i dolby_vision.mkv -o output.mkv --crop auto
+
+# Verify crop detected with info command
+hdr_forge info -i dolby_vision.mkv  # shows "RPU Crop" if offsets present
+
+# Combine with quality settings
+hdr_forge convert -i dolby_vision.mkv -o output.mkv \
+  --crop auto \
+  --quality 14 \
+  --hw-preset cpu:quality
+
+# Note: Manual and ratio crop modes are NOT supported for DV
+# hdr_forge convert -i dv.mkv -o output.mkv --crop 1920:800:0:140  ← ERROR
+# hdr_forge convert -i dv.mkv -o output.mkv --crop 21:9             ← ERROR
+```
+
+**Workaround for manual crop with DV:** Convert to HDR10 first:
+```bash
+hdr_forge convert -i dolby_vision.mkv -o hdr10_temp.mkv --hdr hdr10
+hdr_forge convert -i hdr10_temp.mkv -o final.mkv --crop 1920:800:0:140
+```
+
+### Profile 5 Conversion
+
+Profile 5 (IPTPQc2) uses a non-standard color space and requires full re-encoding with libplacebo:
+
+```bash
+# Profile 5 → Profile 8.1 (requires Vulkan GPU driver and FFmpeg libplacebo)
+hdr_forge convert -i profile5_dv.mkv -o output_p81.mkv --hdr dv8
+
+# Profile 5 → HDR10 (extract base layer with re-encode)
+hdr_forge convert -i profile5_dv.mkv -o output_hdr10.mkv --hdr hdr10
+
+# Profile 5 → SDR (full tone mapping)
+hdr_forge convert -i profile5_dv.mkv -o output_sdr.mkv --hdr sdr
+
+# With quality settings
+hdr_forge convert -i profile5_dv.mkv -o output_p81_1080p.mkv \
+  --hdr dv8 \
+  --quality 15
+```
+
+**Note:** Copy mode is not available for Profile 5 sources (requires re-encoding).
+**Requirements:** FFmpeg compiled with `--enable-libplacebo`, Vulkan-capable GPU.
 
 ### Batch DV Processing
 
 ```bash
 # Convert entire DV library to HDR10
 hdr_forge convert -i ./dv_collection -o ./hdr10_collection \
-  --hdr-sdr-format hdr10 \
+  --hdr hdr10 \
   --scale FHD
 
 # Convert DV library to SDR
 hdr_forge convert -i ./dv_collection -o ./sdr_collection \
-  --hdr-sdr-format sdr \
+  --hdr sdr \
   --crop auto
 ```
 
@@ -771,7 +810,6 @@ hdr_forge convert -i 4k_film.mkv -o archive.mkv \
   --encoder-params "preset=veryslow:crf=12:tune=grain" \
   --crop auto \
   --scale FHD \
-  --grain cat2
 
 # With custom metadata
 hdr_forge convert -i 4k_film.mkv -o archive.mkv \
@@ -779,7 +817,6 @@ hdr_forge convert -i 4k_film.mkv -o archive.mkv \
   --encoder-params "preset=veryslow:crf=12:tune=grain" \
   --crop auto \
   --scale FHD \
-  --grain cat2 \
   --master-display "G(13250,34500)B(7500,30000)R(34000,16000)WP(15635,16450)L(1000,0.05)" \
   --max-cll "1000,400"
 ```
@@ -794,21 +831,19 @@ hdr_forge convert -i ./4k_videos -o ./1080p_encoded \
   --crop auto \
   --scale FHD
 
-# With grain optimization
+# High quality GPU encoding
 hdr_forge convert -i ./videos -o ./encoded \
   --encoder hevc_nvenc \
   --hw-preset gpu:quality \
-  --grain auto \
   --crop auto
 ```
 
 ### Film Restoration Workflow
 
 ```bash
-# Old film with heavy grain
+# Old film restoration
 hdr_forge convert -i old_film.mkv -o restored.mkv \
   --preset film \
-  --grain cat3 \
   --crop auto \
   --quality 13 \
   --hw-preset cpu:quality
@@ -817,7 +852,6 @@ hdr_forge convert -i old_film.mkv -o restored.mkv \
 hdr_forge convert -i old_film.mkv -o test_sample.mkv \
   --sample 60:90 \
   --preset film \
-  --grain cat3 \
   --quality 13 \
   --encoder hevc_nvenc
 ```
@@ -850,10 +884,9 @@ hdr_forge convert -i anime.mkv -o output.mkv \
   --crop auto \
   --scale FHD
 
-# With grain analysis
+# High quality animation
 hdr_forge convert -i anime.mkv -o output.mkv \
   --preset animation \
-  --grain auto \
   --hw-preset cpu:balanced
 ```
 
@@ -875,14 +908,14 @@ hdr_forge convert -i source.mkv -o 1080p_hdr.mkv \
 
 # 1080p SDR for compatibility
 hdr_forge convert -i source.mkv -o 1080p_sdr.mkv \
-  --hdr-sdr-format sdr \
+  --hdr sdr \
   --scale FHD \
   --crop auto \
   --encoder hevc_nvenc
 
 # 720p H.264 for maximum compatibility
 hdr_forge convert -i source.mkv -o 720p_h264.mkv \
-  --hdr-sdr-format sdr \
+  --hdr sdr \
   --scale HD \
   --encoder h264_nvenc \
   --crop auto
@@ -913,7 +946,7 @@ hdr_forge convert -i ./4k_videos -o ./1080p_videos \
 
 # Batch HDR to SDR
 hdr_forge convert -i ./hdr_videos -o ./sdr_videos \
-  --hdr-sdr-format sdr \
+  --hdr sdr \
   --crop auto
 ```
 
@@ -923,7 +956,6 @@ hdr_forge convert -i ./hdr_videos -o ./sdr_videos \
 # Batch films
 hdr_forge convert -i ./films -o ./encoded_films \
   --preset film \
-  --grain auto \
   --crop auto
 
 # Batch action content
@@ -974,10 +1006,9 @@ hdr_forge convert -i input.mkv -o test_gpu_qual.mkv --sample auto --hw-preset gp
 ### Content-Type Optimization
 
 ```bash
-# Film with grain optimization
+# Film with quality optimization
 hdr_forge convert -i film.mkv -o optimized_film.mkv \
   --preset film \
-  --grain auto \
   --hw-preset cpu:quality \
   --crop auto
 

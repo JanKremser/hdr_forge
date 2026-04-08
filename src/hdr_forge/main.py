@@ -19,7 +19,6 @@ from hdr_forge.typedefs.dolby_vision_typing import DolbyVisionProfile
 from hdr_forge.typedefs.encoder_typing import EncoderSettings, LogoRemovalAutoDetectMode, LogoRemovalMode, LogoRemovelSettings
 from hdr_forge.encoder import Encoder
 from hdr_forge.video import Video
-from hdr_forge.analyze.maxcll import calc_maxcll
 
 # Supported input video formats
 SUPPORTED_FORMATS: list[str] = ['.mkv', '.m2ts', '.ts', '.mp4']
@@ -105,7 +104,7 @@ def convert_video(
         True if conversion succeeded, False otherwise
     """
     try:
-        video = Video(filepath=video_file, with_out_rpu_extraction=True)
+        video = Video(filepath=video_file, with_out_rpu_extraction=False)
         print_video_infos(video=video)
 
         # Create encoder with settings
@@ -267,12 +266,14 @@ def process_extract_metadata_command(args) -> int:
         if video.is_dolby_vision_video():
             rpu_file_path: Path = output_path / f"{input_path.stem}.rpu"
             to_dv_profile_8: bool = getattr(args, 'to_dv_8', False)
+            crop: bool = getattr(args, 'crop', False)
             dovi_tool.extract_rpu(
                 input_path=video.get_filepath(),
                 output_rpu=rpu_file_path,
                 total_frames=video.get_total_frames(),
                 dv_profile_source=video.get_dolby_vision_profile(),
                 dv_profile_encoding=DolbyVisionProfile._8 if to_dv_profile_8 else None,
+                crop=crop,
             )
             dv_info: dovi_tool.DolbyVisionRpuInfo = dovi_tool.get_rpu_info(
                 rpu_path=rpu_file_path,
@@ -378,12 +379,6 @@ def main() -> None:
         code = process_detect_logo_command(args)
     elif args.command == 'edit':
         code = process_edit_command(args)
-    elif args.command == 'calc_maxcll':
-        input_path = Path(args.input)
-        if not input_path.exists():
-            print_err(f"Input path does not exist: {input_path}")
-            sys.exit(1)
-        calc_maxcll(video_path=str(input_path))
     else:
         print_err(f"Unknown command: {args.command}")
         code = 1

@@ -297,7 +297,7 @@ class Libx265Codec(VideoCodecBase):
                 'rdoq-level': '2',
                 'qcomp': '0.65',
             })
-        elif hdr_forge_preset == HdrForgeEncodingTuningPresets.GRAIN:
+        elif hdr_forge_preset == HdrForgeEncodingTuningPresets.GRAIN_LOW:
             params.update({
                 'aq-mode': '3',# better to preserve grain
                 'aq-strength': '0.7', # 0.8 is great, 0.7 is better for compression
@@ -396,10 +396,7 @@ class Libx265Codec(VideoCodecBase):
         if hdr_forge_preset == HdrForgeEncodingTuningPresets.ANIMATION:
             return X265Tune.ANIMATION
 
-        if hdr_forge_preset == HdrForgeEncodingTuningPresets.GRAIN_FFMPEG:
-            return X265Tune.GRAIN
-
-        if self._grain.get_category() >= 2:
+        if hdr_forge_preset == HdrForgeEncodingTuningPresets.GRAIN:
             return X265Tune.GRAIN
 
         return None
@@ -461,12 +458,5 @@ class Libx265Codec(VideoCodecBase):
             crf_delta=action_crf,
         )
         crf -= action_crf * action_w
-
-        grain_crf: float = self._grain.get_crf_x265_x264_adjustment()
-        grain_w = self._calculate_crf_adjustment_weight(
-            current_crf=crf,
-            crf_delta=grain_crf,
-        )
-        crf -= grain_crf * grain_w
 
         return round(crf)

@@ -2,20 +2,17 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 import sys
-import time
 from typing import List, Optional, Tuple
 import numpy as np
 from collections import Counter
 
 
-from hdr_forge.core.config import get_global_temp_directory
-from hdr_forge.ffmpeg import ffmpeg_wrapper
 from hdr_forge.typedefs.encoder_typing import LogoRemovalAutoDetectMode, LogoRemovalMode, LogoRemovelSettings
 
 os.environ["OPENCV_FFMPEG_LOGLEVEL"] = "quiet"
 import cv2
 
-from hdr_forge.cli.cli_output import create_ffmpeg_progress_handler, print_info, print_warn, print_err, ProgressBarSpinner
+from hdr_forge.cli.cli_output import print_info, print_warn, print_err, ProgressBarSpinner
 from hdr_forge.video import Video
 
 @dataclass
@@ -614,127 +611,6 @@ Total candidates: {len(results)}"""
 
         return results
 
-    def _create_crop_video_by_mask_size(self, mask_result: MaskResult) -> Path | None:
-        temp_dir: Path = get_global_temp_directory(sub_folder="remove_logo")
-        total_frames = self._video.get_total_frames()
-        duration = self._video.get_duration_seconds()
-
-        progress_callback = None
-
-        process_start_time: float = time.time()
-
-        if duration > 0:
-            progress_callback = create_ffmpeg_progress_handler(
-                duration=duration,
-                total_frames=total_frames,
-                process_start_time=process_start_time,
-                video_fps=self._video.get_fps(),
-                process_name="Creating crop video:",
-            )
-
-        output_options: dict = {
-            'map': '0:v:0',
-            'crf': '0',
-            'preset': 'ultrafast',
-            'vf': f"crop=x={mask_result.x}:y={mask_result.y}:w={mask_result.width}:h={mask_result.height}"
-        }
-        output_path: Path = temp_dir / "crop_video.mp4"
-        success: bool = ffmpeg_wrapper.run_ffmpeg(
-            input_file=self._video._filepath,
-            output_file=output_path,
-            output_options=output_options,
-            progress_callback=progress_callback
-        )
-        if not success:
-            return None
-
-        return output_path
-
-    def _create_crop_delogo_video_by_mask(self, mask_result: MaskResult) -> Path | None:
-        temp_dir: Path = get_global_temp_directory(sub_folder="remove_logo")
-        total_frames = self._video.get_total_frames()
-        duration = self._video.get_duration_seconds()
-
-        progress_callback = None
-
-        process_start_time: float = time.time()
-
-        if duration > 0:
-            progress_callback = create_ffmpeg_progress_handler(
-                duration=duration,
-                total_frames=total_frames,
-                process_start_time=process_start_time,
-                video_fps=self._video.get_fps(),
-                process_name="Creating crop+delogo video:",
-            )
-
-        mask_info: dict | None = self._get_mask_info(mask_result.mask)
-        if mask_info is None:
-            print_err("Could not get mask info for delogo filter.")
-            return None
-
-        delogo_str: str = f"delogo=x={mask_info['x']}:y={mask_info['y']}:w={mask_info['width']}:h={mask_info['height']}"
-
-        output_options: dict[str, list[str] | str] = {
-            'map': '0:v:0',
-            'crf': '0',
-            'preset': 'ultrafast',
-            'vf': f"crop=x={mask_result.x}:y={mask_result.y}:w={mask_result.width}:h={mask_result.height},{delogo_str}"
-        }
-        output_path: Path = temp_dir / "crop_delogo_video.mp4"
-        success: bool = ffmpeg_wrapper.run_ffmpeg(
-            input_file=self._video._filepath,
-            output_file=output_path,
-            output_options=output_options,
-            progress_callback=progress_callback
-        )
-
-        if not success:
-            return None
-
-        return output_path
-
-    def _create_crop_video_with_mask_delogo(self, crop_video_path: Path,  delogo_path: Path, mask_path: Path) -> Path | None:
-        #ffmpeg -i crop_video.mp4 -i delogo.mp4 -i mask.png -filter_complex "[2:v]format=yuva420p,scale=iw:ih[mask_alpha];[1:v][mask_alpha]alphamerge[replacement_masked];[0:v][replacement_masked]overlay" -c:a copy output.mp4
-        temp_dir: Path = get_global_temp_directory(sub_folder="remove_logo")
-        total_frames = self._video.get_total_frames()
-        duration = self._video.get_duration_seconds()
-
-        progress_callback = None
-
-        process_start_time: float = time.time()
-
-        if duration > 0:
-            progress_callback = create_ffmpeg_progress_handler(
-                duration=duration,
-                total_frames=total_frames,
-                process_start_time=process_start_time,
-                video_fps=self._video.get_fps(),
-                process_name="Creating crop video with mask delogo:",
-            )
-
-        output_options: dict = {
-            'i': [
-                str(delogo_path),
-                str(mask_path),
-            ],
-            'crf': '0',
-            'preset': 'ultrafast',
-            "filter_complex": "[2:v]format=gray,gblur=sigma=2.5,format=yuva420p[mask_alpha];[1:v][mask_alpha]alphamerge[replacement_masked];[0:v][replacement_masked]overlay"
-        }
-        output_path: Path = temp_dir / "final_crop_video_delogo_mask.mp4"
-        success: bool = ffmpeg_wrapper.run_ffmpeg(
-            input_file=crop_video_path,
-            output_file=output_path,
-            output_options=output_options,
-            progress_callback=progress_callback
-        )
-
-        if not success:
-            return None
-
-        return output_path
-
     def _create_mask_from_video(self, video_path: str, crop_rect: Tuple[int, int, int, int], threshold: int = 200, padding: int = 0, blur_radius: int = 0, invated: bool = False) -> MaskResult:
         """
         Erzeugt direkt aus einem Video eine finale Schnittmengen-Maske im Speicher.
@@ -897,31 +773,6 @@ Total candidates: {len(results)}"""
         # Optional: limitation to video size can be added here
         return MaskResult(mask=centered_mask, x=new_x, y=new_y, width=new_w, height=new_h, region=None)
 
-    def _create_mask_delogo(self, mask_result: MaskResult) -> None | Path:
-        temp_dir: Path = get_global_temp_directory(sub_folder="remove_logo")
-
-        mask_path: Path = temp_dir / "logo_mask.png"
-        self.save_mask_image(output_path=mask_path, mask_result=mask_result, user_info=False)
-
-        crop_video_path: Path | None = self._create_crop_video_by_mask_size(mask_result=mask_result)
-        if crop_video_path is None:
-            print_err("Could not create crop video.")
-            return None
-        crop_delogo_video_path: Path | None= self._create_crop_delogo_video_by_mask(mask_result=mask_result)
-        if crop_delogo_video_path is None:
-            print_err("Could not create crop delogo video.")
-            return None
-
-        final_crop_video_path: Path | None = self._create_crop_video_with_mask_delogo(
-            crop_video_path=crop_video_path,
-            delogo_path=crop_delogo_video_path,
-            mask_path=mask_path,
-        )
-        if final_crop_video_path is None:
-            print_err("Could not create final crop video with mask delogo.")
-            return None
-        return final_crop_video_path
-
     def save_mask_image(self, output_path: Path, mask_result: MaskResult | None = None, user_info: bool = True) -> bool:
         """
         Save the generated mask image to a file.
@@ -1006,13 +857,6 @@ Total candidates: {len(results)}"""
             sys.exit(status=1)
             return None
 
-        if self._logo_removal_settings.mode == LogoRemovalMode.MASK:
-            final_mask_delogo_video: None | Path = self._create_mask_delogo(mask_result=mask)
-            if final_mask_delogo_video is None:
-                sys.exit(1)
-                return
-            self._crop_mask_delogo_video = final_mask_delogo_video
-
     def get_result(self) -> MaskResult | None:
         """
         Get the logo detection result.
@@ -1045,37 +889,3 @@ Total candidates: {len(results)}"""
             return None
 
         return f"delogo=x={self._result.x}:y={self._result.y}:w={self._result.width}:h={self._result.height}"
-
-    def get_ffmpeg_overlay_video_input(self) -> Optional[Path]:
-        """
-        Get path to temporary overlay video input for logo masking.
-
-        Returns:
-            Path to overlay video or None if no logo detected
-        """
-        if not self._result:
-            return None
-
-        if self._logo_removal_settings.mode not in [LogoRemovalMode.MASK]:
-            return None
-
-        # Here we would normally return the path to the generated overlay video
-        # For this example, we return a placeholder path
-        return self._crop_mask_delogo_video
-
-    def get_ffmpeg_filter_filter_complex(self) -> Optional[str]:
-        """
-        Generate FFmpeg overlay filter string for logo masking.
-
-        Args:
-            mask_path: Path to the mask image file
-        Returns:
-            FFmpeg overlay filter string or None if no logo detected
-        """
-        if not self._result:
-            return None
-
-        if self._logo_removal_settings.mode not in [LogoRemovalMode.MASK]:
-            return None
-
-        return f"[0:v][1:v]overlay=x={self._result.x}:y={self._result.y}"

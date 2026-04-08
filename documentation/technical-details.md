@@ -58,7 +58,7 @@ def _get_video_codec_lib_instance():
 **Priority Chain:**
 
 1. **`--encoder-params`** (Highest)
-   - libx265: `crf=14` in `preset=slow:crf=14:tune=grain`
+   - libx265: `crf=14` in `preset=slow:crf=14`
    - NVENC: `cq=16` in `preset=hq:cq=16:rc=vbr_hq`
 
 2. **`--quality`** (Universal parameter)
@@ -67,14 +67,14 @@ def _get_video_codec_lib_instance():
 
 3. **Auto-detection** (Lowest)
    - Base value from hardware preset
-   - Adjustments for HDR/DV, action preset, grain
+   - Adjustments for HDR/DV, action preset
 
 ### Speed Parameters (Preset)
 
 **Priority Chain (libx265/libx264 only):**
 
 1. **`--encoder-params`** (Highest)
-   - `preset=slow` in `preset=slow:crf=14:tune=grain`
+   - `preset=slow` in `preset=slow:crf=14`
 
 2. **`--speed`**
    - ultrafast, superfast, veryfast, faster, fast, medium, slow, slower, veryslow
@@ -93,7 +93,6 @@ def _get_video_codec_lib_instance():
 
 2. **Auto-detection** (Lowest)
    - Animation preset → `tune=animation`
-   - Grain category ≥2 → `tune=grain`
 
 ## Auto-CRF/CQ Calculation
 
@@ -113,11 +112,6 @@ def _get_auto_crf(hw_preset):
         action_crf_delta = 2.0
         weight = _calculate_crf_adjustment_weight(base_crf, action_crf_delta)
         base_crf -= action_crf_delta * weight
-
-    # Grain adjustment
-    grain_crf_delta = grain.get_crf_adjustment()  # 0, 1, 2, or 3
-    weight = _calculate_crf_adjustment_weight(base_crf, grain_crf_delta)
-    base_crf -= grain_crf_delta * weight
 
     return round(base_crf)
 ```
@@ -248,9 +242,12 @@ def calculate_aspect_ratio_crop(video_width, video_height, target_ratio):
 
 ### Limitations
 
--   **Dolby Vision:** Crop not supported when preserving DV format (RPU metadata is position-dependent)
+-   **Dolby Vision (auto crop only):** When `--crop auto` and DV source: reads L5 Active Area offsets via `dovi_tool info`, produces `crop=W:H:X:Y` filter. Manual crop (`width:height:x:y`) and ratio crop modes (`16:9`, `21:9`, cinema, etc.) are blocked for DV encoding and will produce an error. Scale remains unsupported for DV.
+-   **Non-auto crop modes:** Manual and ratio crop modes require `cropdetect` scanning (10 FFmpeg invocations); blocked for DV
 -   **Variable Black Bars:** Uses most common dimensions; irregular bars may not be perfectly cropped
--   **Performance:** Requires 10 FFmpeg invocations; can be slow for large files
+-   **Performance:** Non-DV auto crop requires 10 FFmpeg invocations; can be slow for large files
+
+**Note:** The `hdr_forge info` display shows `RPU Crop` when L5 active area offsets are detected in DV metadata.
 
 ## HDR Metadata Extraction
 
@@ -428,60 +425,6 @@ def calculate_adaptive_scale(video_width, video_height, max_width, max_height):
 -   **Upscaling:** Blocked (no quality improvement)
 -   **Dolby Vision:** Not supported (RPU metadata is resolution-dependent)
 
-## Grain Analysis
-
-### Detection Method
-
-Currently uses manual specification (`--grain cat1/cat2/cat3`). Auto-detection planned for future release.
-
-### Category Definitions
-
-| Category | Description | CRF Adjustment | Tune |
-|----------|-------------|----------------|------|
-| off | No grain optimization | 0 | none |
-| cat1 | Light grain | -1 | none |
-| cat2 | Medium grain | -2 | grain |
-| cat3 | Heavy grain | -3 | grain |
-
-### Encoding Adjustments
-
-#### CRF Adjustment
-
-Lowers CRF to preserve grain detail:
-
-```python
-def get_crf_adjustment():
-    if grain_category == 1:
-        return 1.0
-    elif grain_category == 2:
-        return 2.0
-    elif grain_category == 3:
-        return 3.0
-    return 0.0
-```
-
-#### Tune Parameter
-
-Sets `tune=grain` for libx265/libx264 when category ≥2:
-
-```python
-def should_use_grain_tune():
-    return grain_category >= 2
-```
-
-### Effect on Encoding
-
-**Without grain optimization:**
-- Higher CRF values
-- Grain may be over-compressed
-- Loss of film texture
-
-**With grain optimization:**
-- Lower CRF values
-- Better grain preservation
-- Larger file size (acceptable trade-off)
-- More natural film look
-
 ## Dolby Vision Processing
 
 ### Three Processing Workflows
@@ -537,14 +480,53 @@ If target is Dolby Vision:
    10. Cleanup temp directory
 ```
 
-### Profile Conversion Modes
+### Profile Conversion Matrix
 
-| Source | Target | Mode | Process |
-|--------|--------|------|---------|
-| Profile 5 | Profile 8.1 | 3 | IPTPQc2 → MEL conversion |
-| Profile 7 | Profile 7 | 2 | MEL preservation + EL extraction |
-| Profile 7 | Profile 8.1 | 2 | MEL → MEL conversion (EL discarded) |
-| Profile 8 | Profile 8.1 | 2 | MEL → MEL conversion |
+| Source | Target | Copy | Re-encode |
+|--------|--------|------|-----------|
+| Profile 5 | 5 (preserved) | Supported | Not applicable |
+| Profile 5 | 8.1 | Not supported | Supported (Vulkan req.) |
+| Profile 7 (EL) | 7 (with EL, preserved) | Supported | Not supported |
+| Profile 7 (EL) | 8.1 | Supported (EL discarded) | Supported |
+| Profile 8 | 8.1 | Supported | Supported |
+
+**dovi_tool mode mapping:**
+| Source | Mode | Process |
+|--------|------|---------|
+| Profile 5 | 3 | IPTPQc2 → MEL conversion (requires Vulkan/libplacebo) |
+| Profile 7 | 2 | MEL preservation (copy) or MEL conversion (re-encode) |
+| Profile 8 | 2 | MEL → MEL conversion |
+
+### Profile 5 Re-encoding Workflow
+
+Profile 5 (IPTPQc2) uses a non-standard color space and cannot be converted via copy mode. Full re-encoding is required:
+
+```
+1. Extract base layer (dovi_tool remove)
+2. Mux BL + audio/subs → temp_BL.mkv
+3. Re-encode with libplacebo color space conversion filter:
+   - For HDR/DV output: libplacebo=colorspace=bt2020nc:color_primaries=bt2020:color_trc=smpte2084:format=yuv420p10le
+   - For SDR output: libplacebo=colorspace=bt709:color_primaries=bt709:color_trc=bt709:format=yuv420p10le|yuv420p
+4. Delete temp_BL.mkv
+
+If target is HDR10/SDR:
+   5. Output encoded.mkv
+   → DONE
+
+If target is Dolby Vision Profile 8.1:
+   5. Extract encoded HEVC from encoded.mkv
+   6. Extract RPU with dovi_tool mode 3 (Profile 5 → 8.1 mapping)
+   7. Inject RPU into encoded HEVC
+   8. Mux final HEVC + audio/subs → output.mkv
+   9. Cleanup temp directory
+```
+
+**Requirements:**
+- FFmpeg compiled with `--enable-libplacebo` support
+- Vulkan GPU driver
+- `-init_hw_device vulkan` prepended to ffmpeg command
+
+**Important:** Profile 5 sources cannot use `--video-codec copy` for profile conversion. Full re-encode with `--hdr dv8` or format conversion (`--hdr hdr10`/`sdr`) is required.
 
 ### RPU Extraction Pipeline
 
@@ -638,6 +620,167 @@ output_options = {
     't': str(end_time - start_time)  # Duration
 }
 ```
+
+## Command Reference
+
+Complete parameter reference for all HDR Forge subcommands.
+
+### Global Options
+
+```
+hdr_forge --version              Show program version
+hdr_forge --help                 Show help message
+```
+
+### info Subcommand
+
+```
+hdr_forge info -i INPUT          Display video metadata
+
+Options:
+  -i, --input INPUT         Input video file
+  -d, --debug               Enable debug output
+```
+
+### detect-logo Subcommand
+
+```
+hdr_forge detect-logo -i INPUT   Detect logos in video
+
+Options:
+  -i, --input INPUT         Input video file
+  -e, --export PATH         Export detected logo mask as PNG image
+  -d, --debug               Enable debug output
+```
+
+### extract-metadata Subcommand
+
+```
+hdr_forge extract-metadata -i INPUT   Extract DV/HDR10/HDR10+ metadata
+
+Options:
+  -i, --input INPUT         Input video file
+  -o, --output FOLDER       Output folder for metadata files
+  --to-dv-8                 Convert extracted DV metadata to Profile 8.1
+  --crop                    Crop RPU active area offsets (passes --crop to dovi_tool)
+  -d, --debug               Enable debug output
+```
+
+### inject-metadata Subcommand
+
+```
+hdr_forge inject-metadata -i INPUT -o OUTPUT   Inject DV/HDR10/HDR10+ metadata
+
+Description:
+  Inject Dolby Vision/HDR10/HDR10+ metadata into HEVC stream without re-encoding
+
+Required Arguments:
+  -i, --input INPUT         Input video file
+  -o, --output OUTPUT       Output video file
+
+Optional Arguments:
+  --rpu PATH                RPU file (Dolby Vision metadata)
+  --el PATH                 Enhancement Layer file (DV)
+  --hdr10 PATH              HDR10 metadata JSON file
+  --hdr10plus PATH          HDR10+ metadata JSON file
+  -d, --debug               Enable debug output
+```
+
+### edit Subcommand
+
+```
+hdr_forge edit -i INPUT [OPTIONS]   Edit MKV files in-place (no re-encoding)
+
+Required Arguments:
+  -i, --input INPUT         Input MKV file or directory
+
+Optional Arguments:
+  -s, --subtitle-flags MODE Subtitle handling: copy, auto, auto>LANG, per-track overrides
+                            Note: remove mode requires convert (remux needed)
+  -d, --debug               Enable debug output
+
+Requirements:
+  mkvpropedit (part of MKVToolNix) must be in PATH or lib/ directory
+```
+
+### convert Subcommand
+
+```
+hdr_forge convert -i INPUT -o OUTPUT [OPTIONS]
+
+Required Arguments:
+  -i, --input INPUT         Input video file or folder
+  -o, --output OUTPUT       Output video file or folder
+
+Encoder Selection:
+  -v, --video-codec CODEC   Video codec: h265, h264, av1, copy (default: h265)
+  --encoder CODEC           Force specific encoder: auto, libx265, libx264,
+                            libsvtav1, hevc_nvenc, h264_nvenc (default: auto)
+
+Audio Options:
+  -a, --audio-codec CODEC   Audio codec per track: copy, remove, aac, ac3,
+                            eac3, flac. Use language/ID targeting:
+                            ger:aac, eng:ac3, 1:remove, dts>aac (default: copy)
+  --audio-default LANG_ID   Set default audio track by language (ger, eng)
+                            or track ID (1, 2, etc.)
+
+Subtitle Options:
+  -s, --subtitle-flags MODE Subtitle management: copy, remove, auto,
+                            auto>LANG (e.g., auto>ger) (default: copy)
+
+Encoding Presets:
+  -p, --preset PRESET       Content preset: auto, film, film4k, film4k:fast,
+                            grain:low, grain, banding, video, action,
+                            animation (default: auto)
+  --hw-preset PRESET        Hardware preset: cpu, cpu:balanced, cpu:quality,
+                            gpu, gpu:balanced, gpu:quality, balanced, quality
+                            (default: cpu:balanced)
+
+Quality Settings:
+  --quality VALUE           Universal quality (0-51, lower = better)
+  --speed PRESET            Speed preset (libx265/libx264 only):
+                            ultrafast, superfast, veryfast, faster, fast,
+                            medium, medium:plus, slow, slow:plus, slower, veryslow
+
+Cropping & Scaling:
+  --crop MODE               Crop mode: off, auto, width:height:x:y,
+                            16:9, 21:9, european, us-widescreen,
+                            cinema, cinema-modern (default: off)
+                            Note: For DV only --crop auto is supported (uses RPU L5 offsets)
+  --scale RESOLUTION        Target resolution: FUHD, UHD, QHD+, WQHD, FHD, HD,
+                            QHD, SD, or numeric height
+  --scale-mode MODE         Scale mode: height, adaptive (default: height)
+
+Content Analysis & Filtering:
+  --remove-logo MODE        Logo removal: off, auto, delogo:auto, delogo:top-left,
+                            delogo:bot-left, delogo:bot-right (default: off)
+  --sample TIME             Process sample: auto or start:end in seconds
+  --dar-ratio RATIO         Custom display aspect ratio (e.g., 16:9, cinema)
+  --vfilter FILTERS         Custom FFmpeg video filters
+
+Format Conversion:
+  --hdr FORMAT   Target format: auto, hdr, hdr10, sdr, dv, dv8 (default: auto)
+                 dv   : Preserve/convert to Dolby Vision (auto-detect profile)
+                 dv8  : Convert to Dolby Vision Profile 8.1
+                 Note: Profile 5 and Profile 7 → 7 preserve format via copy mode
+                       Profile 5 → 8.1 and Profile 7 → 8.1 require re-encoding
+
+Expert Options:
+  --encoder-params PARAMS   Encoder-specific parameters
+  --master-display STRING   Custom master display metadata
+  --max-cll STRING          Custom MaxCLL/MaxFALL values
+  --bit-depth DEPTH         Bit depth override for SDR: auto, 8, 10
+  --color-primaries-flag PRIM  Color primaries (libx265/libx264 only):
+                            bt470bg, smpte170m, bt709, bt2020
+  --try-fix                 Ignore non-fatal errors during video import
+  --threads COUNT           Number of threads for encoding
+  --shutdown                Shutdown system after conversion completes
+
+Debug:
+  -d, --debug               Enable debug output
+```
+
+**For detailed parameter explanations, see earlier sections of this document.**
 
 ## See Also
 

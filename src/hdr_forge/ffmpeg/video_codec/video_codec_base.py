@@ -1,12 +1,11 @@
 from abc import ABC, abstractmethod
 import math
-from pathlib import Path
 import sys
 from typing import Optional, Tuple, Type, TypeVar
 
-from hdr_forge.analyze.crop_video import CropResult, VideoCropper
+from hdr_forge.analyze.crop_video import VideoCropper
+from hdr_forge.typedefs.video_typing import CropResult
 from hdr_forge.analyze.detect_logo import LogoDetector
-from hdr_forge.analyze.grain_score import GrainAnalyzer
 from hdr_forge.cli.cli_output import print_err, print_warn
 from hdr_forge.ffmpeg.video_codec.service.presets import calc_hw_prest_params
 from hdr_forge.typedefs.codec_typing import HDR_FORGE_SPEED_PRESET, CodecPreset, VideoEncoderLibrary
@@ -54,12 +53,6 @@ class VideoCodecBase(ABC):
         )
         self._cropper.detect_crop()
 
-        self._grain = GrainAnalyzer(
-            video=video,
-            grain_mode=encoder_settings.grain,
-        )
-        self._grain.analyze_by_mode()
-
         self._scale_width: Optional[int]
         self._scale_height: Optional[int]
         self._scale_width, self._scale_height = self._determine_scale_width_height(
@@ -87,20 +80,6 @@ class VideoCodecBase(ABC):
         vf: str | None = self._get_default_video_filter()
         if vf:
             output_options["vf"] = vf
-
-        new_input: Path | None = self._logo_remover.get_ffmpeg_overlay_video_input()
-        if new_input:
-            filter_complex: str | None = self._logo_remover.get_ffmpeg_filter_filter_complex()
-            if filter_complex:
-                output_options = {
-                    "i": str(new_input),
-                    **output_options
-                }
-                output_options["map"] = ['[v]', '0:a?', '0:s?']
-                filter_vf: str | None = output_options.get("vf", None)
-                if filter_vf:
-                    del output_options["vf"]
-                output_options["filter_complex"] = f"{filter_complex}{"," + filter_vf if filter_vf else ""}[v]"
 
         if self._encoder_settings.dar_ratio is not None:
             dar_w, dar_h = self._encoder_settings.dar_ratio
@@ -218,14 +197,14 @@ class VideoCodecBase(ABC):
         if delogo_filter:
             filters.append(delogo_filter)
 
+        crop_filter: str | None = self._get_crop_filter()
+        if crop_filter:
+            filters.append(crop_filter)
+
         encoding_hdr_sdr_format: HdrSdrFormat = self.get_encoding_hdr_sdr_format()
 
-        # Add video filters (crop and scale), Only for SDR/HDR10 encoding
+        # Add video filters (scale), Only for SDR/HDR10 encoding
         if encoding_hdr_sdr_format != HdrSdrFormat.DOLBY_VISION:
-            crop_filter: str | None = self._get_crop_filter()
-            if crop_filter:
-                filters.append(crop_filter)
-
             scale_filter: str | None = self._get_scale_filter()
             if scale_filter:
                 filters.append(scale_filter)
@@ -234,9 +213,9 @@ class VideoCodecBase(ABC):
             # Upscale to HDR10 color space for SDR to HDR10/DV conversion
             if encoding_hdr_sdr_format == HdrSdrFormat.SDR:
                 if self.get_bit_depth_for_encoding() == 10:
-                    format= "yuv420p10le"
+                    format = "yuv420p10le"
                 else:
-                    format= "yuv420p"
+                    format = "yuv420p"
 
                 filters.extend([
                     f'libplacebo=colorspace=bt709:color_primaries=bt709:color_trc=bt709:format={format}'
@@ -249,9 +228,9 @@ class VideoCodecBase(ABC):
             if self._video.is_hdr_video():
                 # Tone mapping for HDR to SDR conversion
                 if self.get_bit_depth_for_encoding() == 10:
-                    format= "yuv420p10le"
+                    format = "yuv420p10le"
                 else:
-                    format= "yuv420p"
+                    format = "yuv420p"
                 filters.extend([
                     'zscale=t=linear:npl=100',
                     'format=gbrpf32le',
@@ -294,6 +273,15 @@ class VideoCodecBase(ABC):
             Crop filter
         """
         return self._cropper.get_crop_result()
+
+    def has_crop(self) -> bool:
+        """Check if cropping is needed.
+
+        Returns:
+            True if cropping is needed, False otherwise
+        """
+        crop: CropResult = self._cropper.get_crop_result()
+        return crop.is_valid
 
     def get_encoding_resolution(self) -> Tuple[int, int]:
         if self._scale_width and self._scale_height:

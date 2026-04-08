@@ -257,9 +257,6 @@ iotop  # Check if disk is bottleneck
    ```bash
    # Disable crop detection
    hdr_forge convert -i input.mkv -o output.mkv --crop off
-
-   # Disable grain analysis
-   hdr_forge convert -i input.mkv -o output.mkv --grain off
    ```
 
 4. **Use Lower Resolution:**
@@ -377,41 +374,41 @@ journalctl -xe
    which dovi_tool
    ```
 
-### "Cannot crop/scale Dolby Vision" Warning
+### Cropping and Scaling with Dolby Vision
 
-**Problem:** Trying to crop or scale while preserving Dolby Vision format
+**Auto crop is now supported for Dolby Vision** via RPU L5 Active Area offsets.  
+**Manual crop, ratio crop, and scale remain unsupported** when preserving DV format.
 
-**Explanation:**
-Dolby Vision RPU metadata is frame-position dependent. Cropping or scaling breaks the RPU metadata.
+#### Supported: Auto Crop (reads RPU L5 offsets)
 
-**Solutions:**
+```bash
+# --crop auto uses RPU L5 Active Area offsets (default behavior)
+hdr_forge convert -i dolby_vision.mkv -o output.mkv --crop auto
 
-1. **Disable Cropping:**
-   ```bash
-   # Must use --crop off when preserving DV
-   hdr_forge convert -i dolby_vision.mkv -o output.mkv --crop off
-   ```
+# Verify crop detected with info command
+hdr_forge info -i dolby_vision.mkv  # shows "RPU Crop" when offsets are detected
+```
 
-2. **Convert to HDR10 First:**
-   ```bash
-   # Crop/scale supported when converting to HDR10
-   hdr_forge convert -i dolby_vision.mkv -o output.mkv \
-     --hdr-sdr-format hdr10 \
-     --crop auto \
-     --scale FHD
-   ```
+No cropdetect scan is run. The crop is embedded in the RPU metadata itself.
 
-3. **Two-Step Process:**
-   ```bash
-   # Step 1: Extract HDR10 base layer
-   hdr_forge convert -i dolby_vision.mkv -o hdr10.mkv \
-     --hdr-sdr-format hdr10
+#### Not Supported: Manual Crop / Ratio Crop / Scale
 
-   # Step 2: Crop/scale HDR10 video
-   hdr_forge convert -i hdr10.mkv -o final.mkv \
-     --crop auto \
-     --scale FHD
-   ```
+```bash
+# These will produce an error when preserving DV:
+hdr_forge convert -i dv.mkv -o output.mkv --crop 1920:800:0:140  ← ERROR
+hdr_forge convert -i dv.mkv -o output.mkv --crop 21:9             ← ERROR
+hdr_forge convert -i dv.mkv -o output.mkv --scale FHD             ← ERROR
+```
+
+**Workaround for manual crop/scale:** Convert to HDR10 first.
+
+```bash
+# Step 1: Extract HDR10 base layer (removes DV RPU)
+hdr_forge convert -i dolby_vision.mkv -o hdr10.mkv --hdr hdr10
+
+# Step 2: Apply manual crop or scale to HDR10 video
+hdr_forge convert -i hdr10.mkv -o final.mkv --crop 1920:800:0:140 --scale FHD
+```
 
 ### Dolby Vision Conversion Takes Very Long
 
@@ -427,14 +424,14 @@ Dolby Vision workflow involves multiple steps (base layer extraction, RPU extrac
    # Profile conversion without re-encoding (fast)
    hdr_forge convert -i dolby_vision.mkv -o output.mkv \
      --video-codec copy \
-     --dv-profile 8
+     --hdr dv8
    ```
 
 2. **Convert to HDR10:**
    ```bash
    # If Dolby Vision not needed, convert to HDR10
    hdr_forge convert -i dolby_vision.mkv -o output.mkv \
-     --hdr-sdr-format hdr10
+     --hdr hdr10
    ```
 
 3. **Use GPU Encoding:**
@@ -475,6 +472,38 @@ Dolby Vision workflow creates multiple intermediate files (base layer, RPU, enco
    rm -rf .hdr_forge_temp_*
    ```
 
+### Profile 5 Dolby Vision: "copy mode not supported"
+
+**Problem:** Using `--video-codec copy` with a Profile 5 source fails with an error
+
+**Explanation:**
+Profile 5 (IPTPQc2) uses a non-standard color space which cannot be stream-copied for profile conversion. Full re-encoding is required.
+
+**Solutions:**
+
+1. **Use Re-encoding with `--hdr dv8`:**
+   ```bash
+   # Profile 5 → Profile 8.1 via re-encode (requires Vulkan GPU driver)
+   hdr_forge convert -i profile5_dv.mkv -o output.mkv --hdr dv8 --quality 15
+   ```
+
+2. **Convert to HDR10 (faster alternative):**
+   ```bash
+   # Extracts HDR10 base layer without RPU
+   hdr_forge convert -i profile5_dv.mkv -o output_hdr10.mkv --hdr hdr10
+   ```
+
+3. **Convert to SDR:**
+   ```bash
+   # Profile 5 → SDR with tone mapping
+   hdr_forge convert -i profile5_dv.mkv -o output_sdr.mkv --hdr sdr
+   ```
+
+**Requirements for Profile 5 → 8.1:**
+- FFmpeg compiled with `--enable-libplacebo` support
+- Vulkan-capable GPU with drivers installed
+- Significantly slower than other DV conversions (uses libplacebo color space conversion)
+
 ## Quality Issues
 
 ### Output Quality Lower Than Expected
@@ -500,13 +529,7 @@ Dolby Vision workflow creates multiple intermediate files (base layer, RPU, enco
    hdr_forge convert -i input.mkv -o output.mkv --speed slow
    ```
 
-4. **Enable Grain Tuning:**
-   ```bash
-   # For content with grain
-   hdr_forge convert -i input.mkv -o output.mkv --grain cat2
-   ```
-
-5. **Switch to CPU Encoding:**
+4. **Switch to CPU Encoding:**
    ```bash
    # CPU encoding has better quality than GPU
    hdr_forge convert -i input.mkv -o output.mkv \
@@ -550,31 +573,24 @@ Dolby Vision workflow creates multiple intermediate files (base layer, RPU, enco
 
 **Solutions:**
 
-1. **Enable Grain Analysis:**
-   ```bash
-   hdr_forge convert -i film.mkv -o output.mkv --grain cat2
-   ```
-
-2. **Lower CRF:**
+1. **Lower CRF:**
    ```bash
    hdr_forge convert -i film.mkv -o output.mkv \
-     --quality 14 \
-     --grain cat2
+     --quality 14
    ```
 
-3. **Use Grain Tune:**
+2. **Use Grain Tune:**
    ```bash
    hdr_forge convert -i film.mkv -o output.mkv \
      --encoder libx265 \
      --encoder-params "preset=slow:crf=14:tune=grain"
    ```
 
-4. **Use CPU Encoding:**
+3. **Use CPU Encoding:**
    ```bash
    # CPU encoding better at preserving grain
    hdr_forge convert -i film.mkv -o output.mkv \
-     --hw-preset cpu:quality \
-     --grain cat3
+     --hw-preset cpu:quality
    ```
 
 ## Performance Issues
@@ -648,8 +664,7 @@ Automatic crop detection analyzes 10 video positions, requiring 10 FFmpeg invoca
 4. **Disable Heavy Features:**
    ```bash
    hdr_forge convert -i ./videos -o ./encoded \
-     --crop off \
-     --grain off
+     --crop off
    ```
 
 ## Crop/Scale Issues
@@ -735,8 +750,8 @@ HDR Forge only supports format downgrades (DV → HDR10 → SDR), not upgrades.
 # Can only do: DV → HDR10, HDR10 → SDR, DV → SDR
 
 # Keep original format or downgrade
-hdr_forge convert -i hdr10.mkv -o output.mkv --hdr-sdr-format auto
-hdr_forge convert -i hdr10.mkv -o output.mkv --hdr-sdr-format sdr
+hdr_forge convert -i hdr10.mkv -o output.mkv --hdr auto
+hdr_forge convert -i hdr10.mkv -o output.mkv --hdr sdr
 ```
 
 ### "Speed preset not compatible with NVENC"
@@ -767,7 +782,7 @@ Dolby Vision RPU metadata requires the complete video stream.
 # Cannot sample when preserving Dolby Vision
 # Either remove --sample or convert to HDR10
 hdr_forge convert -i dolby_vision.mkv -o output.mkv \
-  --hdr-sdr-format hdr10 \
+  --hdr hdr10 \
   --sample auto
 ```
 

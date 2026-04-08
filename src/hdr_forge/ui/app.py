@@ -147,7 +147,7 @@ class HdrForgeGui:
             settings_frame,
             textvariable=self.preset_var,
             values=['auto', 'film', 'film4k', 'film4k:fast', 'banding', 'video',
-                    'action', 'animation', 'grain', 'grain:ffmpeg'],
+                    'action', 'animation', 'grain:low', 'grain'],
             state='readonly',
             width=20
         )
@@ -376,7 +376,7 @@ class HdrForgeGui:
                 audio_codec=self.audio_codec_var.get(),
                 audio_default='copy',
                 subtitle_flags=self.subtitle_var.get(),
-                hdr_sdr_format='auto',
+                hdr='auto',
                 dv_profile='auto',
                 preset=self.preset_var.get() or 'auto',
                 hw_preset='cpu:balanced',

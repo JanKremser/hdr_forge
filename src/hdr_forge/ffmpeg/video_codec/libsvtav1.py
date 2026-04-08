@@ -165,12 +165,4 @@ class LibSvtAV1Codec(VideoCodecBase):
             )
             crf -= action_crf * action_w
 
-        grain_crf: float = self._grain.get_crf_x265_x264_adjustment()
-        if grain_crf > 0:
-            grain_w = self._calculate_crf_adjustment_weight(
-                current_crf=crf,
-                crf_delta=grain_crf,
-            )
-            crf -= grain_crf * grain_w
-
         return round(crf)
