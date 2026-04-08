@@ -280,9 +280,9 @@ def print_progress_info(first_update: bool, current_frame: int, total_frames: in
         video_fps=video_fps,
         backup_speed=speed,
     )
-    speed_str: str = f"{speed:.2f}" if speed is not None else "--.-"
+    speed_str: str = f"{speed:.2f}" if speed is not None else "-.--"
 
-    bitrate_str: str = f"{bitrate_kbs:.2f}" if bitrate_kbs is not None else "--.-"
+    bitrate_str: str = f"{bitrate_kbs:.2f}" if bitrate_kbs is not None else "--.--"
 
     size_bytes_str: str = "-- Bytes"
     size_gb_str: str = "--.- GB"
@@ -294,8 +294,8 @@ def print_progress_info(first_update: bool, current_frame: int, total_frames: in
     # Estimate final file size
     estimated_size_bytes = estimate_final_size(size_bytes, current_frame, total_frames)
     estimated_size_bytes_str = "-- Bytes"
-    estimated_size_gib_str = "--.- GiB"
-    estimated_size_gb_str = "--.- GB"
+    estimated_size_gib_str = "--.-- GiB"
+    estimated_size_gb_str = "--.-- GB"
     if estimated_size_bytes is not None:
         estimated_size_bytes_str: str = f"{estimated_size_bytes:.0f}"
         estimated_size_gib_str: str = f"{estimated_size_bytes / 1024 / 1024 / 1024:.2f}"
@@ -316,7 +316,7 @@ def print_progress_info(first_update: bool, current_frame: int, total_frames: in
 {bar_str}
 Frame         : {color_str(current_frame, ANSI_GREEN)}/{total_frames}
 Duration      : {color_str(time_str, ANSI_GREEN)}/{duration_str}
-Speed         : {color_str(speed_str, ANSI_GREEN)}x | {color_str(fps, ANSI_GREEN)} FPS
+Speed         : {color_str(speed_str, ANSI_GREEN)}x | {color_str(f"{fps:.2f}", ANSI_GREEN)}/{video_fps:.2f} FPS
 
 ETA           : {color_str(eta, ANSI_GREEN)} | Done at {color_str(finish_time_str, ANSI_GREEN)}
 Process Time  : {color_str(process_time_str, ANSI_GREEN)}
