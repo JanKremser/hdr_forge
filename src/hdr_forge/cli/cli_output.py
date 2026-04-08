@@ -275,6 +275,7 @@ def print_progress_info(first_update: bool, current_frame: int, total_frames: in
     duration_str: str = format_time(seconds=duration_seconds) if duration_seconds is not None else "--:--:--"
     process_time_str: str = format_time(seconds=process_time_seconds)
 
+    # Calculate speed
     speed = calculate_speed(
         actual_fps=fps,
         video_fps=video_fps,
@@ -282,8 +283,16 @@ def print_progress_info(first_update: bool, current_frame: int, total_frames: in
     )
     speed_str: str = f"{speed:.2f}" if speed is not None else "-.--"
 
-    bitrate_str: str = f"{bitrate_kbs:.2f}" if bitrate_kbs is not None else "--.--"
+    # Calculate bitrate
+    if bitrate_kbs is not None:
+        bitrate_str: str = f"{bitrate_kbs:.2f}"
+    elif size_bytes is not None and time_seconds is not None and time_seconds > 0:
+        estimated_bitrate: float = (size_bytes * 8) / (time_seconds * 1000)
+        bitrate_str: str = f"~{estimated_bitrate:.2f}"
+    else:
+        bitrate_str: str = "--.--"
 
+    # Calculate size
     size_bytes_str: str = "-- Bytes"
     size_gb_str: str = "--.- GB"
     if size_bytes is not None:
