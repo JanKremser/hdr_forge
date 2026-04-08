@@ -30,6 +30,7 @@ class Video:
         """
         self._filepath: Path = filepath
         self._video_metadata: dict = self._extract_video_metadata()
+        self._video_stream: dict = self._get_video_stream()
         self._hdr_metadata: HdrMetadata = self.extract_hdr_metadata()
 
         self._is_hdr10plus: bool = hdr10plus_tool.verify_hdr10plus(input_path=filepath)
@@ -37,9 +38,8 @@ class Video:
         self._container_metadata: MkvInfo = mkvmerge.extract_container_info_json(input_mkv_mp4_ts_file=filepath)
 
         # Extract dimensions from video stream
-        video_stream: dict = self._get_video_stream()
-        self.width: int = video_stream.get('width', 0)
-        self.height: int = video_stream.get('height', 0)
+        self.width: int = self._video_stream.get('width', 0)
+        self.height: int = self._video_stream.get('height', 0)
 
 
         self._dolby_vision_rpu_info: Optional[DolbyVisionRpuInfo] = None
@@ -177,8 +177,7 @@ class Video:
         Returns:
             True if interlaced, False otherwise
         """
-        video_stream: dict = self._get_video_stream()
-        field_order = video_stream.get('field_order', 'progressive').lower()
+        field_order = self._video_stream.get('field_order', 'progressive').lower()
         return field_order in ['tt', 'bb', 'tb', 'bt']
 
     def get_filepath(self) -> Path:
@@ -211,7 +210,7 @@ class Video:
         Returns:
             Video profile string (e.g., 'High 10' for H.264, Main 10 for H.265)
         """
-        return self._get_video_stream().get('profile', None)
+        return self._video_stream.get('profile', None)
 
     def get_pix_fmt(self) -> str | None:
         """Get pixel format of the video.
@@ -219,7 +218,7 @@ class Video:
         Returns:
             Pixel format string (e.g., 'yuv420p10le' for HDR)
         """
-        return self._get_video_stream().get('pix_fmt', None)
+        return self._video_stream.get('pix_fmt', None)
 
     def get_color_primaries(self) -> str | None:
         """Get color primaries information.
@@ -227,7 +226,7 @@ class Video:
         Returns:
             Color primaries string
         """
-        color_primaries: str | None = self._get_video_stream().get('color_primaries', None)
+        color_primaries: str | None = self._video_stream.get('color_primaries', None)
         if color_primaries is None and self.get_dolby_vision_profile() == DolbyVisionProfile._5:
             # DV Profile 5 implies BT.2020 color primaries
             return "bt2020"
@@ -240,7 +239,7 @@ class Video:
         Returns:
             Color space string
         """
-        return self._get_video_stream().get('color_space', None)
+        return self._video_stream.get('color_space', None)
 
     def get_color_transfer(self) -> str | None:
         """Get color transfer characteristics.
@@ -248,7 +247,7 @@ class Video:
         Returns:
             Color transfer string
         """
-        return self._get_video_stream().get('color_transfer', None)
+        return self._video_stream.get('color_transfer', None)
 
     def get_color_range(self) -> str | None:
         """Get color range information.
@@ -256,7 +255,7 @@ class Video:
         Returns:
             Color range string
         """
-        return self._get_video_stream().get('color_range', None)
+        return self._video_stream.get('color_range', None)
 
     def get_container_type(self) -> str:
         """Get container format type.
@@ -308,8 +307,7 @@ class Video:
         Returns:
             DolbyVisionInfo object containing Dolby Vision metadata or None if not found
         """
-        video_stream = self._get_video_stream()
-        side_data = video_stream.get('side_data_list', [])
+        side_data = self._video_stream.get('side_data_list', [])
 
         for data in side_data:
             if data.get('side_data_type') == 'DOVI configuration record':
@@ -422,7 +420,7 @@ class Video:
 
         if new_w == w and new_h == h:
             return None
-        
+
         return CropResult(
             x=dv_info.offset.left,
             y=dv_info.offset.top,
@@ -441,8 +439,7 @@ class Video:
             md: MasterDisplayMetadata = self._hdr_metadata.mastering_display_metadata
             return md
 
-        video_stream = self._get_video_stream()
-        side_data = video_stream.get('side_data_list', [])
+        side_data = self._video_stream.get('side_data_list', [])
 
         for data in side_data:
             if data.get('side_data_type') == 'Mastering display metadata':
@@ -603,8 +600,7 @@ class Video:
         Returns:
             Frame rate as float (e.g., 23.976, 30.0)
         """
-        video_stream = self._get_video_stream()
-        frame_rate_str = video_stream.get('r_frame_rate', '24/1')
+        frame_rate_str = self._video_stream.get('r_frame_rate', '24/1')
 
         try:
             # Parse frame rate (format: "24000/1001" or "30/1")

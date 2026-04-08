@@ -4,28 +4,9 @@ import threading
 from pathlib import Path
 from typing import Optional
 
-from hdr_forge.cli.cli_output import monitor_process_progress, print_debug, print_warn
-from hdr_forge.core.config import PROJECT_ROOT
+from hdr_forge.cli.cli_output import monitor_process_progress, print_debug
 from hdr_forge.core.service import build_cmd_array_to_str
-
-
-def _get_hdr10plus_tool_path() -> str:
-    """Get path to hdr10plus_tool executable.
-
-    Looks for hdr10plus_tool in project directory first, then falls back to system path.
-
-    Returns:
-        Path to hdr10plus_tool executable as string
-    """
-    # Get path to local hdr10plus_tool (in project root)
-    hdr10plus_tool_path: Path = Path(PROJECT_ROOT) / "lib/hdr10plus_tool"
-
-    # Fallback to system hdr10plus_tool if local one doesn't exist
-    if hdr10plus_tool_path.exists():
-        return str(hdr10plus_tool_path)
-    else:
-        print_warn(f"{str(hdr10plus_tool_path)} not found, falling back to system hdr10plus_tool")
-        return "hdr10plus_tool"
+from hdr_forge.tools.helper import get_tool_path
 
 def verify_hdr10plus(input_path: Path) -> bool:
     """Verify if input file contains HDR10+ metadata.
@@ -41,7 +22,7 @@ def verify_hdr10plus(input_path: Path) -> bool:
     if not input_path.exists():
         raise FileNotFoundError(f"file not found: {str(input_path)}")
 
-    tool_exec = _get_hdr10plus_tool_path()
+    tool_exec = get_tool_path('hdr10plus_tool')
 
     try:
         tool_cmd: list[str] = [
@@ -87,7 +68,7 @@ def extract_hdr10plus_metadata(input_path: Path, output_path: Path) -> Path:
     if not input_path.exists():
         raise FileNotFoundError(f"file not found: {str(input_path)}")
 
-    tool_exec = _get_hdr10plus_tool_path()
+    tool_exec = get_tool_path('hdr10plus_tool')
 
     try:
         tool_cmd: list[str] = [
@@ -157,7 +138,7 @@ def inject_hdr10plus_metadata(input_path: Path, hdr10plus_metadata_path: Path, o
     if not hdr10plus_metadata_path.exists():
         raise FileNotFoundError(f"HDR10+ metadata file not found: {str(hdr10plus_metadata_path)}")
 
-    tool_exec = _get_hdr10plus_tool_path()
+    tool_exec = get_tool_path('hdr10plus_tool')
 
     try:
         tool_cmd: list[str] = [

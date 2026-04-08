@@ -6,25 +6,9 @@ from pathlib import Path
 from typing import Optional
 
 from hdr_forge.cli.cli_output import monitor_process_progress, print_debug, create_ffmpeg_minimal_progress_handler
-from hdr_forge.core.config import PROJECT_ROOT
 from hdr_forge.core.service import build_cmd_array_to_str
-from hdr_forge.tools.helper import _ffmpeg_progress_reader_thread
+from hdr_forge.tools.helper import _ffmpeg_progress_reader_thread, get_tool_path
 from hdr_forge.typedefs.mkv_typing import MkvInfo, parse_mkv_info
-
-def _get_mkvmerge_path() -> str:
-    """Get path to mkvmerge executable.
-
-    Looks for mkvmerge in project directory first, then falls back to system path.
-
-    Returns:
-        Path to mkvmerge executable as string
-    """
-    mkvmerge_path: Path = Path(PROJECT_ROOT) / "lib/mkvmerge"
-
-    if mkvmerge_path.exists():
-        return str(mkvmerge_path)
-    else:
-        return "mkvmerge"
 
 
 def extract_hevc(
@@ -135,7 +119,7 @@ def mux_hevc_to_mkv(input_hevc_path: Path, input_mkv: Optional[Path] = None, out
     if output_mkv is None:
         output_mkv = input_hevc_path.with_name(f"{input_hevc_path.stem}_BL.mkv")
 
-    mkvmerge_exec: str = _get_mkvmerge_path()
+    mkvmerge_exec: str = get_tool_path('mkvmerge')
 
     try:
         mkvmerge_cmd: list[str] = [
@@ -201,7 +185,7 @@ def extract_container_info_json(input_mkv_mp4_ts_file: Path) -> MkvInfo:
     Raises:
         RuntimeError: If mkvmerge is not installed or extraction fails
     """
-    mkvmerge_exec: str = _get_mkvmerge_path()
+    mkvmerge_exec: str = get_tool_path('mkvmerge')
 
     try:
         # Create mkvmerge command

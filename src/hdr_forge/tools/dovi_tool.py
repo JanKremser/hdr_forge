@@ -8,28 +8,9 @@ from pathlib import Path
 from typing import Optional
 
 from hdr_forge.cli.cli_output import monitor_process_progress, print_debug, create_dovi_tool_progress_handler
-from hdr_forge.core.config import PROJECT_ROOT
 from hdr_forge.core.service import build_cmd_array_to_str
-from hdr_forge.tools.helper import run_ffmpeg_tool_pipeline, dovi_tool_progress_reader_thread
+from hdr_forge.tools.helper import run_ffmpeg_tool_pipeline, dovi_tool_progress_reader_thread, get_tool_path
 from hdr_forge.typedefs.dolby_vision_typing import DolbyVisionProfile, DolbyVisionRpuInfo
-
-
-def _get_dovi_tool_path() -> str:
-    """Get path to dovi_tool executable.
-
-    Looks for dovi_tool in project directory first, then falls back to system path.
-
-    Returns:
-        Path to dovi_tool executable as string
-    """
-    # Get path to local dovi_tool (in project root)
-    dovi_tool_path: Path = Path(PROJECT_ROOT) / "lib/dovi_tool"
-
-    # Fallback to system dovi_tool if local one doesn't exist
-    if dovi_tool_path.exists():
-        return str(dovi_tool_path)
-    else:
-        return "dovi_tool"
 
 
 def extract_base_layer(
@@ -56,7 +37,7 @@ def extract_base_layer(
     if output_hevc is None:
         output_hevc = input_path.with_suffix('.hevc')
 
-    dovi_tool_exec = _get_dovi_tool_path()
+    dovi_tool_exec = get_tool_path('dovi_tool')
 
     try:
         # Build dovi_tool command
@@ -118,7 +99,7 @@ def inject_rpu(input_path: Path, input_rpu: Path, output_hevc: Optional[Path] = 
     if output_hevc is None:
         output_hevc = input_path.with_name(f"{input_path.stem}_BL_RPU.hevc")
 
-    dovi_tool_exec: str = _get_dovi_tool_path()
+    dovi_tool_exec: str = get_tool_path('dovi_tool')
 
     try:
         dovi_cmd: list[str] = [
@@ -213,7 +194,7 @@ def extract_rpu(
         ):
         return output_rpu
 
-    dovi_tool_exec = _get_dovi_tool_path()
+    dovi_tool_exec = get_tool_path('dovi_tool')
 
     map_dv_profile8_mode: dict[int, str] = {
         5: '3',
@@ -320,7 +301,7 @@ def inject_dolby_vision_layers(bl_path: Path, el_path: Path, output_bl_el: Optio
     if output_bl_el is None:
         output_bl_el = bl_path.with_name(f"{bl_path.stem}_BL_EL.hevc")
 
-    dovi_tool_exec = _get_dovi_tool_path()
+    dovi_tool_exec = get_tool_path('dovi_tool')
 
     try:
         dovi_cmd: list[str] = [
@@ -400,7 +381,7 @@ def extract_enhancement_layer(
     if output_el is None:
         output_el = input_path.with_name(f"{input_path.stem}_EL.hevc")
 
-    dovi_tool_exec = _get_dovi_tool_path()
+    dovi_tool_exec = get_tool_path('dovi_tool')
 
     try:
         # Build dovi_tool command
@@ -563,7 +544,7 @@ def get_rpu_info(rpu_path: Path) -> DolbyVisionRpuInfo:
     if not rpu_path.exists():
         raise FileNotFoundError(f"RPU file not found: {str(rpu_path)}")
 
-    dovi_tool_exec = _get_dovi_tool_path()
+    dovi_tool_exec = get_tool_path('dovi_tool')
 
     try:
         dovi_cmd: list[str] = [

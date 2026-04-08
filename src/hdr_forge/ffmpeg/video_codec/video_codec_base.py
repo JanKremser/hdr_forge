@@ -462,8 +462,8 @@ class VideoCodecBase(ABC):
         crf_norm = (current_crf - min_crf) / (max_crf - min_crf)
         crf_norm = max(0.0, min(crf_norm, 1.0))
 
-        # Weight proportional to CRF delta and base CRF
-        weight = crf_norm * (crf_delta / crf_delta)  # here only scaling logic
+        # Weight: CRF delta adjustment factor normalized to 0..1 range
+        weight = crf_norm
         # Clamp to min/max
         weight = max(min_weight, min(weight, max_weight))
 

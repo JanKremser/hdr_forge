@@ -5,8 +5,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from hdr_forge.cli.cli_output import print_debug
-from hdr_forge.core.config import PROJECT_ROOT
 from hdr_forge.core.service import build_cmd_array_to_str
+from hdr_forge.tools.helper import get_tool_path
 
 
 @dataclass
@@ -17,22 +17,6 @@ class SubtitleTrackEdit:
     name: str | None = None  # Track name/title
     flag_default: bool = False  # Set as default track
     flag_forced: bool = False  # Set as forced track
-
-
-def _get_mkvpropedit_path() -> str:
-    """Get path to mkvpropedit executable.
-
-    Looks for mkvpropedit in project directory first, then falls back to system path.
-
-    Returns:
-        Path to mkvpropedit executable as string
-    """
-    mkvpropedit_path: Path = Path(PROJECT_ROOT) / "lib/mkvpropedit"
-
-    if mkvpropedit_path.exists():
-        return str(mkvpropedit_path)
-    else:
-        return "mkvpropedit"
 
 
 def set_subtitle_track_properties(
@@ -55,7 +39,7 @@ def set_subtitle_track_properties(
         # No edits needed
         return True
 
-    mkvpropedit_exec: str = _get_mkvpropedit_path()
+    mkvpropedit_exec: str = get_tool_path('mkvpropedit')
 
     try:
         # Build mkvpropedit command

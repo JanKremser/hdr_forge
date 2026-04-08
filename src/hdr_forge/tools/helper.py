@@ -277,3 +277,22 @@ def run_ffmpeg_tool_pipeline(
     ffmpeg_process.wait()
 
     return tool_process.returncode, stderr
+
+
+def get_tool_path(tool_name: str) -> str:
+    """Get path to an external tool executable.
+
+    Looks for the tool in the project lib/ directory first, then falls back to system PATH.
+
+    Args:
+        tool_name: Name of the tool (e.g., 'dovi_tool', 'hevc_hdr_editor')
+
+    Returns:
+        Path to the tool executable as string
+    """
+    from hdr_forge.core.config import PROJECT_ROOT
+
+    tool_path: Path = Path(PROJECT_ROOT) / f"lib/{tool_name}"
+    if tool_path.exists():
+        return str(tool_path)
+    return tool_name

@@ -2,24 +2,8 @@ from pathlib import Path
 from typing import Optional
 
 from hdr_forge.cli.cli_output import print_debug
-from hdr_forge.core.config import PROJECT_ROOT
-from hdr_forge.tools.helper import run_ffmpeg_tool_pipeline
+from hdr_forge.tools.helper import run_ffmpeg_tool_pipeline, get_tool_path
 from hdr_forge.typedefs.video_typing import ContentLightLevelMetadata, HdrMetadata, MasterDisplayColorPrimaries, MasterDisplayMetadata
-
-def _get_hevc_hdr_editor_path() -> str:
-    """Get path to hevc_hdr_editor executable.
-
-    Looks for hevc_hdr_editor in project directory first, then falls back to system path.
-
-    Returns:
-        Path to hevc_hdr_editor executable as string
-    """
-    hevc_hdr_editor_path: Path = Path(PROJECT_ROOT) / "lib/hevc_hdr_editor"
-
-    if hevc_hdr_editor_path.exists():
-        return str(hevc_hdr_editor_path)
-    else:
-        return "hevc_hdr_editor"
 
 def inject_hdr_metadata(
     input_path: Path,
@@ -41,7 +25,7 @@ def inject_hdr_metadata(
     if output_hevc is None:
         output_hevc = input_path.with_suffix('.hevc')
 
-    hevc_hdr_editor_exec = _get_hevc_hdr_editor_path()
+    hevc_hdr_editor_exec = get_tool_path('hevc_hdr_editor')
 
     try:
         # Build hevc_hdr_editor command

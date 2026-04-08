@@ -45,6 +45,7 @@ class Encoder:
         self._target_file: Path = target_file
         self._target_video_codec: VideoCodec = settings.video_codec
         self._encoder_settings: EncoderSettings = settings
+        self._hw_encoders_cache: list[VideoEncoderLibrary] | None = None
 
         # Effective HDR/SDR formats that will be present in the output (including base layer formats for DV)
         self._target_hdr_sdr_format: list[HdrSdrFormat] = self._determine_hdr_sdr_format()
@@ -76,6 +77,9 @@ class Encoder:
         :param enum_class: Enum class, e.g. VideoEncoderLibrary
         :return: List of enum members that are available and are HW encoders
         """
+        if self._hw_encoders_cache is not None:
+            return self._hw_encoders_cache
+
         try:
             result = subprocess.run(
                 ["ffmpeg", "-hide_banner", "-encoders"],
@@ -102,10 +106,12 @@ class Encoder:
                 if member.value in available_hw_encoders
             ]
 
+            self._hw_encoders_cache = result_members
             return result_members
 
         except subprocess.CalledProcessError as e:
             print("Error querying encoders:", e)
+            self._hw_encoders_cache = []
             return []
 
 
