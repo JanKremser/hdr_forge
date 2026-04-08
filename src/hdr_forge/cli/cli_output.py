@@ -2,6 +2,7 @@
 
 import time
 import subprocess
+from datetime import datetime, timedelta
 from typing import Callable, Optional
 
 from hdr_forge.core import config
@@ -198,14 +199,10 @@ def create_progress_bar_with_percent(percent: float, width: int = PROGRESS_BAR_W
     return create_progress_bar(percent=percent, text=percent_str_raw, width=width)
 
 
-def calculate_eta(fps: float, current_frame: int, total_frames: int) -> str:
-    # Calculate ETA
-    eta: str = "00:00:00"
+def calculate_eta(fps: float, current_frame: int, total_frames: int) -> float:
     if fps > 0 and total_frames > 0:
-        remaining_frames: int = total_frames - current_frame
-        eta_seconds: float = remaining_frames / fps
-        eta = format_time(eta_seconds)
-    return eta
+        return (total_frames - current_frame) / fps
+    return 0.0
 
 
 def format_time(seconds: float) -> str:
@@ -259,7 +256,9 @@ def print_progress_info(first_update: bool, current_frame: int, total_frames: in
     percent: float = (current_frame / total_frames * 100) if total_frames > 0 else 0.0
 
     # Calculate ETA
-    eta: str = calculate_eta(fps=fps, current_frame=current_frame, total_frames=total_frames)
+    eta_seconds: float = calculate_eta(fps=fps, current_frame=current_frame, total_frames=total_frames)
+    eta: str = format_time(eta_seconds)
+    finish_time_str: str = (datetime.now() + timedelta(seconds=eta_seconds)).strftime("%H:%M")
 
     # Create progress bar
     progress_bar: str = create_progress_bar_with_percent(percent=percent)
@@ -276,28 +275,40 @@ def print_progress_info(first_update: bool, current_frame: int, total_frames: in
     duration_str: str = format_time(seconds=duration_seconds) if duration_seconds is not None else "--:--:--"
     process_time_str: str = format_time(seconds=process_time_seconds)
 
+    # Calculate speed
     speed = calculate_speed(
         actual_fps=fps,
         video_fps=video_fps,
         backup_speed=speed,
     )
-    speed_str: str = f"{speed:.2f}" if speed is not None else "--.-"
+    speed_str: str = f"{speed:.2f}" if speed is not None else "-.--"
 
-    bitrate_str: str = f"{bitrate_kbs:.2f}" if bitrate_kbs is not None else "--.-"
+    # Calculate bitrate
+    if bitrate_kbs is not None:
+        bitrate_str: str = f"{bitrate_kbs:.2f}"
+    elif size_bytes is not None and time_seconds is not None and time_seconds > 0:
+        estimated_bitrate: float = (size_bytes * 8) / (time_seconds * 1000)
+        bitrate_str: str = f"~{estimated_bitrate:.2f}"
+    else:
+        bitrate_str: str = "--.--"
 
-    size_kb_str: str = "--.- KB"
+    # Calculate size
+    size_bytes_str: str = "-- Bytes"
     size_gb_str: str = "--.- GB"
     if size_bytes is not None:
-        size_kb_str: str = f"{size_bytes / 1024:.2f}"
-        size_gb_str: str = f"{size_bytes / 1024 / 1024 / 1204:.2f}"
+        size_bytes_str: str = f"{size_bytes:.0f}"
+        size_gib_str: str = f"{size_bytes / 1024 / 1024 / 1024:.2f}"
+        size_gb_str: str = f"{size_bytes / 1000 / 1000 / 1000:.2f}"
 
     # Estimate final file size
     estimated_size_bytes = estimate_final_size(size_bytes, current_frame, total_frames)
-    estimated_size_kb_str = "--.- KB"
-    estimated_size_gb_str = "--.- GB"
+    estimated_size_bytes_str = "-- Bytes"
+    estimated_size_gib_str = "--.-- GiB"
+    estimated_size_gb_str = "--.-- GB"
     if estimated_size_bytes is not None:
-        estimated_size_kb_str: str = f"{estimated_size_bytes / 1024:.2f}"
-        estimated_size_gb_str: str = f"{estimated_size_bytes / 1024 / 1024 / 1024:.2f}"
+        estimated_size_bytes_str: str = f"{estimated_size_bytes:.0f}"
+        estimated_size_gib_str: str = f"{estimated_size_bytes / 1024 / 1024 / 1024:.2f}"
+        estimated_size_gb_str: str = f"{estimated_size_bytes / 1000 / 1000 / 1000:.2f}"
 
     bar_len = 70
     bar_str: str = color_str("-" * 70, ANSI_GREEN)
@@ -308,19 +319,20 @@ def print_progress_info(first_update: bool, current_frame: int, total_frames: in
             process_name = process_name.strip()
         new_bar_len: int = bar_len - (len(process_name) + 4)
         bar_str = color_str(f"-- {process_name} " + ("-" * new_bar_len), ANSI_GREEN)
+
     # Format for multi-line output
     info_line: str = f"""
 {bar_str}
 Frame         : {color_str(current_frame, ANSI_GREEN)}/{total_frames}
-Speed         : {color_str(speed_str, ANSI_GREEN)}x | {color_str(fps, ANSI_GREEN)} FPS
+Duration      : {color_str(time_str, ANSI_GREEN)}/{duration_str}
+Speed         : {color_str(speed_str, ANSI_GREEN)}x | {color_str(f"{fps:.2f}", ANSI_GREEN)}/{video_fps:.2f} FPS
 
-ETA           : {color_str(eta, ANSI_GREEN)}
-Time          : {color_str(time_str, ANSI_GREEN)}/{duration_str}
+ETA           : {color_str(eta, ANSI_GREEN)} | Done at {color_str(finish_time_str, ANSI_GREEN)}
 Process Time  : {color_str(process_time_str, ANSI_GREEN)}
 
 Bitrate       : {color_str(bitrate_str, ANSI_GREEN)} kb/s
-Size          : {color_str(size_kb_str, ANSI_GREEN)} KB ~> {color_str(size_gb_str, ANSI_GREEN)} GB
-Final size    : {color_str(estimated_size_kb_str, ANSI_GREEN)} KB ~> {color_str(estimated_size_gb_str, ANSI_GREEN)} GB
+Size          : {color_str(size_gib_str, ANSI_GREEN)} GiB | {color_str(size_gb_str, ANSI_GREEN)} GB ~> [{color_str(size_bytes_str, ANSI_GREEN)} Bytes]
+Final size    : {color_str(estimated_size_gib_str, ANSI_GREEN)} GiB | {color_str(estimated_size_gb_str, ANSI_GREEN)} GB ~> [{color_str(estimated_size_bytes_str, ANSI_GREEN)} Bytes]
 {progress_bar}
 {color_str("-" * bar_len, ANSI_GREEN)}"""
 
@@ -339,7 +351,9 @@ def print_progress_info_minimal(process_name: str, first_update: bool, current_f
     percent: float = (current_frame / total_frames * 100) if total_frames > 0 else 0.0
 
     # Calculate ETA
-    eta: str = calculate_eta(fps=fps, current_frame=current_frame, total_frames=total_frames)
+    eta_seconds = calculate_eta(fps=fps, current_frame=current_frame, total_frames=total_frames)
+    eta: str = format_time(seconds=eta_seconds)
+    finish_time_str: str = (datetime.now() + timedelta(seconds=eta_seconds)).strftime("%H:%M")
 
     # Create progress bar
     progress_bar: str = create_progress_bar_with_percent(percent=percent)
@@ -352,7 +366,7 @@ def print_progress_info_minimal(process_name: str, first_update: bool, current_f
     info_line: str = f"""
 {color_str(f"-- {process_name} " + ("-" * bar_len), ANSI_GREEN)}
 Frame         : {color_str(current_frame, ANSI_GREEN)}/{total_frames}
-ETA           : {color_str(eta, color=ANSI_GREEN)}
+ETA           : {color_str(eta, ANSI_GREEN)} | Done at {color_str(finish_time_str, ANSI_GREEN)}
 Process Time  : {color_str(process_time_str, ANSI_GREEN)}
 {progress_bar}
 {color_str("-" * 70, ANSI_GREEN)}"""
