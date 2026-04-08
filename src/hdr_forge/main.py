@@ -285,6 +285,7 @@ def process_extract_metadata_command(args) -> int:
                     output_el=el_file_path,
                     total_frames=video.get_total_frames(),
                 )
+        success = True
     except Exception as e:
         print_err(f"Error processing {input_path.name}: {e}")
         return 1

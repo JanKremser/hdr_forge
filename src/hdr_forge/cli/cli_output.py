@@ -294,6 +294,7 @@ def print_progress_info(first_update: bool, current_frame: int, total_frames: in
 
     # Calculate size
     size_bytes_str: str = "-- Bytes"
+    size_gib_str: str = "--.-- GiB"
     size_gb_str: str = "--.- GB"
     if size_bytes is not None:
         size_bytes_str: str = f"{size_bytes:.0f}"

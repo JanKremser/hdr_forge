@@ -1,7 +1,7 @@
 from typing import Optional, Tuple
 from hdr_forge.ffmpeg.video_codec.service.presets import Hdr_Forge_AV1_Preset
 from hdr_forge.ffmpeg.video_codec.video_codec_base import VideoCodecBase
-from hdr_forge.typedefs.encoder_typing import EncoderSettings, HdrSdrFormat
+from hdr_forge.typedefs.encoder_typing import EncoderSettings, HdrForgeEncodingTuningPresets, HdrSdrFormat
 from hdr_forge.typedefs.video_typing import ContentLightLevelMetadata, HdrMetadata, MasterDisplayMetadata, build_master_display_string, build_max_cll_string
 from hdr_forge.typedefs.codec_typing import PIXEL_FORMAT_YUV420_10_BIT, PIXEL_FORMAT_YUV420_8_BIT, VideoEncoderLibrary
 from hdr_forge.video import Video
@@ -156,8 +156,8 @@ class LibSvtAV1Codec(VideoCodecBase):
         if self.is_hdr_encoding():
             crf += 1.0  # 10-Bit HDR allows slightly higher CRF without quality loss
 
-        hdr_forge_preset = self._encoder_settings.hdr_forge_encoding_preset.preset
-        action_crf: float = 2.0 if str(hdr_forge_preset) == "ACTION" else 0.0  # Action preset lowers CRF for better handling of fast motion
+        hdr_forge_preset: HdrForgeEncodingTuningPresets = self._encoder_settings.hdr_forge_encoding_preset.preset
+        action_crf: float = 2.0 if hdr_forge_preset == HdrForgeEncodingTuningPresets.ACTION else 0.0  # Action preset lowers CRF for better handling of fast motion
         if action_crf > 0:
             action_w = self._calculate_crf_adjustment_weight(
                 current_crf=crf,

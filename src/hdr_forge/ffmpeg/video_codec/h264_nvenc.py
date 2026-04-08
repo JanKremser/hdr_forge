@@ -33,7 +33,7 @@ class H264NvencCodec(VideoCodecBase):
         output_options: dict = super().get_ffmpeg_params(exist_params=exist_params)
         output_options.update({
             "rc": self._nvenc_rc.value,
-            "profile:v": self.get_pix_format_for_encoding(),
+            "profile:v": self.SDR_PROFILE,
             "preset": self._preset.codec_preset,
             "cq": str(self._cq)
         })
@@ -93,7 +93,7 @@ class H264NvencCodec(VideoCodecBase):
         if nvenc_params.preset is not None:
             return CodecPreset(
                 codec_libs=[self.lib],
-                value=nvenc_params.preset.value,
+                codec_preset=nvenc_params.preset.value,
                 ffmpeg_params={},
             )
 

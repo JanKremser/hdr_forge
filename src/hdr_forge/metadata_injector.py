@@ -53,7 +53,8 @@ class MetadataInjector:
 
         if self._hdr10plus_metadata is not None:
             # Inject HDR10+ metadata
-            assert hevc_file is not None
+            if hevc_file is None:
+                raise RuntimeError("Expected HEVC file for HDR10+ metadata injection but got None")
             hdr10plus_hevc_file: Path = hdr10plus_tool.inject_hdr10plus_metadata(
                 input_path=hevc_file,
                 hdr10plus_metadata_path=self._hdr10plus_metadata,
@@ -64,7 +65,8 @@ class MetadataInjector:
 
         if self._rpu_file is not None:
             # Inject RPU into the HEVC file
-            assert hevc_file is not None
+            if hevc_file is None:
+                raise RuntimeError("Expected HEVC file for RPU injection but got None")
             hevc_file = dovi_tool.inject_rpu(
                 input_path=hevc_file,
                 input_rpu=self._rpu_file,
@@ -73,7 +75,8 @@ class MetadataInjector:
 
         if self._el_file is not None:
             # Inject EL layer into the HEVC file
-            assert hevc_file is not None
+            if hevc_file is None:
+                raise RuntimeError("Expected HEVC file for EL injection but got None")
             bl_el_rpu_hevc: Path = dovi_tool.inject_dolby_vision_layers(
                 bl_path=hevc_file,
                 el_path=self._el_file,
@@ -83,7 +86,8 @@ class MetadataInjector:
             hevc_file = bl_el_rpu_hevc
 
         # Mux the final HEVC file back into an MKV
-        assert hevc_file is not None
+        if hevc_file is None:
+            raise RuntimeError("Expected final HEVC file for muxing but got None")
         mkvmerge.mux_hevc_to_mkv(
             input_hevc_path=hevc_file,
             input_mkv=self._input_file,
