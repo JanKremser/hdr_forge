@@ -1,6 +1,5 @@
 from abc import ABC, abstractmethod
 import math
-from pathlib import Path
 import sys
 from typing import Optional, Tuple, Type, TypeVar
 
@@ -274,6 +273,15 @@ class VideoCodecBase(ABC):
             Crop filter
         """
         return self._cropper.get_crop_result()
+
+    def has_crop(self) -> bool:
+        """Check if cropping is needed.
+
+        Returns:
+            True if cropping is needed, False otherwise
+        """
+        crop: CropResult = self._cropper.get_crop_result()
+        return crop.is_valid
 
     def get_encoding_resolution(self) -> Tuple[int, int]:
         if self._scale_width and self._scale_height:

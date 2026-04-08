@@ -733,6 +733,8 @@ class Encoder:
 
         total_frames: int = self._video.get_total_frames()
 
+        has_crop: bool = self._video_codec_lib.has_crop() if self._video_codec_lib else False
+
         # Step 1: Extract RPU metadata from original Dolby Vision video
         rpu_file_path: Path = dovi_tool.extract_rpu(
             input_path=input_file,
@@ -740,7 +742,8 @@ class Encoder:
             dv_profile_source=source_dv_profile,
             dv_profile_encoding=target_dv_profile,
             total_frames=total_frames,
-            use_cache=True,
+            use_cache=False,
+            crop=has_crop,
         )
 
         hevc: Path = hevc_bl
