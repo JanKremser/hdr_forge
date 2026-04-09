@@ -265,3 +265,8 @@ class EncoderSettings:
     sample: SampleSettings = field(default_factory=lambda: SampleSettings(enabled=False))
 
     threads: Optional[int] = None  # Number of threads to use for encoding (None for auto)
+
+
+class EncoderConfigurationError(Exception):
+    """Raised when encoder configuration is invalid or incompatible."""
+    pass

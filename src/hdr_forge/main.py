@@ -16,7 +16,7 @@ from hdr_forge.edit_files import process_edit_command
 from hdr_forge.metadata_injector import MetadataInjector
 from hdr_forge.tools import dovi_tool, hdr10plus_tool, hevc_hdr_editor
 from hdr_forge.typedefs.dolby_vision_typing import DolbyVisionProfile
-from hdr_forge.typedefs.encoder_typing import EncoderSettings, LogoRemovalAutoDetectMode, LogoRemovalMode, LogoRemovelSettings
+from hdr_forge.typedefs.encoder_typing import EncoderConfigurationError, EncoderSettings, LogoRemovalAutoDetectMode, LogoRemovalMode, LogoRemovelSettings
 from hdr_forge.encoder import Encoder
 from hdr_forge.video import Video
 
@@ -137,6 +137,9 @@ def convert_video(
         print("\n" * 3)
         print_warn("Encoding cancelled by user.")
         return None
+    except EncoderConfigurationError as e:
+        print_err(str(e))
+        return False
     except Exception as e:
         print(f"Error processing {video.get_filepath().name}: {e}")
         return False

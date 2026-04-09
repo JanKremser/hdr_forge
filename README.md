@@ -5,7 +5,7 @@
 [![Python 3.14+](https://img.shields.io/badge/python-3.14+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-A powerful command-line tool for converting video files with hardware-accelerated encoding (NVIDIA NVENC), intelligent HDR metadata preservation, automatic quality optimization, flexible cropping, and advanced format conversion (H.264, H.265/HEVC, AV1, Dolby Vision).
+A powerful command-line tool for converting video files with intelligent HDR metadata preservation, automatic quality optimization, flexible cropping, and advanced format conversion (H.264, H.265/HEVC, AV1, Dolby Vision).
 
 ## Features
 

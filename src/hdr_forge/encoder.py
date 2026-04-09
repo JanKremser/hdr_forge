@@ -19,7 +19,7 @@ from hdr_forge.ffmpeg.video_codec.libx265 import Libx265Codec
 from hdr_forge.ffmpeg.video_codec.libsvtav1 import LibSvtAV1Codec
 from hdr_forge.tools import dovi_tool
 from hdr_forge.typedefs.codec_typing import VideoEncoderLibrary
-from hdr_forge.typedefs.encoder_typing import AudioCodec, AudioCodecItem, EncoderOverride, HdrSdrFormat, EncoderSettings, SampleSettings, SubtitleMode, SubtitleModeItem, SubtitleTrackAction, SubtitleTrackOverride, VideoCodec
+from hdr_forge.typedefs.encoder_typing import AudioCodec, AudioCodecItem, EncoderConfigurationError, EncoderOverride, HdrSdrFormat, EncoderSettings, SampleSettings, SubtitleMode, SubtitleModeItem, SubtitleTrackAction, SubtitleTrackOverride, VideoCodec
 from hdr_forge.typedefs.dolby_vision_typing import DolbyVisionInfo, DolbyVisionProfile, DolbyVisionProfileEncodingMode
 from hdr_forge.typedefs.mkv_typing import MkvTrack
 from hdr_forge.video import Video
@@ -146,8 +146,7 @@ class Encoder:
                 if VideoEncoderLibrary.HEVC_NVENC in test:
                     return HevcNvencCodec(encoder_settings=encoder_settings, video=video, scale=scale_tuple)
                 else:
-                    print_err("Only NVENC hardware acceleration is supported currently.")
-                    sys.exit(1)
+                    raise EncoderConfigurationError("Only NVENC hardware acceleration is supported currently.")
             else:
                 return Libx265Codec(encoder_settings=encoder_settings, video=video, scale=scale_tuple)
         elif encoder_settings.video_codec == VideoCodec.H264:
@@ -156,14 +155,12 @@ class Encoder:
                 if VideoEncoderLibrary.H264_NVENC in test:
                     return H264NvencCodec(encoder_settings=encoder_settings, video=video, scale=scale_tuple)
                 else:
-                    print_err("Only NVENC hardware acceleration is supported currently.")
-                    sys.exit(1)
+                    raise EncoderConfigurationError("Only NVENC hardware acceleration is supported currently.")
             else:
                 return Libx264Codec(encoder_settings=encoder_settings, video=video, scale=scale_tuple)
         elif encoder_settings.video_codec == VideoCodec.AV1:
             if encoder_settings.enable_gpu_acceleration:
-                print_err("Hardware acceleration is not supported for AV1 encoding.")
-                sys.exit(1)
+                raise EncoderConfigurationError("Hardware acceleration is not supported for AV1 encoding.")
             return LibSvtAV1Codec(encoder_settings=encoder_settings, video=video, scale=scale_tuple)
         return None
 
@@ -196,16 +193,14 @@ class Encoder:
             if VideoEncoderLibrary.HEVC_NVENC in available_encoders:
                 return HevcNvencCodec(encoder_settings=encoder_settings, video=video, scale=scale_tuple)
             else:
-                print_err("Error: HEVC NVENC encoder not available on this system.")
-                sys.exit(1)
+                raise EncoderConfigurationError("Error: HEVC NVENC encoder not available on this system.")
 
         elif override == EncoderOverride.H264_NVENC:
             available_encoders = self.get_available_hw_encoders()
             if VideoEncoderLibrary.H264_NVENC in available_encoders:
                 return H264NvencCodec(encoder_settings=encoder_settings, video=video, scale=scale_tuple)
             else:
-                print_err("Error: H264 NVENC encoder not available on this system.")
-                sys.exit(1)
+                raise EncoderConfigurationError("Error: H264 NVENC encoder not available on this system.")
 
         elif override == EncoderOverride.LIBSVTAV1:
             return LibSvtAV1Codec(encoder_settings=encoder_settings, video=video, scale=scale_tuple)
@@ -243,8 +238,7 @@ class Encoder:
             return None
 
         if self.is_dolby_vision_encoding():
-            print_err(msg="Video sampling is not supported for Dolby Vision encoding.")
-            sys.exit(1)
+            raise EncoderConfigurationError("Video sampling is not supported for Dolby Vision encoding.")
 
         video_duration: float = self._video.get_duration_seconds()
         if video_duration <= 0:
@@ -343,26 +337,22 @@ class Encoder:
                     elif self._video.is_hdr_video():
                         formats.append(HdrSdrFormat.HDR)
             else:
-                print_err("Cannot encode to Dolby Vision format because source video does not contain Dolby Vision.")
-                sys.exit(1)
+                raise EncoderConfigurationError("Cannot encode to Dolby Vision format because source video does not contain Dolby Vision.")
         if HdrSdrFormat.HDR10 in encoder_settings_formats and HdrSdrFormat.HDR10 not in formats:
             if HdrSdrFormat.HDR10 in video_formats:
                 formats.append(HdrSdrFormat.HDR10)
             else:
-                print_err("Cannot encode to HDR10 format because source video does not contain HDR10.")
-                sys.exit(1)
+                raise EncoderConfigurationError("Cannot encode to HDR10 format because source video does not contain HDR10.")
         if HdrSdrFormat.HDR in encoder_settings_formats and HdrSdrFormat.HDR not in formats:
             if HdrSdrFormat.HDR in video_formats or HdrSdrFormat.HDR10 in video_formats:
                 formats.append(HdrSdrFormat.HDR)
             else:
-                print_err("Cannot encode to HDR format because source video does not contain HDR.")
-                sys.exit(1)
+                raise EncoderConfigurationError("Cannot encode to HDR format because source video does not contain HDR.")
         if HdrSdrFormat.SDR in encoder_settings_formats and HdrSdrFormat.SDR not in formats:
             if HdrSdrFormat.SDR in video_formats:
                 formats.append(HdrSdrFormat.SDR)
             else:
-                print_err("Cannot encode to SDR format because source video does not contain SDR.")
-                sys.exit(1)
+                raise EncoderConfigurationError("Cannot encode to SDR format because source video does not contain SDR.")
 
         if (
             HdrSdrFormat.HDR10_PLUS in video_formats and
@@ -479,8 +469,7 @@ class Encoder:
                         count_ch: int = track.properties.audio_channels
 
                     if audio_codec_item.to_codec == AudioCodec.FLAC and count_ch > 8:
-                        print_err(f"FLAC codec supports a maximum of 8 (7.1) channels. Track ID {track.id} has {count_ch} channels.")
-                        sys.exit(1)
+                        raise EncoderConfigurationError(f"FLAC codec supports a maximum of 8 (7.1) channels. Track ID {track.id} has {count_ch} channels.")
                     elif audio_codec_item.to_codec == AudioCodec.FLAC and count_ch > 6:
                         print_warn(f"FLAC codec with more than 6 channels may not be widely supported. Track ID {track.id} has {count_ch} channels.")
                     if audio_codec_item.to_codec == AudioCodec.FLAC:
@@ -488,8 +477,7 @@ class Encoder:
                         continue # no bitrate setting for FLAC
 
                     if audio_codec_item.to_codec == AudioCodec.AC3 and count_ch > 6:
-                        print_err(f"AC3 codec supports a maximum of 6 (5.1) channels. Track ID {track.id} has {count_ch} channels.")
-                        sys.exit(1)
+                        raise EncoderConfigurationError(f"AC3 codec supports a maximum of 6 (5.1) channels. Track ID {track.id} has {count_ch} channels.")
 
                     if audio_codec_item.to_codec == AudioCodec.AAC and count_ch > 6:
                         print_warn(f"AAC codec with more than 6 channels may not be widely supported. Track ID {track.id} has {count_ch} channels.")
@@ -979,13 +967,11 @@ class Encoder:
         if self._encoder_settings.hdr_sdr_format == HdrSdrFormat.DOLBY_VISION:
             # Check if source is Dolby Vision
             if self._video.get_dolby_vision_profile() is None:
-                print_err("Error: --hdr dv/dv8 requires a Dolby Vision source. Use --hdr auto to preserve the source format.")
-                sys.exit(1)
+                raise EncoderConfigurationError("Error: --hdr dv/dv8 requires a Dolby Vision source. Use --hdr auto to preserve the source format.")
 
             # Check if AV1 codec is being used
             if self.get_encoding_video_codec() == VideoCodec.AV1:
-                print_err("Error: Dolby Vision encoding is not supported with AV1 (libsvtav1).")
-                sys.exit(1)
+                raise EncoderConfigurationError("Error: Dolby Vision encoding is not supported with AV1 (libsvtav1).")
 
         if self._video.is_dolby_vision_video():
 
