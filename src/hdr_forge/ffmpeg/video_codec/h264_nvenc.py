@@ -2,8 +2,8 @@ from typing import Optional, Tuple
 from hdr_forge.cli.cli_output import print_warn
 from hdr_forge.ffmpeg.video_codec.service.presets import Hdr_Forge_HEVC_H264_NVENC_Preset
 from hdr_forge.ffmpeg.video_codec.nvenc_base import NvencCodecBase
-from hdr_forge.typedefs.encoder_typing import EncoderSettings, HdrSdrFormat
-from hdr_forge.typedefs.codec_typing import PIXEL_FORMAT_YUV420_8_BIT, VideoEncoderLibrary
+from hdr_forge.typedefs.encoder_typing import EncoderSettings, HdrSdrFormat, NvencRcMode
+from hdr_forge.typedefs.codec_typing import PIXEL_FORMAT_YUV420_8_BIT, CodecPreset, VideoEncoderLibrary
 from hdr_forge.typedefs.video_typing import HdrMetadata
 from hdr_forge.video import Video
 
@@ -65,4 +65,3 @@ class H264NvencCodec(NvencCodecBase):
 
     def get_hdr_metadata_for_encoding(self) -> Optional[HdrMetadata]:
         return None
-

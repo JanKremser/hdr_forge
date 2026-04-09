@@ -45,6 +45,8 @@ docker run --rm \
     python -m PyInstaller --clean --onefile src/hdr_forge/main.py --name hdr_forge \
       --hidden-import=hdr_forge \
       --collect-submodules hdr_forge
+
+    rm -rf ./build ./*.spec
   "
 
 echo "[build] Done. Binary: $SCRIPT_DIR/dist/hdr_forge"

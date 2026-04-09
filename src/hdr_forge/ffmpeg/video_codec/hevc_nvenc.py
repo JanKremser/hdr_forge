@@ -2,8 +2,8 @@ from typing import Optional, Tuple
 from hdr_forge.cli.cli_output import print_warn
 from hdr_forge.ffmpeg.video_codec.service.presets import Hdr_Forge_HEVC_H264_NVENC_Preset
 from hdr_forge.ffmpeg.video_codec.nvenc_base import NvencCodecBase
-from hdr_forge.typedefs.encoder_typing import EncoderSettings, HdrForgeSpeedPreset, HdrSdrFormat
-from hdr_forge.typedefs.codec_typing import PIXEL_FORMAT_YUV420_8_BIT, VideoEncoderLibrary
+from hdr_forge.typedefs.encoder_typing import EncoderSettings, HdrForgeSpeedPreset, HdrSdrFormat, NvencRcMode
+from hdr_forge.typedefs.codec_typing import PIXEL_FORMAT_YUV420_8_BIT, CodecPreset, VideoEncoderLibrary
 from hdr_forge.typedefs.video_typing import ContentLightLevelMetadata, HdrMetadata, MasterDisplayMetadata, build_master_display_string, build_max_cll_string
 from hdr_forge.video import Video
 
@@ -97,4 +97,3 @@ class HevcNvencCodec(NvencCodecBase):
             mastering_display_metadata=master_display,
             content_light_level_metadata=max_cll_max_fll,
         )
-
