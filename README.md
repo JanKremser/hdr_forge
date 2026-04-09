@@ -1,6 +1,8 @@
 # HDR Forge - SDR/HDR10/HDR10+/DolbyVision Video Converter
 
-[![Python 3.13+](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/downloads/)
+<img src="assets/hdr_forge_logo.png" alt="HDR Forge Logo" width="150" />
+
+[![Python 3.14+](https://img.shields.io/badge/python-3.14+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 A powerful command-line tool for converting video files with hardware-accelerated encoding (NVIDIA NVENC), intelligent HDR metadata preservation, automatic quality optimization, flexible cropping, and advanced format conversion (H.264, H.265/HEVC, AV1, Dolby Vision).
