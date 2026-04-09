@@ -293,9 +293,9 @@ def print_progress_info(first_update: bool, current_frame: int, total_frames: in
         bitrate_str: str = "--.--"
 
     # Calculate size
-    size_bytes_str: str = "-- Bytes"
-    size_gib_str: str = "--.-- GiB"
-    size_gb_str: str = "--.- GB"
+    size_bytes_str: str = "--"
+    size_gib_str: str = "-.--"
+    size_gb_str: str = "-.--"
     if size_bytes is not None:
         size_bytes_str: str = f"{size_bytes:.0f}"
         size_gib_str: str = f"{size_bytes / 1024 / 1024 / 1024:.2f}"
@@ -303,9 +303,9 @@ def print_progress_info(first_update: bool, current_frame: int, total_frames: in
 
     # Estimate final file size
     estimated_size_bytes = estimate_final_size(size_bytes, current_frame, total_frames)
-    estimated_size_bytes_str = "-- Bytes"
-    estimated_size_gib_str = "--.-- GiB"
-    estimated_size_gb_str = "--.-- GB"
+    estimated_size_bytes_str = "--"
+    estimated_size_gib_str = "-.--"
+    estimated_size_gb_str = "-.--"
     if estimated_size_bytes is not None:
         estimated_size_bytes_str: str = f"{estimated_size_bytes:.0f}"
         estimated_size_gib_str: str = f"{estimated_size_bytes / 1024 / 1024 / 1024:.2f}"
@@ -321,6 +321,7 @@ def print_progress_info(first_update: bool, current_frame: int, total_frames: in
         new_bar_len: int = bar_len - (len(process_name) + 4)
         bar_str = color_str(f"-- {process_name} " + ("-" * new_bar_len), ANSI_GREEN)
 
+    size_space_len: int = len(estimated_size_bytes_str) - len(size_bytes_str)
     # Format for multi-line output
     info_line: str = f"""
 {bar_str}
@@ -328,11 +329,11 @@ Frame         : {color_str(current_frame, ANSI_GREEN)}/{total_frames}
 Duration      : {color_str(time_str, ANSI_GREEN)}/{duration_str}
 Speed         : {color_str(speed_str, ANSI_GREEN)}x | {color_str(f"{fps:.2f}", ANSI_GREEN)}/{video_fps:.2f} FPS
 
-ETA           : {color_str(eta, ANSI_GREEN)} | Done at {color_str(finish_time_str, ANSI_GREEN)}
+ETA           : {color_str(eta, ANSI_GREEN)} ~> Done at {color_str(finish_time_str, ANSI_GREEN)}
 Process Time  : {color_str(process_time_str, ANSI_GREEN)}
 
 Bitrate       : {color_str(bitrate_str, ANSI_GREEN)} kb/s
-Size          : {color_str(size_gib_str, ANSI_GREEN)} GiB | {color_str(size_gb_str, ANSI_GREEN)} GB ~> [{color_str(size_bytes_str, ANSI_GREEN)} Bytes]
+Size          : {color_str(size_gib_str, ANSI_GREEN)} GiB | {color_str(size_gb_str, ANSI_GREEN)} GB ~> [{" " * size_space_len}{color_str(size_bytes_str, ANSI_GREEN)} Bytes]
 Final size    : {color_str(estimated_size_gib_str, ANSI_GREEN)} GiB | {color_str(estimated_size_gb_str, ANSI_GREEN)} GB ~> [{color_str(estimated_size_bytes_str, ANSI_GREEN)} Bytes]
 {progress_bar}
 {color_str("-" * bar_len, ANSI_GREEN)}"""
