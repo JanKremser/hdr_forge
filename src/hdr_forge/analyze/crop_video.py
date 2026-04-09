@@ -1,5 +1,4 @@
 import os
-import subprocess
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Counter, Optional, Tuple
@@ -7,7 +6,7 @@ from hdr_forge.cli.cli_output import ProgressBarSpinner, print_err, print_warn
 from hdr_forge.typedefs.encoder_typing import CropMode, CropSettings, HdrSdrFormat
 from hdr_forge.typedefs.video_typing import CropResult
 from hdr_forge.video import Video
-from hdr_forge.tools.ffmpeg import clean_subprocess_env
+from hdr_forge.tools.ffmpeg import detect_crop_at_position
 
 class VideoCropper:
     def __init__(self, video: Video, crop_settings: CropSettings, encoding_hdr_sdr_format: HdrSdrFormat):
@@ -24,37 +23,11 @@ class VideoCropper:
         )
 
     def _detect_crop_at_position(self, position_seconds: int) -> Optional[Tuple[int, int, int, int]]:
-        hdr_cropdetect_filter: str = ""
-        if self._video.is_hdr_video():
-            hdr_cropdetect_filter = "zscale=transfer=bt709,format=yuv420p,hqdn3d=1.5:1.5:6:6,"
-
-        cmd: list[str] = [
-            'ffmpeg',
-            '-ss', str(position_seconds),
-            '-i', str(self._video._filepath),
-            '-vf', f'{hdr_cropdetect_filter}cropdetect=24:16:0',
-            '-frames:v', '30',
-            '-f', 'null',
-            '-'
-        ]
-
-        try:
-            result: subprocess.CompletedProcess[str] = subprocess.run(
-                cmd, capture_output=True, text=True, timeout=30, env=clean_subprocess_env()
-            )
-
-            import re
-            crop_pattern = re.compile(r'crop=(\d+):(\d+):(\d+):(\d+)')
-
-            for line in result.stderr.split('\n'):
-                match = crop_pattern.search(line)
-                if match:
-                    w, h, x, y = map(int, match.groups())
-                    return (w, h, x, y)
-        except (subprocess.TimeoutExpired, Exception):
-            pass
-
-        return None
+        return detect_crop_at_position(
+            filepath=self._video._filepath,
+            position_seconds=position_seconds,
+            is_hdr=self._video.is_hdr_video(),
+        )
 
     def _detect_crop_auto(
         self,

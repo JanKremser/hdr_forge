@@ -2,7 +2,8 @@ from pathlib import Path
 from typing import Optional
 
 from hdr_forge.cli.cli_output import print_debug
-from hdr_forge.tools.helper import run_ffmpeg_tool_pipeline, get_tool_path
+from hdr_forge.tools.ffmpeg import run_ffmpeg_tool_pipeline
+from hdr_forge.tools.helper import get_tool_path
 from hdr_forge.typedefs.video_typing import ContentLightLevelMetadata, HdrMetadata, MasterDisplayColorPrimaries, MasterDisplayMetadata
 
 def inject_hdr_metadata(

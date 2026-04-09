@@ -1,7 +1,6 @@
 """Video encoder configuration and parameter building."""
 
 from pathlib import Path
-import subprocess
 import sys
 import time
 from typing import Dict, Optional, Tuple
@@ -9,7 +8,7 @@ from typing import Dict, Optional, Tuple
 from hdr_forge.cli.cli_output import create_ffmpeg_progress_handler, print_err, print_warn
 from hdr_forge.core.config import get_global_temp_directory
 from hdr_forge.tools import mkvmerge, mkvpropedit
-from hdr_forge.tools.ffmpeg import clean_subprocess_env
+from hdr_forge.tools.ffmpeg import query_available_hw_encoders, extract_hevc
 from hdr_forge.ffmpeg.ffmpeg_wrapper import run_ffmpeg
 from hdr_forge.ffmpeg.video_codec.h264_nvenc import H264NvencCodec
 from hdr_forge.ffmpeg.video_codec.hevc_nvenc import HevcNvencCodec
@@ -75,46 +74,13 @@ class Encoder:
         Returns a list of enum members whose encoders are available on the
         system via FFmpeg AND are hardware-accelerated.
 
-        :param enum_class: Enum class, e.g. VideoEncoderLibrary
         :return: List of enum members that are available and are HW encoders
         """
         if self._hw_encoders_cache is not None:
             return self._hw_encoders_cache
 
-        try:
-            result = subprocess.run(
-                ["ffmpeg", "-hide_banner", "-encoders"],
-                capture_output=True,
-                text=True,
-                check=True,
-                env=clean_subprocess_env()
-            )
-
-            lines = result.stdout.splitlines()
-            available_hw_encoders = set()
-
-            for line in lines:
-                if line.startswith(" V"):
-                    parts = line.split()
-                    if len(parts) > 1:
-                        encoder_name = parts[1]
-                        # typical HW indicators
-                        if any(hw in encoder_name for hw in ["nvenc", "qsv", "vaapi", "amf", "v4l2"]):
-                            available_hw_encoders.add(encoder_name)
-
-            result_members: list[VideoEncoderLibrary] = [
-                member
-                for member in VideoEncoderLibrary
-                if member.value in available_hw_encoders
-            ]
-
-            self._hw_encoders_cache = result_members
-            return result_members
-
-        except subprocess.CalledProcessError as e:
-            print("Error querying encoders:", e)
-            self._hw_encoders_cache = []
-            return []
+        self._hw_encoders_cache = query_available_hw_encoders()
+        return self._hw_encoders_cache
 
 
     def _get_video_codec_lib_instance(
@@ -933,7 +899,7 @@ class Encoder:
         print()
 
         # Step 4: Extract encoded HEVC video stream from MKV
-        encoded_hevc_bl_path: Path = mkvmerge.extract_hevc(
+        encoded_hevc_bl_path: Path = extract_hevc(
             input_path=encoded_base_layer_mkv,
             output_hevc=temp_dir / f"video_encoded_BL.hevc",
             total_frames=total_frames,

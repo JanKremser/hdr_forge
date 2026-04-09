@@ -1,123 +1,16 @@
 import subprocess
 import threading
 import json
-import time
 from pathlib import Path
-from typing import Optional
 
-from hdr_forge.cli.cli_output import monitor_process_progress, print_debug, create_ffmpeg_minimal_progress_handler
+from hdr_forge.cli.cli_output import monitor_process_progress, print_debug
 from hdr_forge.core.service import build_cmd_array_to_str
-from hdr_forge.tools.helper import _ffmpeg_progress_reader_thread, get_tool_path
+from hdr_forge.tools.helper import get_tool_path
 from hdr_forge.tools.ffmpeg import clean_subprocess_env
 from hdr_forge.typedefs.mkv_typing import MkvInfo, parse_mkv_info
 
 
-def extract_hevc(
-    input_path: Path,
-    output_hevc: Optional[Path] = None,
-    total_frames: Optional[int] = None,
-) -> Path:
-    """Extract HEVC bitstream from video file.
-
-    Args:
-        input_path: Path to input video file
-        output_hevc: Path to output HEVC file. If None, generates filename based on input
-        total_frames: Total number of frames in the video (for progress tracking)
-
-    Returns:
-        Path to the extracted HEVC file
-
-    Raises:
-        RuntimeError: If extraction fails
-    """
-    if output_hevc is None:
-        output_hevc = input_path.with_name(f"{input_path.stem}_BL.hevc")
-
-    try:
-        # Build FFmpeg command
-        ffmpeg_cmd: list[str] = [
-            'ffmpeg',
-            '-i', str(input_path),
-            '-c:v', 'copy',
-            '-bsf:v', 'hevc_mp4toannexb',
-            '-f', 'hevc',
-        ]
-
-        # Add progress reporting if we have frame/duration info
-        if total_frames:
-            ffmpeg_cmd.extend(['-progress', 'pipe:2'])
-
-        ffmpeg_cmd.append(str(output_hevc))
-
-        print_debug(build_cmd_array_to_str(ffmpeg_cmd))
-
-        # FFmpeg stderr is used for progress if available, otherwise DEVNULL
-        ffmpeg_stderr = subprocess.PIPE if (total_frames) else subprocess.DEVNULL
-
-        # Execute ffmpeg to extract HEVC
-        ffmpeg_process = subprocess.Popen(
-            ffmpeg_cmd,
-            stdout=subprocess.PIPE,
-            stderr=ffmpeg_stderr,
-            text=True if ffmpeg_stderr == subprocess.PIPE else False,
-            bufsize=1 if ffmpeg_stderr == subprocess.PIPE else -1,
-            env=clean_subprocess_env()
-        )
-
-        # Start progress tracking if we have frame/duration info
-        if total_frames and ffmpeg_process.stderr:
-            process_start_time = time.time()
-            progress_callback = create_ffmpeg_minimal_progress_handler(
-                total_frames=total_frames,
-                process_start_time=process_start_time,
-                process_name="Extracting HEVC:"
-            )
-
-            stderr_buffer: list = []
-            reader_thread = threading.Thread(
-                target=_ffmpeg_progress_reader_thread,
-                args=(ffmpeg_process.stderr, ffmpeg_process, progress_callback, total_frames, stderr_buffer),
-                daemon=True
-            )
-            reader_thread.start()
-        else:
-            # Fallback to old spinner-based progress
-            monitor_thread = threading.Thread(
-                target=monitor_process_progress,
-                args=(ffmpeg_process, "Extracting HEVC:"),
-                daemon=True
-            )
-            monitor_thread.start()
-
-        # Wait for ffmpeg to complete
-        ffmpeg_process.wait()
-
-        # Wait for progress thread to finish
-        if total_frames:
-            if ffmpeg_process.stderr:
-                reader_thread.join(timeout=1.0)
-        else:
-            monitor_thread.join(timeout=1.0)
-
-        if ffmpeg_process.returncode != 0:
-            raise RuntimeError("FFmpeg extraction failed")
-
-        if not output_hevc.exists():
-            raise RuntimeError("HEVC file was not created")
-
-        print_debug(f"- HEVC extracted successfully: {str(output_hevc)}")
-        return output_hevc
-
-    except FileNotFoundError as e:
-        raise RuntimeError(
-            f"Required tool not found: {e.filename}. "
-            "Please ensure ffmpeg is installed."
-        )
-    except Exception as e:
-        raise RuntimeError(f"Failed to extract HEVC: {e}")
-
-
-def mux_hevc_to_mkv(input_hevc_path: Path, input_mkv: Optional[Path] = None, output_mkv: Optional[Path] = None) -> Path:
+def mux_hevc_to_mkv(input_hevc_path: Path, input_mkv: Path | None = None, output_mkv: Path | None = None) -> Path:
     if output_mkv is None:
         output_mkv = input_hevc_path.with_name(f"{input_hevc_path.stem}_BL.mkv")
 

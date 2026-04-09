@@ -9,8 +9,8 @@ from typing import Optional
 
 from hdr_forge.cli.cli_output import monitor_process_progress, print_debug, create_dovi_tool_progress_handler
 from hdr_forge.core.service import build_cmd_array_to_str
-from hdr_forge.tools.helper import run_ffmpeg_tool_pipeline, dovi_tool_progress_reader_thread, get_tool_path
-from hdr_forge.tools.ffmpeg import clean_subprocess_env
+from hdr_forge.tools.ffmpeg import run_ffmpeg_tool_pipeline, clean_subprocess_env
+from hdr_forge.tools.helper import dovi_tool_progress_reader_thread, get_tool_path
 from hdr_forge.typedefs.dolby_vision_typing import DolbyVisionProfile, DolbyVisionRpuInfo
 
 

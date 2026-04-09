@@ -172,6 +172,8 @@ def run_ffmpeg(
     # Add input file
     cmd.extend(['-i', str(input_file)])
 
+    debug_ffmpeg: str = ' '.join(cmd)
+
     # Add output options
     # Handle multiple identical keys (e.g., multiple -metadata:s:v arguments)
     for key, value in output_options.items():
@@ -179,14 +181,16 @@ def run_ffmpeg(
             # If value is a list, add the key multiple times
             for v in value:
                 cmd.extend([f'-{key}', str(v)])
+                debug_ffmpeg += f' -{key} "{v}"'
         else:
             cmd.extend([f'-{key}', str(value)])
+            debug_ffmpeg += f' -{key} "{value}"'
 
     # Add output file
     cmd.append(str(output_file))
 
     # Debug output
-    debug_ffmpeg: str = ' '.join(cmd)
+    debug_ffmpeg += f' "{str(output_file)}"'
     print_debug(f'Run command: ffmpeg -y {debug_ffmpeg}')
 
     # Add progress reporting to stderr

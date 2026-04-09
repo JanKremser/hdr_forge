@@ -1,9 +1,6 @@
 """Video metadata extraction and analysis module."""
 
-import json
-import os
 import re
-import subprocess
 from pathlib import Path
 from typing import Dict, Optional, Tuple
 
@@ -11,7 +8,7 @@ from hdr_forge.typedefs.video_typing import CropResult
 from hdr_forge.core.config import get_global_temp_directory
 from hdr_forge.tools import hdr10plus_tool, mkvmerge
 from hdr_forge.tools import dovi_tool
-from hdr_forge.tools.ffmpeg import clean_subprocess_env
+from hdr_forge.tools.ffmpeg import probe_video_metadata, extract_hdr_metadata_from_frames
 from hdr_forge.typedefs.encoder_typing import HdrSdrFormat
 from hdr_forge.typedefs.dolby_vision_typing import DolbyVisionEnhancementLayer, DolbyVisionInfo, DolbyVisionOffset, DolbyVisionProfile, DolbyVisionSiteDataInfo, DolbyVisionRpuInfo
 from hdr_forge.typedefs.video_typing import MASTER_DISPLAY_PRESETS, ContentLightLevelMetadata, HdrMetadata, MasterDisplayColorPrimaries, MasterDisplayMetadata
@@ -61,74 +58,8 @@ class Video:
             )
 
     def extract_hdr_metadata(self) -> HdrMetadata:
-        # FFmpeg command: run showinfo only until data appears
-        cmd: list = [
-            "ffmpeg", "-hide_banner",
-            "-i", self._filepath,
-            "-vf", "showinfo",
-            "-frames:v", "10",
-            "-f", "null", "-",
-        ]
-
-        process = subprocess.Popen(
-            args=cmd,
-            stderr=subprocess.PIPE,
-            stdout=subprocess.DEVNULL,
-            text=True,
-            env=clean_subprocess_env(),
-        )
-
-        #Dolby Vision Metadata Example:
-        #[Parsed_showinfo_0 @ 0x7f3e94003d00]   side data - Dolby Vision Metadata:     rpu_type=2; rpu_format=18; vdr_rpu_profile=1; vdr_rpu_level=0; chroma_resampling_explicit_filter_flag=0; coef_data_type=0; coef_log2_denom=23; vdr_rpu_normalized_idc=1; bl_video_full_range_flag=0; bl_bit_depth=10; el_bit_depth=10; vdr_bit_depth=12; spatial_resampling_filter_flag=0; el_spatial_resampling_filter_flag=1; disable_residual_flag=0
-
-        mastering_data: MasterDisplayMetadata | None = None
-        light_data: ContentLightLevelMetadata | None = None
-
-        # Regex for Mastering Display Metadata - cover both formats
-        mastering_re: re.Pattern[str] = re.compile(
-            r"(?:Mastering display metadata|side data - mastering display).*?"
-            r"r\((?P<r_x>[\d\.]+)[\s,]+(?P<r_y>[\d\.]+)\)\s*"
-            r"g\((?P<g_x>[\d\.]+)[\s,]+(?P<g_y>[\d\.]+)\)\s*"
-            r"b\((?P<b_x>[\d\.]+)[\s,]+(?P<b_y>[\d\.]+)\)\s*"
-            r"wp\((?P<wp_x>[\d\.]+)[\s,]+(?P<wp_y>[\d\.]+)\)\s*"
-            r"min_luminance=(?P<min_lum>[\d\.]+)[\s,]*max_luminance=(?P<max_lum>[\d\.]+)"
-        )
-
-        # Regex for Content Light Level Metadata - cover both formats
-        light_re: re.Pattern[str] = re.compile(
-            r"(?:Content light level metadata|side data - Content Light Level information).*?"
-            r"MaxCLL=(?P<maxcll>\d+),\s*MaxFALL=(?P<maxfall>\d+)"
-        )
-
-        if process.stderr:
-            for line in process.stderr.readlines():
-                if not mastering_data:
-                    m: re.Match[str] | None = mastering_re.search(line)
-                    if m:
-                        mastering_data = MasterDisplayMetadata(**{k: float(v) for k, v in m.groupdict().items()})
-                if not light_data:
-                    l: re.Match[str] | None = light_re.search(line)
-                    if l:
-                        light_data = ContentLightLevelMetadata(**{k: int(v) for k, v in l.groupdict().items()})
-
-                # If both found, terminate early
-                if mastering_data and light_data:
-                    process.kill()
-                    break
-
-        process.wait()
-
-        # Clean up values (0 → None)
-        if light_data:
-            if light_data.maxcll == 0:
-                light_data.maxcll = None
-            if light_data.maxfall == 0:
-                light_data.maxfall = None
-
-        return HdrMetadata(
-            mastering_display_metadata=mastering_data,
-            content_light_level_metadata=light_data,
-        )
+        """Extract HDR metadata from the video file."""
+        return extract_hdr_metadata_from_frames(self._filepath)
 
     def _extract_video_metadata(self) -> dict:
         """Extract video metadata using ffprobe.
@@ -139,31 +70,7 @@ class Video:
         Raises:
             RuntimeError: If ffprobe command fails
         """
-        try:
-            result = subprocess.run(
-                args=[
-                    'ffprobe',
-                    '-v', 'quiet',
-                    '-print_format', 'json',
-                    '-show_format',
-                    '-show_streams',
-                    str(self._filepath)
-                ],
-                capture_output=True,
-                text=True,
-                check=True,
-                env=clean_subprocess_env(),
-            )
-
-            stdout_json = result.stdout.strip()
-
-            return json.loads(stdout_json)
-        except subprocess.CalledProcessError as e:
-            raise RuntimeError(
-                f"ffprobe failed:\nSTDERR:\n{e.stderr}\nSTDOUT:\n{e.stdout}"
-            )
-        except json.JSONDecodeError as e:
-            raise RuntimeError(f"Failed to parse ffprobe output: {e}")
+        return probe_video_metadata(self._filepath)
 
     def _get_video_stream(self) -> Dict:
         """Get the first video stream from metadata.
