@@ -7,6 +7,7 @@ from typing import Optional
 from hdr_forge.cli.cli_output import monitor_process_progress, print_debug, print_warn
 from hdr_forge.core.config import PROJECT_ROOT
 from hdr_forge.core.service import build_cmd_array_to_str
+from hdr_forge.tools.ffmpeg import clean_subprocess_env
 
 
 def _get_hdr10plus_tool_path() -> str:
@@ -57,7 +58,8 @@ def verify_hdr10plus(input_path: Path) -> bool:
             tool_cmd,
             capture_output=True,
             text=True,
-            check=True
+            check=True,
+            env=clean_subprocess_env()
         )
 
         return True if "Dynamic HDR10+ metadata detected" in result.stdout else False
@@ -102,7 +104,8 @@ def extract_hdr10plus_metadata(input_path: Path, output_path: Path) -> Path:
         tool_process = subprocess.Popen(
             tool_cmd,
             stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
+            stderr=subprocess.PIPE,
+            env=clean_subprocess_env()
         )
 
         # Start a thread to monitor and show progress
@@ -173,7 +176,8 @@ def inject_hdr10plus_metadata(input_path: Path, hdr10plus_metadata_path: Path, o
         tool_process = subprocess.Popen(
             tool_cmd,
             stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
+            stderr=subprocess.PIPE,
+            env=clean_subprocess_env()
         )
 
         # Start a thread to monitor and show progress

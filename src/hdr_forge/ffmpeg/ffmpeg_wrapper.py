@@ -8,6 +8,7 @@ from typing import Callable, Dict, Optional
 
 from hdr_forge.cli.cli_output import print_debug, print_err
 from hdr_forge.core.service import build_ffmpeg_cmd_dict_to_str
+from hdr_forge.tools.ffmpeg import clean_subprocess_env
 from hdr_forge.typedefs.ffmpeg_typing import FfmpegProgressInfo
 
 
@@ -205,7 +206,8 @@ def run_ffmpeg(
             stdout=subprocess.DEVNULL,
             stderr=subprocess.PIPE,
             text=True,
-            bufsize=1  # Line buffered
+            bufsize=1,  # Line buffered
+            env=clean_subprocess_env()
         )
 
         # Start progress reader thread

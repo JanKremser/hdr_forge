@@ -9,6 +9,7 @@ from typing import Callable, Optional
 
 from hdr_forge.cli.cli_output import ProgressBarSpinner, monitor_process_progress, print_debug, create_ffmpeg_minimal_progress_handler, create_dovi_tool_progress_handler
 from hdr_forge.core.service import build_cmd_pipe_str
+from hdr_forge.tools.ffmpeg import clean_subprocess_env
 from hdr_forge.typedefs.ffmpeg_typing import FfmpegMiniProgressInfo
 
 
@@ -225,14 +226,16 @@ def run_ffmpeg_tool_pipeline(
         stdout=subprocess.PIPE,
         stderr=ffmpeg_stderr,
         text=True if ffmpeg_stderr == subprocess.PIPE else False,
-        bufsize=1 if ffmpeg_stderr == subprocess.PIPE else -1
+        bufsize=1 if ffmpeg_stderr == subprocess.PIPE else -1,
+        env=clean_subprocess_env()
     )
 
     tool_process = subprocess.Popen(
         tool_cmd,
         stdin=ffmpeg_process.stdout,
         stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE
+        stderr=subprocess.PIPE,
+        env=clean_subprocess_env()
     )
 
     # Close ffmpeg stdout in parent to allow SIGPIPE to be sent

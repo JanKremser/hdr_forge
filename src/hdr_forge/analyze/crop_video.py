@@ -7,6 +7,7 @@ from hdr_forge.cli.cli_output import ProgressBarSpinner, print_err, print_warn
 from hdr_forge.typedefs.encoder_typing import CropMode, CropSettings, HdrSdrFormat
 from hdr_forge.typedefs.video_typing import CropResult
 from hdr_forge.video import Video
+from hdr_forge.tools.ffmpeg import clean_subprocess_env
 
 class VideoCropper:
     def __init__(self, video: Video, crop_settings: CropSettings, encoding_hdr_sdr_format: HdrSdrFormat):
@@ -39,7 +40,7 @@ class VideoCropper:
 
         try:
             result: subprocess.CompletedProcess[str] = subprocess.run(
-                cmd, capture_output=True, text=True, timeout=30
+                cmd, capture_output=True, text=True, timeout=30, env=clean_subprocess_env()
             )
 
             import re

@@ -7,6 +7,7 @@ from pathlib import Path
 from hdr_forge.cli.cli_output import print_debug
 from hdr_forge.core.config import PROJECT_ROOT
 from hdr_forge.core.service import build_cmd_array_to_str
+from hdr_forge.tools.ffmpeg import clean_subprocess_env
 
 
 @dataclass
@@ -87,6 +88,7 @@ def set_subtitle_track_properties(
             capture_output=True,
             text=True,
             check=False,
+            env=clean_subprocess_env(),
         )
 
         if process.returncode != 0:

@@ -1,6 +1,7 @@
 """Video metadata extraction and analysis module."""
 
 import json
+import os
 import re
 import subprocess
 from pathlib import Path
@@ -10,6 +11,7 @@ from hdr_forge.typedefs.video_typing import CropResult
 from hdr_forge.core.config import get_global_temp_directory
 from hdr_forge.tools import hdr10plus_tool, mkvmerge
 from hdr_forge.tools import dovi_tool
+from hdr_forge.tools.ffmpeg import clean_subprocess_env
 from hdr_forge.typedefs.encoder_typing import HdrSdrFormat
 from hdr_forge.typedefs.dolby_vision_typing import DolbyVisionEnhancementLayer, DolbyVisionInfo, DolbyVisionOffset, DolbyVisionProfile, DolbyVisionSiteDataInfo, DolbyVisionRpuInfo
 from hdr_forge.typedefs.video_typing import MASTER_DISPLAY_PRESETS, ContentLightLevelMetadata, HdrMetadata, MasterDisplayColorPrimaries, MasterDisplayMetadata
@@ -73,6 +75,7 @@ class Video:
             stderr=subprocess.PIPE,
             stdout=subprocess.DEVNULL,
             text=True,
+            env=clean_subprocess_env(),
         )
 
         #Dolby Vision Metadata Example:
@@ -140,7 +143,7 @@ class Video:
             result = subprocess.run(
                 args=[
                     'ffprobe',
-                    '-v', 'debug',
+                    '-v', 'quiet',
                     '-print_format', 'json',
                     '-show_format',
                     '-show_streams',
@@ -148,14 +151,17 @@ class Video:
                 ],
                 capture_output=True,
                 text=True,
-                check=True
+                check=True,
+                env=clean_subprocess_env(),
             )
 
             stdout_json = result.stdout.strip()
 
             return json.loads(stdout_json)
         except subprocess.CalledProcessError as e:
-            raise RuntimeError(f"Failed to extract metadata: {e}")
+            raise RuntimeError(
+                f"ffprobe failed:\nSTDERR:\n{e.stderr}\nSTDOUT:\n{e.stdout}"
+            )
         except json.JSONDecodeError as e:
             raise RuntimeError(f"Failed to parse ffprobe output: {e}")
 
@@ -422,7 +428,7 @@ class Video:
 
         if new_w == w and new_h == h:
             return None
-        
+
         return CropResult(
             x=dv_info.offset.left,
             y=dv_info.offset.top,
