@@ -14,10 +14,11 @@ from hdr_forge.cli.cli_output import (
     create_ffmpeg_minimal_progress_handler,
     monitor_process_progress,
     print_debug,
+    print_err,
 )
-from hdr_forge.core.service import build_cmd_array_to_str, build_cmd_pipe_str
+from hdr_forge.core.service import build_cmd_array_to_str, build_cmd_pipe_str, build_ffmpeg_cmd_dict_to_str
 from hdr_forge.typedefs.codec_typing import VideoEncoderLibrary
-from hdr_forge.typedefs.ffmpeg_typing import FfmpegMiniProgressInfo
+from hdr_forge.typedefs.ffmpeg_typing import FfmpegMiniProgressInfo, FfmpegProgressInfo
 from hdr_forge.typedefs.video_typing import (
     ContentLightLevelMetadata,
     HdrMetadata,
@@ -505,3 +506,223 @@ def run_ffmpeg_tool_pipeline(
     ffmpeg_process.wait()
 
     return tool_process.returncode, stderr
+
+
+def _parse_encoding_progress_line(line: str, progress_data: dict[str, str]) -> None:
+    """Parse a single line from FFmpeg progress output (for main encoding).
+
+    Args:
+        line: Line from FFmpeg progress output (format: key=value)
+        progress_data: Dictionary to store parsed key-value pairs
+    """
+    line = line.strip()
+    if '=' in line:
+        key, value = line.split('=', 1)
+        progress_data[key.strip()] = value.strip()
+
+
+def _create_encoding_progress_info(progress_data: dict[str, str]) -> FfmpegProgressInfo:
+    """Create FfmpegProgressInfo from parsed progress data.
+
+    Args:
+        progress_data: Dictionary with parsed FFmpeg progress data
+
+    Returns:
+        FfmpegProgressInfo object with parsed values
+    """
+    frame = int(progress_data.get('frame', 0))
+    fps = float(progress_data.get('fps', 0.0))
+
+    speed = None
+    speed_str = progress_data.get('speed')
+    if speed_str and speed_str != 'N/A':
+        speed_match = re.match(r'([\d.]+)x', speed_str)
+        if speed_match:
+            speed = float(speed_match.group(1))
+
+    time_seconds = None
+    out_time_us = progress_data.get('out_time_us')
+    if out_time_us and out_time_us != 'N/A':
+        try:
+            time_seconds = float(out_time_us) / 1_000_000
+        except ValueError:
+            pass
+
+    if time_seconds is None:
+        out_time = progress_data.get('out_time')
+        if out_time and out_time != 'N/A':
+            time_match = re.match(r'(\d+):(\d+):([\d.]+)', out_time)
+            if time_match:
+                hours = int(time_match.group(1))
+                minutes = int(time_match.group(2))
+                seconds = float(time_match.group(3))
+                time_seconds = hours * 3600 + minutes * 60 + seconds
+
+    bitrate = None
+    bitrate_str = progress_data.get('bitrate')
+    if bitrate_str and bitrate_str != 'N/A':
+        bitrate_match = re.match(r'([\d.]+)kbits/s', bitrate_str)
+        if bitrate_match:
+            bitrate = float(bitrate_match.group(1))
+
+    size = None
+    total_size = progress_data.get('total_size')
+    if total_size and total_size != 'N/A':
+        try:
+            size = int(total_size)
+        except ValueError:
+            pass
+
+    return FfmpegProgressInfo(
+        frame=frame,
+        fps=fps,
+        speed=speed,
+        time=time_seconds,
+        bitrate=bitrate,
+        size=size
+    )
+
+
+def _encoding_progress_reader_thread(
+    pipe,
+    progress_callback: Callable[[FfmpegProgressInfo], None],
+    stderr_buffer: list
+) -> None:
+    """Thread function to read and parse FFmpeg progress output (for main encoding).
+
+    Args:
+        pipe: File-like object (stderr) to read from
+        progress_callback: Callback function to call with ProgressInfo
+        stderr_buffer: List to store all stderr lines for error reporting
+    """
+    progress_data: dict[str, str] = {}
+
+    try:
+        for line in iter(pipe.readline, ''):
+            if not line:
+                break
+
+            line = line.strip()
+            stderr_buffer.append(line)
+
+            _parse_encoding_progress_line(line, progress_data)
+
+            if line.startswith('progress='):
+                if progress_data:
+                    progress_info: FfmpegProgressInfo = _create_encoding_progress_info(progress_data=progress_data)
+                    if progress_callback:
+                        progress_callback(progress_info)
+
+                if line == 'progress=end':
+                    break
+
+    except Exception:
+        pass
+    finally:
+        pipe.close()
+
+
+def run_ffmpeg(
+    input_file: Path,
+    output_file: Path,
+    output_options: dict[str, list[str] | str],
+    progress_callback: Optional[Callable[[FfmpegProgressInfo], None]] = None,
+    timeout: Optional[float] = None,
+    try_fix: bool = False,
+    init_hw_device_vulkan: bool = False,
+) -> bool:
+    """Execute FFmpeg with progress tracking.
+
+    Args:
+        input_file: Path to input video file
+        output_file: Path to output video file
+        output_options: Dictionary of FFmpeg output options (key: value pairs)
+        progress_callback: Optional callback function for progress updates
+        timeout: Optional timeout in seconds
+        try_fix: Whether to use -err_detect ignore_err
+        init_hw_device_vulkan: Whether to initialize Vulkan hardware device
+
+    Returns:
+        True if FFmpeg executed successfully, False otherwise
+
+    Raises:
+        RuntimeError: If FFmpeg execution fails
+    """
+    cmd = []
+
+    if init_hw_device_vulkan:
+        cmd.extend(['-init_hw_device', 'vulkan'])
+
+    if try_fix:
+        cmd.extend(['-err_detect', 'ignore_err'])
+
+    cmd.extend(['-i', str(input_file)])
+
+    debug_ffmpeg: str = ' '.join(cmd)
+
+    for key, value in output_options.items():
+        if isinstance(value, list):
+            for v in value:
+                cmd.extend([f'-{key}', str(v)])
+                debug_ffmpeg += f' -{key} "{v}"'
+        else:
+            cmd.extend([f'-{key}', str(value)])
+            debug_ffmpeg += f' -{key} "{value}"'
+
+    cmd.append(str(output_file))
+    debug_ffmpeg += f' "{str(output_file)}"'
+    print_debug(f'Run command: ffmpeg -y {debug_ffmpeg}')
+
+    cmd_prefix: list[str] = ['ffmpeg', '-y']
+    if progress_callback:
+        cmd_prefix.extend(['-progress', 'pipe:2'])
+    cmd: list[str] = cmd_prefix + cmd
+
+    stderr_buffer: list = []
+
+    try:
+        process = subprocess.Popen(
+            cmd,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+            text=True,
+            bufsize=1,
+            env=clean_subprocess_env()
+        )
+
+        reader_thread = None
+        if process.stderr:
+            reader_thread = threading.Thread(
+                target=_encoding_progress_reader_thread,
+                args=(process.stderr, progress_callback, stderr_buffer),
+                daemon=True
+            )
+            reader_thread.start()
+
+        from hdr_forge.core import config as _config
+        _config.set_running_process(process)
+
+        try:
+            returncode = process.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            raise RuntimeError(f"FFmpeg execution timed out after {timeout} seconds")
+        finally:
+            _config.set_running_process(None)
+
+        if reader_thread:
+            reader_thread.join(timeout=1.0)
+
+        if returncode != 0:
+            if stderr_buffer:
+                print_err("\n=== FFmpeg Error Output ===")
+                for line in stderr_buffer:
+                    if line:
+                        print_err(line)
+                print_err("===========================\n")
+            return False
+
+        return True
+
+    except Exception as e:
+        raise RuntimeError(f"FFmpeg execution failed: {e}")

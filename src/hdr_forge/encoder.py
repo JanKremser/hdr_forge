@@ -8,8 +8,7 @@ from typing import Dict, Optional, Tuple
 from hdr_forge.cli.cli_output import create_ffmpeg_progress_handler, print_err, print_warn
 from hdr_forge.core.config import get_global_temp_directory
 from hdr_forge.tools import mkvmerge, mkvpropedit
-from hdr_forge.tools.ffmpeg import query_available_hw_encoders, extract_hevc
-from hdr_forge.ffmpeg.ffmpeg_wrapper import run_ffmpeg
+from hdr_forge.tools.ffmpeg import query_available_hw_encoders, extract_hevc, run_ffmpeg
 from hdr_forge.ffmpeg.video_codec.h264_nvenc import H264NvencCodec
 from hdr_forge.ffmpeg.video_codec.hevc_nvenc import HevcNvencCodec
 from hdr_forge.ffmpeg.video_codec.video_codec_base import VideoCodecBase
