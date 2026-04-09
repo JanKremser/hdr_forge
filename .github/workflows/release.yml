@@ -27,7 +27,9 @@ jobs:
 
       - name: Build with PyInstaller
         run: |
-          pyinstaller --clean --onefile ./src/hdr_forge/main.py --name hdr_forge
+          pyinstaller --clean --onefile ./src/hdr_forge/main.py --name hdr_forge \
+            --hidden-import=hdr_forge \
+            --collect-submodules hdr_forge
 
       - name: Rename binary
         run: |

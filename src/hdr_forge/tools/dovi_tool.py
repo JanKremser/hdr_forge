@@ -10,6 +10,7 @@ from typing import Optional
 from hdr_forge.cli.cli_output import monitor_process_progress, print_debug, create_dovi_tool_progress_handler
 from hdr_forge.core.service import build_cmd_array_to_str
 from hdr_forge.tools.helper import run_ffmpeg_tool_pipeline, dovi_tool_progress_reader_thread, get_tool_path
+from hdr_forge.tools.ffmpeg import clean_subprocess_env
 from hdr_forge.typedefs.dolby_vision_typing import DolbyVisionProfile, DolbyVisionRpuInfo
 
 
@@ -116,7 +117,8 @@ def inject_rpu(input_path: Path, input_rpu: Path, output_hevc: Optional[Path] = 
             dovi_cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
-            text=True
+            text=True,
+            env=clean_subprocess_env()
         )
 
         # Start progress tracking thread for dovi_tool's percentage output
@@ -228,7 +230,8 @@ def extract_rpu(
             dovi_process = subprocess.Popen(
                 dovi_cmd,
                 stdout=subprocess.PIPE,
-                stderr=subprocess.DEVNULL
+                stderr=subprocess.DEVNULL,
+                env=clean_subprocess_env()
             )
 
             # Start a thread to monitor and show progress
@@ -318,7 +321,8 @@ def inject_dolby_vision_layers(bl_path: Path, el_path: Path, output_bl_el: Optio
             dovi_cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
-            text=True
+            text=True,
+            env=clean_subprocess_env()
         )
 
         # Start progress tracking thread for dovi_tool's percentage output
@@ -561,7 +565,8 @@ def get_rpu_info(rpu_path: Path) -> DolbyVisionRpuInfo:
             dovi_cmd,
             capture_output=True,
             text=True,
-            check=True
+            check=True,
+            env=clean_subprocess_env()
         )
 
         return _parse_rpu_info(result.stdout)

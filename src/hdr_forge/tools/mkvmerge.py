@@ -8,6 +8,7 @@ from typing import Optional
 from hdr_forge.cli.cli_output import monitor_process_progress, print_debug, create_ffmpeg_minimal_progress_handler
 from hdr_forge.core.service import build_cmd_array_to_str
 from hdr_forge.tools.helper import _ffmpeg_progress_reader_thread, get_tool_path
+from hdr_forge.tools.ffmpeg import clean_subprocess_env
 from hdr_forge.typedefs.mkv_typing import MkvInfo, parse_mkv_info
 
 
@@ -59,7 +60,8 @@ def extract_hevc(
             stdout=subprocess.PIPE,
             stderr=ffmpeg_stderr,
             text=True if ffmpeg_stderr == subprocess.PIPE else False,
-            bufsize=1 if ffmpeg_stderr == subprocess.PIPE else -1
+            bufsize=1 if ffmpeg_stderr == subprocess.PIPE else -1,
+            env=clean_subprocess_env()
         )
 
         # Start progress tracking if we have frame/duration info
@@ -142,7 +144,8 @@ def mux_hevc_to_mkv(input_hevc_path: Path, input_mkv: Optional[Path] = None, out
         mkvmerge_process = subprocess.Popen(
             mkvmerge_cmd,
             stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL
+            stderr=subprocess.DEVNULL,
+            env=clean_subprocess_env()
         )
 
         # Start a thread to monitor and show progress
@@ -202,7 +205,8 @@ def extract_container_info_json(input_mkv_mp4_ts_file: Path) -> MkvInfo:
             mkvmerge_cmd,
             capture_output=True,
             text=True,
-            check=True
+            check=True,
+            env=clean_subprocess_env()
         )
 
         # Parse JSON output

@@ -42,7 +42,9 @@ docker run --rm \
     pip install --quiet .
 
     echo '[docker] Running PyInstaller...'
-    python -m PyInstaller --clean --onefile src/hdr_forge/main.py --name hdr_forge
+    python -m PyInstaller --clean --onefile src/hdr_forge/main.py --name hdr_forge \
+      --hidden-import=hdr_forge \
+      --collect-submodules hdr_forge
   "
 
 echo "[build] Done. Binary: $SCRIPT_DIR/dist/hdr_forge"
