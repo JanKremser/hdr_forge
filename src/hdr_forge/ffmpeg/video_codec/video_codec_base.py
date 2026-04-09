@@ -4,7 +4,7 @@ import sys
 from typing import Optional, Tuple, Type, TypeVar
 
 from hdr_forge.analyze.crop_video import VideoCropper
-from hdr_forge.typedefs.video_typing import CropResult
+from hdr_forge.typedefs.video_typing import ContentLightLevelMetadata, CropResult, MasterDisplayMetadata
 from hdr_forge.analyze.detect_logo import LogoDetector
 from hdr_forge.cli.cli_output import print_err, print_warn
 from hdr_forge.ffmpeg.video_codec.service.presets import calc_hw_prest_params
@@ -265,6 +265,36 @@ class VideoCodecBase(ABC):
             True if encoding is HDR, False otherwise
         """
         return self._hdr_sdr_format_for_encoding in [HdrSdrFormat.HDR10]
+
+    def _get_master_display_for_encoding(self) -> Optional[MasterDisplayMetadata]:
+        """Get master display metadata for encoding.
+
+        Priority:
+            1. encoder_settings.hdr_metadata (user-supplied override)
+            2. video.get_master_display() (detected from input)
+
+        Returns:
+            Master display metadata or None if not available
+        """
+        master_display: MasterDisplayMetadata | None = self._encoder_settings.hdr_metadata.mastering_display_metadata
+        if master_display is None:
+            master_display = self._video.get_master_display()
+        return master_display
+
+    def _get_max_cll_for_encoding(self) -> Optional[ContentLightLevelMetadata]:
+        """Get content light level metadata for encoding.
+
+        Priority:
+            1. encoder_settings.hdr_metadata (user-supplied override)
+            2. video.get_content_light_level_metadata() (detected from input)
+
+        Returns:
+            Content light level metadata or None if not available
+        """
+        encoder_max_cll: ContentLightLevelMetadata | None = self._encoder_settings.hdr_metadata.content_light_level_metadata
+        if encoder_max_cll is None:
+            encoder_max_cll = self._video.get_content_light_level_metadata()
+        return encoder_max_cll
 
     def get_crop(self) -> CropResult:
         """Get ffmpeg crop filter string if cropping is needed.

@@ -1,13 +1,13 @@
 from typing import Optional, Tuple
 from hdr_forge.cli.cli_output import print_warn
 from hdr_forge.ffmpeg.video_codec.service.presets import Hdr_Forge_HEVC_H264_NVENC_Preset
-from hdr_forge.ffmpeg.video_codec.video_codec_base import VideoCodecBase
-from hdr_forge.typedefs.encoder_typing import EncoderSettings, HdrForgeEncodingTuningPresets, HdrForgeSpeedPreset, HdrSdrFormat, NvencParams, NvencRcMode
-from hdr_forge.typedefs.codec_typing import PIXEL_FORMAT_YUV420_8_BIT, CodecPreset, VideoEncoderLibrary
+from hdr_forge.ffmpeg.video_codec.nvenc_base import NvencCodecBase
+from hdr_forge.typedefs.encoder_typing import EncoderSettings, HdrForgeSpeedPreset, HdrSdrFormat
+from hdr_forge.typedefs.codec_typing import PIXEL_FORMAT_YUV420_8_BIT, VideoEncoderLibrary
 from hdr_forge.typedefs.video_typing import ContentLightLevelMetadata, HdrMetadata, MasterDisplayMetadata, build_master_display_string, build_max_cll_string
 from hdr_forge.video import Video
 
-class HevcNvencCodec(VideoCodecBase):
+class HevcNvencCodec(NvencCodecBase):
 
     HDR_SDR_SUPPORT: list[HdrSdrFormat] = [
         HdrSdrFormat.HDR10,
@@ -98,86 +98,3 @@ class HevcNvencCodec(VideoCodecBase):
             content_light_level_metadata=max_cll_max_fll,
         )
 
-    def _get_master_display_for_encoding(self) -> Optional[MasterDisplayMetadata]:
-        master_display: MasterDisplayMetadata | None = self._encoder_settings.hdr_metadata.mastering_display_metadata
-        if master_display is None:
-            master_display = self._video.get_master_display()
-
-        return master_display
-
-    def _get_max_cll_for_encoding(self) -> Optional[ContentLightLevelMetadata]:
-        encoder_max_cll: ContentLightLevelMetadata | None = self._encoder_settings.hdr_metadata.content_light_level_metadata
-        if encoder_max_cll is None:
-            encoder_max_cll = self._video.get_content_light_level_metadata()
-
-        return encoder_max_cll
-
-    def _get_nvenc_rc(self) -> NvencRcMode:
-        """Get the rate control mode for NVENC encoding.
-
-        Returns:
-            Rate control mode as string
-        """
-        nvenc_params: NvencParams = self._encoder_settings.nvenc_params
-        if nvenc_params.rc is not None:
-            return nvenc_params.rc
-
-        return NvencRcMode.VBR_HQ  # default to variable bitrate with high quality
-
-    def _get_auto_preset(self, calc_preset: HdrForgeSpeedPreset) -> CodecPreset:
-        """Select optimal encoding preset based on resolution and parameter priority.
-
-        Priority:
-            1. nvenc_params.preset (from --encoder-params)
-            2. hw_preset.preset (from --hw-preset)
-
-        Returns:
-            HEVC_NVENC_Preset enum value
-        """
-        # Priority 1: nvenc_params from --encoder-params
-        nvenc_params = self._encoder_settings.nvenc_params
-        if nvenc_params.preset is not None:
-            return CodecPreset(
-                codec_libs=[self.lib],
-                codec_preset=nvenc_params.preset.value,
-                ffmpeg_params={},
-            )
-
-        # Priority 2: Auto-detection from hw_preset
-        return super()._get_auto_preset(calc_preset=calc_preset)
-
-    def _get_auto_cq(self, hw_preset: Hdr_Forge_HEVC_H264_NVENC_Preset) -> int:
-        """Calculate optimal CQ value based on parameter priority.
-
-        Priority:
-            1. nvenc_params.cq (from --encoder-params)
-            2. universal_params.quality (from --quality)
-            3. hw_preset.cq (auto-detection)
-
-        Returns:
-            CQ value (lower = higher quality)
-        """
-        # Priority 1: nvenc_params from --encoder-params
-        nvenc_params = self._encoder_settings.nvenc_params
-        if nvenc_params.cq is not None:
-            return nvenc_params.cq
-
-        # Priority 2: universal_params from --quality
-        universal_params = self._encoder_settings.universal_params
-        if universal_params.quality is not None:
-            return universal_params.quality
-
-        # Priority 3: Auto-detection from hw_preset
-        cq: float = hw_preset.cq
-        if self.is_hdr_encoding():
-            cq += 1.0  # 10-Bit HDR allows slightly higher CRF without quality loss
-
-        hdr_forge_preset: HdrForgeEncodingTuningPresets = self._encoder_settings.hdr_forge_encoding_preset.preset
-        action_crf: float = 2.0 if hdr_forge_preset == HdrForgeEncodingTuningPresets.ACTION else 0.0 # Action preset lowers CRF for better handling of fast motion
-        action_w = self._calculate_crf_adjustment_weight(
-            current_crf=cq,
-            crf_delta=action_crf,
-        )
-        cq -= action_crf * action_w
-
-        return round(cq)

@@ -100,20 +100,6 @@ class LibSvtAV1Codec(VideoCodecBase):
             content_light_level_metadata=max_cll,
         )
 
-    def _get_master_display_for_encoding(self) -> Optional[MasterDisplayMetadata]:
-        master_display: MasterDisplayMetadata | None = self._encoder_settings.hdr_metadata.mastering_display_metadata
-        if master_display is None:
-            master_display: MasterDisplayMetadata | None = self._video.get_master_display()
-
-        return master_display
-
-    def _get_max_cll_for_encoding(self) -> Optional[ContentLightLevelMetadata]:
-        encoder_max_cll: ContentLightLevelMetadata | None = self._encoder_settings.hdr_metadata.content_light_level_metadata
-        if encoder_max_cll is None:
-            encoder_max_cll = self._video.get_content_light_level_metadata()
-
-        return encoder_max_cll
-
     def _get_auto_preset(self, hw_preset: Hdr_Forge_AV1_Preset) -> int:
         """Select optimal encoding preset based on parameter priority.
 
