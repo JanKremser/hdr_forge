@@ -28,6 +28,17 @@ A powerful command-line tool for converting video files with intelligent HDR met
 
 All videos are converted with compression settings dynamically adjusted based on resolution and content type. Settings can be customized using various CLI parameters.
 
+## Demo
+
+### [Video Information](#video-information)
+![info command demo](assets/info.gif)
+
+### [Format Conversion: HDR10 → SDR](#format-conversion)
+![HDR10 to SDR conversion demo](assets/hdr10_to_sdr.gif)
+
+### [Dolby Vision: Profile 7 → Profile 8](#dolby-vision)
+![Dolby Vision Profile 7 to 8 conversion demo](assets/dv7_to_dv8.gif)
+
 ## Quick Start
 
 ```bash
