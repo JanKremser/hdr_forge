@@ -30,7 +30,7 @@ All videos are converted with compression settings dynamically adjusted based on
 
 ## Demo
 
-### [Video Information](#video-information)
+### [Show Video Information](#video-information)
 ![info command demo](assets/info.gif)
 
 ### [Format Conversion: HDR10 → SDR](#format-conversion)
