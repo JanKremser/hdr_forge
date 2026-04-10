@@ -558,6 +558,10 @@ class Encoder:
             # No subtitle edits needed for REMOVE mode
             return True
 
+        if subtitle_flags.mode == SubtitleMode.COPY and not overrides:
+            # No mkvpropedit needed: FFmpeg already copies subtitle tracks as-is
+            return True
+
         try:
             from hdr_forge.tools.mkvmerge import extract_container_info_json
             from hdr_forge.edit_files.subtitle_editor import build_subtitle_track_edits
