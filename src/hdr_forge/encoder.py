@@ -567,7 +567,7 @@ class Encoder:
             from hdr_forge.edit_files.subtitle_editor import build_subtitle_track_edits
 
             # Extract output file track information
-            output_info = extract_container_info_json(output_file)
+            output_info = extract_container_info_json(input_mkv_mp4_ts_file=output_file)
             output_subtitle_tracks = [
                 track for track in output_info.tracks if track.type.value.lower() == 'subtitles'
             ]
