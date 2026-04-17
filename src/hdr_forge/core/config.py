@@ -18,6 +18,7 @@ def _get_project_root():
 PROJECT_ROOT = _get_project_root()
 
 debug_mode: bool = False
+keep_temp: bool = False
 
 global_temp_dir: Path = Path(f"{PROJECT_ROOT}/.hdr_forge_temp")
 
@@ -67,6 +68,10 @@ def clear_global_temp_directory() -> None:
     Deletes the temp directory created by get_temp_directory().
     Handles errors gracefully and prints warnings if cleanup fails.
     """
+    if keep_temp:
+        print(f"Keeping temporary files at: {global_temp_dir}")
+        return
+
     import shutil
 
     temp_dir: Path = global_temp_dir

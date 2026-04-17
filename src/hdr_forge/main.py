@@ -366,6 +366,9 @@ def main() -> None:
     config.debug_mode = getattr(args, 'debug', False) or False
     if config.debug_mode:
         print_debug("Debug mode enabled")
+    config.keep_temp = getattr(args, 'keep_temp', False) or False
+    if config.keep_temp:
+        print_debug("Keep temp mode enabled")
 
     config.set_global_temp_directory(input_path_str=getattr(args, 'input', None), output_path_str=getattr(args, 'output', None))
 

@@ -503,3 +503,11 @@ Shutdown the system after conversion is complete.\n
 Enable debug output\n
 """
     )
+
+    convert_parser.add_argument(
+        '--keep-temp',
+        action='store_true',
+        help=f"""{expert_dot}
+Keep temporary files after conversion (useful for debugging)\n
+"""
+    )
